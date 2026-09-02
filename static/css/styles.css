@@ -1,0 +1,1018 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+  /* Use a nice, modern font */
+}
+
+#map {
+  height: 100%;
+  position: absolute;
+  top: 0;
+  /* Positioned below the header */
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* ============================================================================  */
+/* ============================================================================  */
+/* ============================================================================  */
+
+/* Header Bar Styling */
+#header-bar {
+  display: flex;
+  align-items: center;
+  /* Align items vertically */
+  justify-content: space-between;
+  /* Space between groups */
+  position: fixed;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  /* Adjust width */
+  height: 5.5%;
+  background-color: #756e6e;
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+  padding: 0.5%;
+  z-index: 1001;
+  border-radius: 10px 10px 0 0;
+}
+
+/* Logo Styling */
+#logo {
+  font-size: 40px;
+  font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+  font-weight: bold;
+  color: #4caf50;
+  text-shadow: 4px 2px 4px #303331;
+  margin-left: 10px;
+  text-decoration: none;
+  /* Remove underline */
+}
+
+#logo:hover {
+  color: #2ba732;
+  /* Change color on hover */
+}
+
+/* Input Container Styling */
+.input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Space between input and button */
+}
+
+#location-input {
+  padding: 5px;
+  width: 200px;
+}
+
+#location-button {
+  background: url("/static/images/enter_icon.png") no-repeat center center;
+  background-size: contain;
+  padding: 2% 8%;
+  font-size: 100%;
+  border-radius: 5px;
+  /* background-color: #4caf50; */
+  width: 40px;
+  height: 40px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  /* Smooth effect */
+}
+
+#location-button:hover {
+  transform: scale(1);
+  /* Slight zoom effect */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  /* Add shadow */
+  background-color: #3a9c3a00;
+  /* Optional: subtle color change */
+}
+
+#location-button:focus {
+  outline: none;
+  /* Optional: Removes focus outline */
+}
+
+/* Checkbox Container Styling */
+#checkbox-container {
+  display: flex;
+  gap: 20px;
+  /* Space between checkboxes */
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 100%;
+  color: white;
+  font-weight: bold;
+}
+
+#checkbox-container .icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
+#checkbox-container input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4caf50;
+  /* Set the checkbox color to green */
+  cursor: pointer;
+  /* Add a pointer cursor for better UX */
+}
+
+#checkbox-container input[type="checkbox"]:hover {
+  filter: brightness(1.2);
+  /* Slightly brighten the checkbox on hover */
+}
+
+/* Header Buttons Styling */
+.header-buttons {
+  display: flex;
+  gap: 10px;
+  margin-right: 20px;
+}
+
+.header-buttons button {
+  padding: 2% 8%;
+
+  font-size: 153%;
+  border-radius: 5px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  /* Smooth effect */
+  width: 300%;
+  margin-right: 5 px;
+}
+
+.header-buttons button:hover {
+  background-color: #3a9c3a;
+}
+
+/* Fancy Bar Styling */
+#fancy-bar-button {
+  position: absolute;
+  width: 80%;
+  top: 11.5%;
+  left: 10%;
+  right: 0;
+  height: 40px;
+  background-color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+  color: white;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  border-radius: 0 0 5px 5px;
+}
+
+#fancy-bar-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #fffdd0;
+}
+
+#fancy-bar-button span {
+  display: inline-block;
+  line-height: 40px;
+  font-size: 16px;
+}
+
+#select-message {
+  /* display: none; Start as hidden */
+  position: fixed;
+  /* Stick to the bottom of the page */
+  /* bottom: 10%; */
+  /* left: 0; */
+  width: 80%;
+  /* Full width */
+  text-align: center;
+  /* Center the text */
+  /* background-color: #a0cf9b; */
+  color: #47af47;
+  /* Dark red text */
+  font-size: 25px;
+  /* Large font */
+  font-weight: bold;
+  /*padding: 20px;  Padding around the text */
+  z-index: 1000;
+  /* Ensure it's on top of other elements */
+  pointer-events: none;
+  /* Ignore mouse events */
+}
+
+#select-message span {
+  font-size: 30px;
+  /* Increase font size */
+  font-weight: bold;
+  /* center */
+  text-align: center;
+  /* Center the text */
+  animation: wave 0.5s;
+  /* Infinite wave animation */
+  animation-delay: calc(var(--i) * 0.02s);
+  /* Delay for each letter */
+  color: #47af47;
+  /* Initial color */
+}
+
+@keyframes wave {
+
+  0%,
+  100% {
+    color: #eff5f0;
+    /* Initial and end color */
+  }
+
+  50% {
+    color: #51d155;
+    /* Middle color (wave color) */
+  }
+}
+
+/* Helper function to create spans for each letter */
+.split-text {
+  display: inline-block;
+  animation: wave 2s ease-in-out infinite;
+}
+
+/* ============================================================================  */
+
+/* Improved Graph Window Styling */
+#graph-container {
+  position: absolute;
+  top: 11%;
+  /* Positioned below the header bar */
+  left: 50%;
+  transform: translateX(-50%);
+  /* Center horizontally */
+  width: 80%;
+  /* Set the width to 80% of the screen */
+  background-color: #f9f9f9;
+  /* Light background */
+  border-radius: 0px 0px 10px 10px;
+  /* Rounded corners */
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+  /* Add shadow for depth */
+  border: 1px solid #ccc;
+  padding: 20px;
+  z-index: 1000;
+  display: block;
+  transition: opacity 1s ease, transform 1s ease;
+  /* Smooth transitions */
+}
+
+/* Hide with a transition */
+#graph-container.hidden {
+  opacity: 0;
+  transform: translateY(-50px);
+  /* Slide up effect on minimize */
+  display: none;
+}
+
+.graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* padding: 10px; */
+}
+
+/* ============================================================================  */
+.left-header {
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+}
+
+.left-header span {
+  /* margin-right: 2%; */
+  font-weight: bold;
+  /* margin-inline-end: auto; */
+  margin-bottom: 10px;
+}
+
+/* ============================================================================  */
+/* Container styling */
+.cs-dropdown {
+  display: flex;
+  /* flex-direction: column; */
+  /* align-items: flex-start; */
+  /* center items vertically and horizontally */
+  align-items: center;
+  font-family: "Poppins", sans-serif;
+  /* Use a nice, modern font */
+  /* margin: 0 0; */
+  width: 45%;
+  margin-bottom: 10px;
+}
+
+.cs-dropdown select {
+  width: 80%;
+  /* Full width */
+  height: 40px;
+  /* Set height to match the input field */
+  padding: 0px 20px;
+  font-size: 15px;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* Add some depth */
+  /* align on the left */
+  margin-left: 0px;
+  vertical-align: middle;
+}
+
+/* Select hover and focus styling */
+.cs-dropdown select:hover {
+  border-color: #7b61ff;
+  /* Change to a fancier color on hover */
+  background-color: #ffffff;
+  /* Lighten background on hover */
+}
+
+.cs-dropdown select:focus {
+  outline: none;
+  /* Remove default outline */
+  border-color: #9285d4;
+  /* Highlight border on focus */
+  box-shadow: 0 0 8px rgba(123, 97, 255, 0.5);
+  /* Fancy glow effect on focus */
+}
+
+/* Option styling (optional) */
+/* .cs-dropdown select option {
+  padding: 10px;
+  font-size: 16px;
+}
+
+#cs-id-dropdown {
+  right: 10px;
+  font-size: 14px;
+  width: 80%;
+  height: 30px; /* Fixed height for buttons */
+/* padding: 0; Remove padding to maintain fixed height */
+/* margin-inline-end: auto; */
+/* margin-left: 10px; */
+/* } */
+
+/* ============================================================================  */
+
+.right-header {
+  display: flex;
+  /* align-items: center; */
+  /* justify-content: flex-end; */
+  margin-left: auto;
+  font-size: 18px;
+}
+
+.right-header span {
+  margin-right: 10px;
+  font-weight: bold;
+  margin-inline-end: auto;
+  margin-bottom: 10px;
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 5px;
+  margin-right: 10px;
+  font-weight: bold;
+  letter-spacing: 0.75px;
+}
+
+/* ============================================================================  */
+
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 10px;
+  margin-right: 100px;
+  /* width: 100%; */
+}
+
+.tabs button {
+  flex: 1;
+  /* width: 40%; */
+  /* padding: 10px; */
+  width: 210px;
+  /* Fixed width for buttons */
+  height: 30px;
+  /* Fixed height for buttons */
+  padding: 0;
+  /* Remove padding to maintain fixed height */
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+  background: #e0e0e0;
+  font-weight: bold;
+  align-items: center;
+  margin-left: 5px;
+  transition: background-color 0.2s ease;
+
+  font-size: 18px;
+  color: #333;
+  /* margin-bottom: 5px;
+    margin-right: 10px; */
+  letter-spacing: 0.75px;
+  /* text-transform: uppercase; */
+}
+
+.tabs button.active {
+  background: green;
+  color: white;
+  border-radius: 10px;
+}
+
+.tabs button:hover {
+  background-color: #ccc;
+  /* Hover effect for tabs */
+}
+
+/* ============================================================================  */
+
+/* Bottom Section */
+.graph-bottom {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+/* ============================================================================  */
+/* Container styling */
+.strategy-dropdown {
+  display: flex;
+  /* flex-direction: column; */
+  /* align-items: flex-start; */
+  /* center items vertically and horizontally */
+  align-items: center;
+  font-family: "Poppins", sans-serif;
+  /* Use a nice, modern font */
+  /* margin: 0 0; */
+  width: 45%;
+  margin-bottom: 10px;
+  overflow: hidden;
+
+}
+
+/* Label styling */
+.strategy-dropdown label {
+  font-size: 15px;
+  color: #333;
+  margin-bottom: 0px;
+  margin-right: 20px;
+  font-weight: bold;
+  letter-spacing: 0.75px;
+  width: 20%;
+  align-items: right;
+  /* overflow: hidden; */
+  /* text-transform: uppercase; */
+}
+
+/* Select dropdown styling */
+.strategy-dropdown select {
+  width: 70%;
+  /* Full width */
+  height: 40px;
+  /* Set height to match the input field */
+  padding: 0px 20px;
+  font-size: 15px;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* Add some depth */
+  /* align on the left */
+  margin-left: 0px;
+  vertical-align: middle;
+}
+
+/* Select hover and focus styling */
+.strategy-dropdown select:hover {
+  border-color: #7b61ff;
+  /* Change to a fancier color on hover */
+  background-color: #ffffff;
+  /* Lighten background on hover */
+}
+
+.strategy-dropdown select:focus {
+  outline: none;
+  /* Remove default outline */
+  border-color: #9285d4;
+  /* Highlight border on focus */
+  box-shadow: 0 0 8px rgba(123, 97, 255, 0.5);
+  /* Fancy glow effect on focus */
+}
+
+/* Option styling (optional) */
+.strategy-dropdown select option {
+  padding: 10px;
+  font-size: 16px;
+}
+
+/* ============================================================================  */
+
+.graph-actions button {
+  width: 250px;
+  /* Adjust width to make it visually appealing */
+  height: 40px;
+  /* Set height to match the input field */
+  padding: 10px 15px;
+  margin-left: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #4caf50;
+  color: white;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+  font-size: 16px;
+}
+
+.graph-actions button:hover {
+  background-color: #2ba732;
+}
+
+/* ============================================================================  */
+
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+/* Download and Print buttons styling */
+.actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background-color: #4caf50;
+  color: white;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+.actions button:hover {
+  background-color: #45a049;
+  /* Hover effect */
+}
+
+/* Hidden class to hide elements */
+.hidden {
+  display: none;
+}
+
+.minimize-btn {
+  position: absolute;
+  top: 2.65%;
+  right: 10px;
+  height: 30px;
+  background-color: #cc6464;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 5px 25px;
+  font-size: 16px;
+  border-radius: 5px;
+  transition: background-color 0.2s ease;
+  /* display: flex; */
+  align-items: center;
+  /* justify-content: space-around; */
+  margin-left: 10px;
+  /* margin-bottom: 20px; */
+}
+
+.minimize-btn:hover {
+  background-color: #ff4d4d;
+  /* Darker red on hover */
+}
+
+.hidden {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------------- */
+
+#toggle-graph-btn {
+  padding: 5px 10px;
+  background-color: #ccc;
+  border: none;
+  cursor: pointer;
+}
+
+.autocomplete-suggestions {
+  position: absolute;
+  top: 100%;
+  /* Moves the suggestions below the input */
+  left: 0;
+  border: 1px solid #ccc;
+  background-color: white;
+  z-index: 1000;
+  max-height: 150px;
+  overflow-y: auto;
+  width: calc(100% - 90px);
+  margin-top: 5px;
+  display: none;
+}
+
+.autocomplete-suggestion {
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #ddd;
+}
+
+.autocomplete-suggestion:hover {
+  background-color: #f0f0f0;
+}
+
+/* --------------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------------- */
+
+.shape-label {
+  font-size: 34px;
+  font-weight: bold;
+  color: #000000;
+  /* Green text */
+  background-color: transparent;
+  /* Transparent background */
+  /* padding: 2px 5px; */
+  /* border: 1px solid #ddd; */
+  /* border-radius: 3px; */
+  white-space: nowrap;
+  pointer-events: none;
+  /* Prevent mouse interactions */
+  text-align: center;
+  z-index: 1000;
+  /* Ensure it's on top of other elements */
+}
+
+/* --------------------------------------------------------------------------------- */
+
+.toggle-container {
+  position: float;
+  width: 240px;
+  height: 30px;
+  /* Fixed height for buttons */
+  padding: 0;
+  /* Remove padding to maintain fixed height */
+  margin-bottom: 10px;
+
+  margin-right: 10px;
+  /* margin: 100px auto; */
+}
+
+.toggle-checkbox {
+  display: none;
+}
+
+.toggle-label {
+  display: block;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid #4caf50;
+  border-radius: 5px;
+  position: relative;
+  background-color: #fff;
+  transition: border-color 0.3s ease-in-out;
+}
+
+.toggle-inner {
+  display: flex;
+  width: 200%;
+  transition: margin-left 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.toggle-option {
+  width: 50%;
+  text-align: center;
+  line-height: 30px;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 15px;
+  /* overflow-wrap: break-word;
+  word-break: break-all; */
+}
+
+.toggle-option:first-child {
+  background-color: #4caf50;
+  /* Charger option background */
+}
+
+.toggle-option:last-child {
+  background-color: #43721c;
+  /* Grid option background */
+}
+
+.toggle-switch {
+  width: 20%;
+  background: #756e6e;
+  border-radius: 5px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 80%;
+  transition: all 0.3s ease-in-out;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-checkbox:checked+.toggle-label .toggle-inner {
+  margin-left: -100%;
+}
+
+.toggle-checkbox:checked+.toggle-label .toggle-switch {
+  right: 0%;
+}
+
+.toggle-checkbox:checked+.toggle-label {
+  border-color: #43721c;
+}
+
+/* --------------------------------------------------------------------------------- */
+
+.custom-attribution {
+  position: fixed;
+  bottom: 0px;
+  left: 0px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 5px;
+  font-size: 12px;
+  border-radius: 3px;
+  z-index: 1000;
+  /* Ensure it appears above other elements */
+}
+
+.custom-attribution img {
+  vertical-align: middle;
+  height: 16px;
+  margin-right: 5px;
+}
+
+.custom-attribution a {
+  color: #0078a8;
+  text-decoration: none;
+}
+
+.custom-attribution a:hover {
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------------- */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f9f9f9;
+}
+
+#graph {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  /* Two columns */
+  gap: 20px;
+  /* Space between grid items */
+  margin: 20px;
+}
+
+.table-wrapper {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+  margin-right: 5%;
+  margin-left: 5%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+caption {
+  caption-side: top;
+  text-align: center;
+  font-weight: bold;
+  margin: 10px 0;
+  font-size: 18px;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: center;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 800px) {
+  #tables-container {
+    grid-template-columns: 1fr;
+    /* Single column on smaller screens */
+  }
+}
+
+/* --------------------------------------------------------------------------------- */
+/* Container for the help icon and popup */
+
+/* Help Icon Span */
+.help-icon {
+  display: inline-flex;
+  /* Use Flexbox for centering */
+  align-items: center;
+  /* Vertically center the image */
+  justify-content: center;
+  /* Horizontally center the image */
+  width: 16px;
+  /* Ensure span has consistent dimensions */
+  height: 16px;
+  vertical-align: middle;
+  /* Align with text line */
+  margin-left: -5px;
+  /* Add spacing to the right of the icon */
+}
+
+/* Help Icon Image */
+.help-icon img {
+  max-width: 200%;
+  /* Ensure the image fits within the span */
+  max-height: 200%;
+  display: block;
+  /* Prevent extra spacing below the image */
+  transition: transform 0.3s, opacity 0.3s;
+  /* Smooth hover effect */
+}
+
+/* Hover Effect */
+.help-icon:hover img {
+  transform: scale(1.2);
+  /* Slightly enlarge the image */
+  opacity: 0.8;
+  /* Reduce opacity */
+}
+
+/* ########################################################################################### */
+/* ########################################################################################### */
+/* ########################################################################################### */
+
+/* Toolbar block aligns with header height */
+.draw-toolbar-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
+  margin-right: 20px;
+}
+.draw-toolbar h5 {
+  margin: 0 15px 0 5px;
+  font-size: 16px;
+  /* align text right */
+  text-align: right;
+  color: #eaf4ee;
+  /* font-weight: bold; */
+}
+
+/* Button sizing matches compact header controls */
+.draw-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.draw-btn {
+  inline-size: 32px;
+  /* width */
+  block-size: 32px;
+  /* height */
+  padding: 1%;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: rgba(255, 255, 255, .10);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background-color: #4caf50;
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+
+.draw-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, .18);
+  border-color: rgba(255, 255, 255, .35);
+}
+
+.draw-btn.active {
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, .45) inset;
+  border-color: rgba(76, 175, 80, .65);
+}
+
+.draw-btn .icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Make SVG match header icon color */
+.draw-btn .icon path,
+.draw-btn .icon rect,
+.draw-btn .icon circle {
+  stroke: #e9f8eb;
+  fill: none;
+}
+
+.draw-btn .icon circle {
+  fill: #e9f8eb;
+  stroke: none;
+  opacity: .95;
+}
+
+/* Place the hint directly under the buttons (optional) */
+.draw-hint[hidden] {
+  display: none !important;
+}
+
+.draw-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  max-width: 360px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: #eaf4ee;
+  background: rgba(15, 17, 19, .85);
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+  z-index: 1500;
+  pointer-events: none;
+}
+
+.draw-hint::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 14px;
+  border-width: 0 6px 6px 6px;
+  border-style: solid;
+  border-color: transparent transparent rgba(15, 17, 19, .85) transparent;
+}
+
+
+/* Hide built-in Leaflet.draw toolbars everywhere */
+.leaflet-draw.leaflet-control,
+.leaflet-draw-toolbar,
+.leaflet-control-container .leaflet-draw {
+  display: none !important;
+}
+
+/*  */
+
+/* Clickable header text for opening the landing modal (looks like plain text)
+   - keeps keyboard accessibility via role and tabindex
+   - subdued appearance so it doesn't stand out as a button */
+.open-landing-text,
+#open-landing {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: bold !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 8px !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.open-landing-text:focus {
+  outline: 2px solid rgba(255,255,255,0.12);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.open-landing-text:hover {
+  color: rgba(255,255,255,1) !important;
+}

@@ -1,0 +1,15 @@
+polars
+geopandas
+folium
+flask
+pyarrow
+sqlalchemy
+geoalchemy2
+Flask-SQLAlchemy-Lite
+Flask-Alembic
+alembic
+geojson
+pyyaml
+geojson
+scipy
+requests

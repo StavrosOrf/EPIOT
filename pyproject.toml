@@ -1,0 +1,65 @@
+[project]
+name = "epiot"
+version = "0.1.0"
+description = "EPIOT - Drive2X WP5: short-term load forecasting for charge point operators and grid operators"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "BSD-3-Clause" }
+authors = [
+    { name = "Babak Ravanbach" },
+    { name = "Stavros Orfanoudakis" },
+    { name = "Arellano Ruiz, Eugenio Salvador" },
+]
+
+dependencies = [
+    # Web application
+    "flask",
+    "flask-alembic",
+    "flask-sqlalchemy-lite",
+    # Database / ORM
+    "alembic",
+    "sqlalchemy",
+    "geoalchemy2",
+    # Geospatial
+    "geopandas",
+    "shapely",
+    "geojson",
+    "folium",
+    # Data handling
+    "numpy",
+    "pandas",
+    "polars",
+    "pyarrow",
+    "scipy",
+    # Misc
+    "pyyaml",
+    "requests",
+    # Only used by scripts/install_spatialite.py to unpack the official
+    # mod_spatialite bundle, which is distributed as a .7z archive.
+    "py7zr; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+# Load forecasting models in backend/ml. Kept separate because torch is a
+# large download and the Flask app runs without it.
+ml = [
+    "torch",
+    "scikit-learn",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.uv]
+# The repository is an application, not an installable library: uv only has to
+# manage the environment, not build and install ./backend into it.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# OneDrive-synced checkouts deny the directory swap pytest uses to write its
+# cache, so keep the cache out of the working tree.
+addopts = "-p no:cacheprovider"

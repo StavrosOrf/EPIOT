@@ -1,0 +1,60 @@
+/* Center the container */
+.datepicker-container {
+    display: flex;
+    /* max-width: 40%; */
+    /* margin: 50px auto; */
+    text-align: center;
+    font-family: "Poppins", sans-serif;
+    width: 45%;
+    margin-bottom: 10px;
+    align-items: center;
+    margin-left: 30px;
+    
+
+  }
+  
+  /* Style the input field */
+  .datepicker-input {
+    width: 52%;
+    /* padding: 10px 15px; */
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    outline: none;
+    height: 40px; /* Set height to match the input field */
+    padding: 0px 20px;
+
+    font-size: 15px;
+    /* border: 2px solid #ccc;
+    border-radius: 8px; */
+    background-color: #f9f9f9;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Add some depth */
+    /* align on the left */
+    margin-left: 0px;
+    vertical-align: middle;
+  }
+
+  /* Label styling */
+.datepicker-container label {
+    font-size: 15px;
+    color: #333;
+    margin-bottom: 0px;
+    margin-right: 20px;
+    font-weight: bold;
+    letter-spacing: 0.75px;
+    width: 30%;
+    align-items: right;
+    /* overflow: hidden; */
+    /* text-transform: uppercase; */
+  }
+  
+  /* Focus style for the input */
+  .datepicker-input:focus {
+    border-color: #007BFF;
+    box-shadow: 0 0 4px rgba(0, 123, 255, 0.5);
+  }
+  

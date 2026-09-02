@@ -1,0 +1,1 @@
+curl -H "Content-Type: application/json"  -d "{\"type\": \"Polygon\", \"coordinates\": [[[4.801712, 52.345408],[4.801712, 52.367215], [4.864883, 52.367215],[4.864883, 52.345408], [4.801712, 52.345408]]], \"crs\": { \"type\": \"name\", \"properties\": {\"name\": \"urn:ogc:def:crs:EPSG::4326\"}}}" -X POST http://127.0.0.1:5000/stations/within

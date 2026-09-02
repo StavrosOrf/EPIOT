@@ -1,0 +1,263 @@
+#-*- coding:utf-8 -*-
+# __license__ = "BSD-3-Clause"
+
+# Number of session probabilities calculated based on ElaadNL historical data
+session_probabilities:
+    1: 0.5717016003696391
+    2: 0.2651671077134176
+    3: 0.10165777572422677
+    4: 0.03740496492628219
+    5: 0.014120496772657901
+    6: 0.005502583273827025
+    7: 0.0023522493384298734
+    8: 0.0010081068593270886
+    9: 0.00045504823511292197
+    10: 0.00034303636185435655
+    11: 0.00017501855196650845
+    12: 6.300667870794304e-05
+    13: 2.1002226235981016e-05
+    14: 2.1002226235981016e-05
+    15: 7.000742078660338e-06
+
+# Energy demand distributions according to the hour of the weekday/weekend based on ElaadNL data
+charging_demand_distributions:
+    weekday_0_hour_0:
+        distribution: gamma
+        shape: 2.156022273433067
+        loc: 0
+        scale: 16.303558173116322
+    weekday_0_hour_1:
+        distribution: gamma
+        shape: 3.021188667245895
+        loc: 0
+        scale: 11.021397069050463
+    weekday_0_hour_2:
+        distribution: gamma
+        shape: 1.8841738675066482
+        loc: 0
+        scale: 20.517949323683585
+    weekday_0_hour_3:
+        distribution: gamma
+        shape: 2.2320710117306204
+        loc: 0
+        scale: 11.301422116129427
+    weekday_0_hour_4:
+        distribution: gamma
+        shape: 1.5556936924131894
+        loc: 0
+        scale: 14.151683819287713
+    weekday_0_hour_5:
+        distribution: gamma
+        shape: 1.4479238882193899
+        loc: 0
+        scale: 12.45504667600114
+    weekday_0_hour_6:
+        distribution: gamma
+        shape: 1.4468040893146683
+        loc: 0
+        scale: 13.128905983368147
+    weekday_0_hour_7:
+        distribution: gamma
+        shape: 1.4444082639185087
+        loc: 0
+        scale: 13.739915020255838
+    weekday_0_hour_8:
+        distribution: gamma
+        shape: 1.4473797447637233
+        loc: 0
+        scale: 13.282648056432116
+    weekday_0_hour_9:
+        distribution: gamma
+        shape: 1.3822777193930396
+        loc: 0
+        scale: 13.407714383066063
+    weekday_0_hour_10:
+        distribution: gamma
+        shape: 1.2412161061423488
+        loc: 0
+        scale: 15.790488921111029
+    weekday_0_hour_11:
+        distribution: gamma
+        shape: 1.4159874496698963
+        loc: 0
+        scale: 13.948009065909636
+    weekday_0_hour_12:
+        distribution: gamma
+        shape: 1.2554892009979797
+        loc: 0
+        scale: 15.418021739378394
+    weekday_0_hour_13:
+        distribution: gamma
+        shape: 1.3521670714154914
+        loc: 0
+        scale: 15.461058605244656
+    weekday_0_hour_14:
+        distribution: gamma
+        shape: 1.3955826599967915
+        loc: 0
+        scale: 17.060259045339908
+    weekday_0_hour_15:
+        distribution: gamma
+        shape: 1.4550925541250543
+        loc: 0
+        scale: 16.999275437677685
+    weekday_0_hour_16:
+        distribution: gamma
+        shape: 1.5149292827374676
+        loc: 0
+        scale: 16.54474746603394
+    weekday_0_hour_17:
+        distribution: gamma
+        shape: 1.6038231532739768
+        loc: 0
+        scale: 16.567532120906034
+    weekday_0_hour_18:
+        distribution: gamma
+        shape: 1.572468407575956
+        loc: 0
+        scale: 17.62503463481101
+    weekday_0_hour_19:
+        distribution: gamma
+        shape: 1.7880290257276328
+        loc: 0
+        scale: 15.45514885849592
+    weekday_0_hour_20:
+        distribution: gamma
+        shape: 1.7906340874615592
+        loc: 0
+        scale: 15.903529410956322
+    weekday_0_hour_21:
+        distribution: gamma
+        shape: 1.8293618944651429
+        loc: 0
+        scale: 15.815206767297171
+    weekday_0_hour_22:
+        distribution: gamma
+        shape: 1.9169149435778636
+        loc: 0
+        scale: 14.28318098199279
+    weekday_0_hour_23:
+        distribution: gamma
+        shape: 2.1776681459255194
+        loc: 0
+        scale: 15.371473854782876
+    weekday_1_hour_0:
+        distribution: gamma
+        shape: 2.020507057485642
+        loc: 0
+        scale: 13.43289034804956
+    weekday_1_hour_1:
+        distribution: gamma
+        shape: 3.286442498614551
+        loc: 0
+        scale: 8.929187384530413
+    weekday_1_hour_2:
+        distribution: gamma
+        shape: 2.1477717156820906
+        loc: 0
+        scale: 14.436607021820747
+    weekday_1_hour_3:
+        distribution: gamma
+        shape: 2.34485443435953
+        loc: 0
+        scale: 5.9241453561157265
+    weekday_1_hour_4:
+        distribution: gamma
+        shape: 2.151430187061828
+        loc: 0
+        scale: 6.001504874469156
+    weekday_1_hour_5:
+        distribution: gamma
+        shape: 1.7584664985749858
+        loc: 0
+        scale: 7.9633371092680445
+    weekday_1_hour_6:
+        distribution: gamma
+        shape: 1.6873581933304342
+        loc: 0
+        scale: 8.755826372457934
+    weekday_1_hour_7:
+        distribution: gamma
+        shape: 1.7157766965867867
+        loc: 0
+        scale: 9.007661102189527
+    weekday_1_hour_8:
+        distribution: gamma
+        shape: 1.4702007711047307
+        loc: 0
+        scale: 11.382534683786886
+    weekday_1_hour_9:
+        distribution: gamma
+        shape: 1.3879510820865437
+        loc: 0
+        scale: 11.663963663711161
+    weekday_1_hour_10:
+        distribution: gamma
+        shape: 1.30740028915987
+        loc: 0
+        scale: 12.99612940975267
+    weekday_1_hour_11:
+        distribution: gamma
+        shape: 1.451601545989083
+        loc: 0
+        scale: 11.046028472063213
+    weekday_1_hour_12:
+        distribution: gamma
+        shape: 1.2741466516404665
+        loc: 0
+        scale: 14.600789776677464
+    weekday_1_hour_13:
+        distribution: gamma
+        shape: 1.3039396777856367
+        loc: 0
+        scale: 16.662149269335632
+    weekday_1_hour_14:
+        distribution: gamma
+        shape: 1.417749560341716
+        loc: 0
+        scale: 15.709871961605167
+    weekday_1_hour_15:
+        distribution: gamma
+        shape: 1.4007603174910637
+        loc: 0
+        scale: 15.385331545025364
+    weekday_1_hour_16:
+        distribution: gamma
+        shape: 1.4653057624417414
+        loc: 0
+        scale: 15.331185116680087
+    weekday_1_hour_17:
+        distribution: gamma
+        shape: 1.577352671019718
+        loc: 0
+        scale: 15.128780254036583
+    weekday_1_hour_18:
+        distribution: gamma
+        shape: 1.5767514046188686
+        loc: 0
+        scale: 16.087879086071876
+    weekday_1_hour_19:
+        distribution: gamma
+        shape: 1.6821383425600958
+        loc: 0
+        scale: 15.337496446649126
+    weekday_1_hour_20:
+        distribution: gamma
+        shape: 1.9136005840197203
+        loc: 0
+        scale: 14.386253754022633
+    weekday_1_hour_21:
+        distribution: gamma
+        shape: 1.9247338902744924
+        loc: 0
+        scale: 14.673260591011275
+    weekday_1_hour_22:
+        distribution: gamma
+        shape: 1.8021657892745349
+        loc: 0
+        scale: 15.375423086831203
+    weekday_1_hour_23:
+        distribution: gamma
+        shape: 2.337053433831598
+        loc: 0
+        scale: 13.174983015211454
