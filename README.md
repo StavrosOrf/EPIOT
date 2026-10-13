@@ -7,69 +7,120 @@ the following:
 The tool is supposed to be easily accessible and to provide a range of interfaces for researchers and developpers.
 
 
-## Running Instructions
+## Environment setup
 
-Initialize conda environment and install the dependencies.
+The project is managed with [uv](https://docs.astral.sh/uv/); `pyproject.toml`
+and `uv.lock` are the source of truth, and `requirements.txt` is kept only for
+the legacy conda instructions below.
+
 ```
-#create a conda environment
-conda create -n epiot python=3.9
-conda activate epiot
+uv sync
 ```
+
+That creates `.venv` from the lockfile. Run everything through `uv run`, which
+uses that environment without needing to activate it:
+
+```
+uv run python app.py
+uv run pytest
+```
+
+The load-forecasting models in `backend/ml` need PyTorch, which the Flask app
+does not. They live behind an optional extra:
+
+```
+uv sync --extra ml
+```
+
+### OneDrive checkouts
+
+This repository is often cloned inside a OneDrive-synced folder. OneDrive locks
+files while it uploads them, which makes `uv sync` fail part-way through with
+`os error 396` or `os error 32`. Two things avoid that:
+
+- `link-mode = "copy"` is set in `pyproject.toml`, because OneDrive rejects the
+  hardlinks uv normally uses.
+- Keep the virtualenv outside the synced tree. Create the real directory
+  elsewhere and point `.venv` at it with a junction, which OneDrive does not
+  follow:
+
+  ```
+  mkdir %USERPROFILE%\.venvs\EPIOT_v2
+  mklink /J .venv %USERPROFILE%\.venvs\EPIOT_v2
+  ```
+
+  Run that before the first `uv sync`. Everything else, `uv run` included,
+  keeps working through the junction.
 
 ## Setting up the database
-#To set up the database for the first time you need to install the requirements and make #spatialite available in your system. Conda is the fastest way to do this on windows. 
+
+### SpatiaLite
+
+The app stores geometry in SQLite and needs the `mod_spatialite` extension.
+GeoAlchemy2 finds it through `SPATIALITE_LIBRARY_PATH`; `backend/spatialite.py`
+sets that automatically, and an existing value is always respected if you want
+to point at a system copy instead.
+
+On Windows there is no system package, so fetch the official prebuilt bundle
+into `./.spatialite` once:
 
 ```
-conda install libspatialite -c conda-forge
+uv run python scripts/install_spatialite.py
 ```
 
-##### Install the dependencies
-```
-pip install -r requirements.txt
-```
+On Ubuntu:
 
-##### If having trouble with the installation of libspatialite, try the following:
-
-https://docs.djangoproject.com/en/5.1/ref/contrib/gis/install/spatialite/
-
-###### For windows:
-- Download the latest version of SpatiaLite from https://www.gaia-gis.it/gaia-sins/
-- Unzip the file and copy the contents of the zip file to the folder where you want to install SpatiaLite. (I copied the contents to the source folder of my conda environment)
-
-###### For Ubuntu:
 ```
 sudo apt-get install libsqlite3-mod-spatialite
-export SPATIALITE_LIBRARY_PATH=mod_spatialite.so
-source ~/.bashrc
 ```
 
+On macOS:
 
-##### Once this is achieved you can first run two times:
 ```
-flask db upgrade
+brew install libspatialite
 ```
 
+### Data and migrations
 
+Make sure the database files are in the **./data** folder:
 
-
-
-##### Make sure you have the database files in the **./data** folder
 - chargers_data_ams.json
 - liander_elektriciteitsnetten.gpkg
 - wijkenbuurten_2022_v2_amsterdam.gpkg
 
-##### The first time it is run initiazes the database
+Apply the migrations, then populate the database on first run:
+
+```
+uv run flask --app app db upgrade
+uv run python database_init.py
 ```
 
-python database_init.py
+## Running the app
+
+```
+uv run python app.py
 ```
 
-##### To run the Flask app
+The app serves on http://127.0.0.1:5000.
+
+Note that the `ocost` (cost-optimal) charging strategy calls the ReFlex service
+at `drive2x-reflex.hesi.energy`, which is only reachable from the project
+network. The other strategies (`afap`, `alap`, `avg`) run entirely locally.
+
+## Legacy conda setup
+
+The project previously used conda. These instructions are kept for reference;
+prefer `uv sync` above.
+
 ```
-python app.py
+conda create -n epiot python=3.11
+conda activate epiot
+conda install libspatialite -c conda-forge
+pip install -r requirements.txt
 ```
 
-
+If you have trouble installing libspatialite, see
+https://docs.djangoproject.com/en/5.1/ref/contrib/gis/install/spatialite/
 
 The current development team consists of:
 

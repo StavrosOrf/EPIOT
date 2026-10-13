@@ -56,6 +56,10 @@ dev = [
 # The repository is an application, not an installable library: uv only has to
 # manage the environment, not build and install ./backend into it.
 package = false
+# OneDrive-synced checkouts reject the hardlinks uv uses to populate .venv from
+# its cache ("cannot be performed on a file with incompatible hardlinks",
+# os error 396), so copy the files in instead.
+link-mode = "copy"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

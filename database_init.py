@@ -5,6 +5,7 @@ from flask_sqlalchemy_lite import SQLAlchemy
 from sqlalchemy import event
 
 from geoalchemy2 import load_spatialite
+from backend.spatialite import configure_spatialite
 from backend.loaders import (
     load_ams_data,
     load_transformer_data,
@@ -25,21 +26,10 @@ from backend.api_calls.env_data_api import (
     load_electricity_data_for_supported_countries
 )
 
-import os
-from sys import platform
 from getpass import getpass
 from sqlalchemy import select
 
-if os.environ.get("SPATIALITE_LIBRARY_PATH") is None:
-
-    if platform == "linux" or platform == "linux2":
-        os.environ["SPATIALITE_LIBRARY_PATH"] = "mod_spatialite.so"
-    elif platform == "darwin":
-        os.environ["SPATIALITE_LIBRARY_PATH"] = "mod_spatialite.dylib"
-    elif platform == "win32":
-        os.environ["SPATIALITE_LIBRARY_PATH"] = "mod_spatialite"
-    else:
-        raise EnvironmentError("Unsupported platform")
+configure_spatialite()
 
 app = Flask(__name__)
 alembic = Alembic(metadatas=Model.metadata)

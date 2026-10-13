@@ -1,0 +1,478 @@
+openapi: 3.0.3
+
+info:
+  title: ReFlex Insights API
+  description: >-
+    REST API to start a optimization for energy flexibility of device models in ReFlex. Those devices will typically offer energy flexibility that will be optimized against the optimization target that the user of the API provides.
+    Currently are supported devices:
+
+    - EV charging points, both uni-directional and bi-directional (V2X)
+
+    - Fixed energy profile device, i.e. devices that are not flexible at all
+  version: 0.3.0
+
+servers:
+  - url: https://drive2x-reflex.hesi.energy/api/v1
+
+paths:
+  /run/single:
+    post:
+      operationId: postSingleRun
+      requestBody:
+          $ref: '#/components/requestBodies/StartSingleRun'
+      responses:
+        '200':
+          $ref: '#/components/responses/RunStartedResponse'
+        '400':
+          description: Bad Request
+        '500':
+          description: Internal server error
+  /run/repeated:
+    post:
+      operationId: postRepeatedRun
+      requestBody:
+          $ref: '#/components/requestBodies/StartRepeatedRun'
+      responses:
+        '200':
+          $ref: '#/components/responses/RunStartedResponse'
+        '400':
+          description: Bad Request
+        '500':
+          description: Internal server error
+  /run/multiple:
+    post:
+      operationId: postMultipleRun
+      requestBody:
+          $ref: '#/components/requestBodies/StartMultipleRun'
+      responses:
+        '200':
+          $ref: '#/components/responses/RunStartedResponse'
+        '400':
+          description: Bad Request
+        '500':
+          description: Internal server error
+  /run/info:
+    get:
+      operationId: getRunInfo
+      description: Receive run info for all runs
+      responses:
+        '200':  
+          description: Information about all runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/runInfo'
+  /run/info/{id}:
+    get:
+      operationId: getRunInfoPerId
+      description: Receive run info for run with 'id'.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: UUID
+      responses:
+        '200':
+           $ref: '#/components/responses/RunInfoResponse'
+        '404':
+          description: Not Found
+  /run/results/{id}:
+    get:
+      operationId: getRunResultsPerId
+      description: Receive result of run with 'id'.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: UUID
+      responses:
+        '200':
+          $ref: '#/components/responses/RunResultResponse'
+        '404':
+          description: Not Found
+  /run/{id}:
+    delete:
+      operationId: deleteRun
+      description: Delete results of run with 'id' or cancel run when it is running/submitted.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: UUID
+      responses:
+        '202':
+          description: Deleted
+        '404':
+          description: Not Found
+
+components:
+  schemas:
+    targetProfile:
+      description: A fixed time step, consecutive profile with optimization target values.
+      type: object
+      required: 
+        - start
+        - timeStepDuration
+        - elements
+      properties:
+        start:
+          type: string
+          format: date-time
+          example: 2024-09-26T00:00:00Z
+        timeStepDuration:
+          type: string
+          format: duration
+          description: ISO 8601 duration
+          example: PT15M
+        elements:
+          type: array
+          items:
+            type: object
+            title: targetProfileElement
+            description: >- 
+              Energy target element in Joule, price target element or noTarget target element.
+              The following rules must be respected:
+
+              - Energy target element may be followed by all target element types.
+
+              - Price target elements may not be followed by an energy target element.
+
+              - noTarget target elements may not be followed by energy or price target elements.
+              
+              In case of noTarget element the value is ignored.
+            properties:
+              targetType:
+                type: string
+                enum:
+                  - energy
+                  - price
+                  - noTarget
+                example: price
+              value:
+                type: number  
+            example: 
+              - type: price 
+                value: 0.5
+              - type: price 
+                value: 0.3
+              - type: price 
+                value: 0.35
+
+    integerProfile:
+      description: A generic fixed time step, consecutive profile with signed 64-bit values.
+      type: object
+      required:
+        - start
+        - timeStepDuration
+        - elements
+      properties:
+        start:
+          type: string
+          format: date-time
+          example: 2024-09-26T00:00:00Z
+        timeStepDuration:
+          type: string
+          format: duration
+          description: ISO 8601 duration
+          example: PT15M
+        elements:
+          type: array
+          items:
+            type: integer
+            format: int64
+    
+    nonFlexibleAsset:
+      type: object
+      description: Energy consuming and/or producing device with a fixed energy profile
+      required:
+        - id
+        - energyProfile
+      properties:
+        id:
+          type: string
+          example: "nonflex-0001"
+        energyProfile:
+          description: Energy consumption profile (Joule) of the device. Production is negative.
+          allOf:
+            - $ref: '#/components/schemas/integerProfile'
+          example:
+            start: 2024-09-26T00:00:00Z
+            timeStepDuration: PT1H
+            values:
+              - 3600000
+              - 5400000
+              - 7200000
+    
+    evChargePoint:
+      type: object
+      required:
+        - id
+        - maxChargePower
+        - chargeSessions
+      properties:
+        id:
+          type: string
+          example: "charge-point-0001"
+        minChargePower:
+          type: number
+          default: 0
+          example: 1000
+          description: Minimum charge power in Watt of the EV charge point
+        maxChargePower:
+          type: number
+          example: 11000
+          description: Maximum charge power in Watt of the EV charge point
+        minDischargePower:
+          type: number
+          default: 0
+          example: 1000
+          description: In case the charge point and the EV supports V2X, the minimum discharge power in Watt. Omit this property if the charge point does not support V2X.
+        maxDischargePower:
+          type: number
+          example: 11000
+          description: In case the charge point and the EV supports V2X, the maximum discharge power in Watt. Omit this property if the charge point does not support V2X.
+        chargeSessions:
+          type: array
+          items:
+            title: chargeSession
+            type: object
+            description: Charge Session
+            required:
+              - startTime
+              - endTime
+              - energyToCharge          
+            properties:
+              evId:
+                type: string
+                example: "ACME-00001"
+              startTime:
+                type: string
+                format: date-time
+                example: 2024-09-26T00:00:00Z
+              endTime:
+                type: string
+                format: date-time
+                example: 2024-09-26T03:00:00Z
+              energyToCharge:
+                description: The maximum amount of energy in Joule to charge in the session (until the battery is full or the end time is reached).
+                type: number
+                example: 360000000
+              minEnergyToCharge:
+                description: In case of V2X, this parameter provides the minimum amount of energy in Joule that will have been charged at the end of the session. Can be negative if the SoC is allowed to be lower than at the start of the session (be careful to not go below the empty battery). Omit this property if the charge point does not support V2X.
+                type: number
+                example: 180000000
+              minEnergyDuringCharging:
+                description: In case of V2X, this parameter provides the minimum amount of energy in Joule to charge during the session. Can be negative if the SoC is allowed to be lower than at the start of the session (be careful to not go below the empty battery). Omit this property if the charge point does not support V2X.
+                type: number
+                example: 180000000
+    
+    congestionPoint:
+      type: object
+      description: Congestion Point
+      required:
+        - id
+        - assets
+      properties:
+        id:
+          type: string
+          example: EAN-8716948000003
+        assets:
+          type: array
+          description: Identifiers of the assets under this congestion point
+          items:
+            type: string
+          example: 
+            - ev-0001
+            - nonflex-0001
+        lowerLimits:
+          description: >-
+            Profile with consecutive values for congestion point lower limits in Joule. Does not need to span the full simulation window. The start time must be aligned to the time steps in the global target and the timeStepDurations must be the same.
+          allOf:
+            - $ref: '#/components/schemas/integerProfile'
+          example:
+            start: 2024-09-26T00:00:00Z
+            timeStepDuration: PT15M
+            elements:
+              - -36000000
+              - -36000000
+              - -36000000
+        upperLimits:
+          description: >-
+            Profile with consecutive values for congestion point upper limits in Joule. Does not need to span the full simulation window. The start time must be aligned to the time steps in the global target and the timeStepDurations must be the same.
+          allOf:
+            - $ref: '#/components/schemas/integerProfile'
+          example:
+            start: 2024-09-26T00:00:00Z
+            timeStepDuration: PT15M
+            elements:
+              - 36000000
+              - 36000000
+              - 36000000
+    
+    runConfigBase:
+      description: the base for all input configurations
+      required:
+        - runType
+        - globalTarget
+        - assets
+      properties:
+        runType:
+          type: string
+          example: singleRunConfig
+        congestionPoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/congestionPoint'
+        globalTarget:
+          $ref: '#/components/schemas/targetProfile'
+        assets:
+          title: assets
+          properties:
+            evChargePoints:
+              type: array
+              items:
+                $ref: '#/components/schemas/evChargePoint'
+            nonFlexibleAssets:
+              type: array
+              items:
+                $ref: '#/components/schemas/nonFlexibleAsset'
+      discriminator:
+        propertyName: runType
+        
+        
+    singleRunConfig:
+      description: Input for a single optimization run
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/runConfigBase'
+
+    
+    repeatedRunConfig:
+      description: Input for multiple optimization runs with a fixed increment with respect to the previous start time. The GlobalTarget and other input on congestion point and device level should span the period for all the runs. Every run will slice out the relevant parts of the input.
+      allOf:
+        - $ref: '#/components/schemas/runConfigBase'
+        - type: object
+          required:
+            - startTime
+            - increment
+            - repeat
+          properties:
+            startTime:
+              type: string
+              format: date-time
+            optimizationWindow:
+              type: string
+              format: duration
+              description: ISO 8601 duration. The period that this runs concerns. If not provided, the runs will be consecutively started with `increment` duration between the start times.
+            increment:
+              type: string
+              format: duration
+              description: ISO 8601 duration. The period between the start times of the runs.
+            repeat:
+              description: The amount of repetitions of the simulations
+              type: number
+    
+    multipleStartTimeRunConfig:
+      description: Input for multiple optimization runs for all provided start times. The GlobalTarget and other input on congestion point and device level should span the period for all the runs. Every run will slice out the relevant parts of the input.
+      title: multipleStartTimeRunConfig
+      allOf:
+        - $ref: '#/components/schemas/runConfigBase'
+        - type: object
+          required:
+            - startTimes
+          properties:
+            startTimes:
+              type: array
+              items:
+                type: object
+                title: multipleStartTimeRunConfigStartTime
+                required:
+                  - startTime
+                  - optimizationWindow
+                properties:
+                  startTime:
+                    type: string
+                    description: "Format defined in: https://tools.ietf.org/html/rfc3339#section-5.6"
+                    format: date-time
+                  optimizationWindow:
+                    type: string
+                    format: duration
+                    description: ISO 8601 duration. The period after `startTime` that this optimization concerns.
+    runInfo:
+      description: RunInfo
+      required:
+        - id
+        - runStarted
+        - runStatus
+      properties:
+        id:
+          type: string
+          format: UUID
+        runStarted:
+          type: string
+          format: date-time
+          description: The time when the request to start the run was done.
+        runStatus:
+          type: string
+          enum:
+            - submitted
+            - running
+            - failed
+            - cancelled
+            - completed      
+
+  requestBodies:
+    StartSingleRun:
+      description: Configuration to start a ReFlex Insights Run
+      content:
+        application/json:
+          schema:
+              $ref: '#/components/schemas/singleRunConfig'
+    StartRepeatedRun:
+      description: Configuration to start a ReFlex Insights Run
+      content:
+        application/json:
+          schema:
+              $ref: '#/components/schemas/repeatedRunConfig'
+    StartMultipleRun:
+      description: Configuration to start a ReFlex Insights Run
+      content:
+        application/json:
+          schema:
+              $ref: '#/components/schemas/multipleStartTimeRunConfig'              
+              
+  responses:
+    RunStartedResponse:
+      description: Identifier of the run
+      content:
+        application/json:
+          schema:
+            type: object
+            title: runStarted
+            required:
+              - id
+            properties:
+              id:
+                type: string
+                format: UUID
+    RunInfoResponse:
+      description: Information about a run
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/runInfo'
+    RunResultResponse:
+      description: Results of the run
+      content:
+        application/json:
+          schema:
+            type: object
+            default: {}

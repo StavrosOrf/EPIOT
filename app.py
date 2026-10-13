@@ -15,24 +15,15 @@ if not DEBUG:
 from sqlalchemy import event
 from geoalchemy2 import load_spatialite
 from backend.models import Model
+from backend.spatialite import configure_spatialite
 from backend.views import station_data
 from backend.features import features_data
 from backend.kpi.user import kpi_data
-import os
-from sys import platform
 
 from pathlib import Path
 import yaml
 
-if os.environ.get("SPATIALITE_LIBRARY_PATH") is None:
-
-    if platform == "linux" or platform == "linux2":
-        os.environ["SPATIALITE_LIBRARY_PATH"] = "mod_spatialite.so"
-    elif platform == "darwin":
-        os.environ["SPATIALITE_LIBRARY_PATH"] = "mod_spatialite.dylib"
-    elif platform == "win32":
-        os.environ["SPATIALITE_LIBRARY_PATH"] = "mod_spatialite"
-
+configure_spatialite()
 
 db = SQLAlchemy()
 app = Flask(

@@ -16,3 +16,10 @@ __pycache__/
 run.py
 instance/
 logs/
+
+# mod_spatialite bundle installed by scripts/install_spatialite.py
+.spatialite/
+
+# Virtualenv. On OneDrive checkouts this is a junction to a directory
+# outside the synced tree - see README, "Environment setup".
+.venv/
