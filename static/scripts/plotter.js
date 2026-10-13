@@ -1,3 +1,165 @@
+// ---------------------------------------------------------------------------
+// Shared rendering: every chart goes through renderPlot so that sizing,
+// typography and the small-screen layout stay consistent.
+// ---------------------------------------------------------------------------
+
+const NARROW_WIDTH = 640;
+// Below this width per subplot column, a multi-column grid is stacked
+const MIN_COLUMN_WIDTH = 300;
+let lastPlot = null;
+
+function containerWidth(container) {
+  return container.clientWidth || window.innerWidth;
+}
+
+function isNarrow(container) {
+  return containerWidth(container) < NARROW_WIDTH;
+}
+
+// Layout "mode" used to decide when a resize needs a full re-layout
+function layoutMode(container, columns) {
+  const width = containerWidth(container);
+  const stacked = columns > 1 && width / columns < MIN_COLUMN_WIDTH;
+  return `${isNarrow(container) ? "n" : "w"}${stacked ? "s" : "g"}`;
+}
+
+// Word-wrap a (possibly <b>-wrapped) subplot title for small screens
+function wrapTitle(text, maxChars) {
+  const bold = /^<b>(.*)<\/b>$/.exec(text);
+  const words = (bold ? bold[1] : text).split(" ");
+  const lines = [""];
+  words.forEach((word) => {
+    const current = lines[lines.length - 1];
+    if (current && (current + " " + word).length > maxChars) lines.push(word);
+    else lines[lines.length - 1] = current ? current + " " + word : word;
+  });
+  const wrapped = lines.join("<br>");
+  return bold ? `<b>${wrapped}</b>` : wrapped;
+}
+
+function renderPlot(data, layout) {
+  const container = document.getElementById("graph");
+  // Keep pristine copies so the plot can be re-laid out on resize
+  lastPlot = { data: structuredClone(data), layout: structuredClone(layout) };
+
+  const narrow = isNarrow(container);
+  const grid = layout.grid || { rows: 1, columns: 1 };
+  const columns = grid.columns || 1;
+  let rows = grid.rows || 1;
+  const mode = layoutMode(container, columns);
+
+  // When the columns would get too thin, stack the grid into one column.
+  // Grid cells are numbered row-major, so axis references keep their meaning.
+  const stacked = mode.endsWith("s");
+  if (stacked) {
+    rows = rows * columns;
+    layout.grid = { ...grid, rows: rows, columns: 1 };
+  }
+
+  const rowHeight = narrow ? 250 : columns > 1 && !stacked ? 300 : 320;
+  const margin = narrow
+    ? { t: 96, b: 64, l: 64, r: 12 }
+    : { t: 100, b: 80, l: 80, r: 32 };
+
+  layout.grid = {
+    ...layout.grid,
+    ygap: rows > 1 ? (narrow ? 0.35 : 0.3) : undefined,
+    xgap: narrow ? undefined : 0.12,
+  };
+  // Fill the visible panel area, growing (and scrolling) when there are many rows
+  const body = container.parentElement;
+  const available = body ? body.clientHeight - 24 : 0;
+  layout.height = Math.max(
+    narrow ? 380 : 460,
+    rows * rowHeight + margin.t + margin.b,
+    Math.min(available, 900)
+  );
+  layout.autosize = true;
+  layout.margin = margin;
+  layout.font = {
+    family: "Inter, system-ui, -apple-system, Segoe UI, sans-serif",
+    size: narrow ? 11 : 12,
+    color: "#18221c",
+  };
+  layout.paper_bgcolor = "rgba(0,0,0,0)";
+  layout.plot_bgcolor = "#ffffff";
+  layout.hoverlabel = { font: { family: layout.font.family } };
+  layout.legend = {
+    ...(layout.legend || {}),
+    orientation: "h",
+    x: 0.5,
+    xanchor: "center",
+    y: 1,
+    yanchor: "top",
+    yref: "container",
+    font: { size: narrow ? 11 : 12 },
+  };
+
+  (layout.annotations || []).forEach((annotation) => {
+    annotation.font = { ...(annotation.font || {}), size: narrow ? 12 : 14 };
+    if (narrow && annotation.text) {
+      annotation.text = wrapTitle(annotation.text, 36);
+    }
+  });
+
+  // Style every axis consistently
+  Object.keys(layout)
+    .filter((key) => /^[xy]axis\d*$/.test(key))
+    .forEach((key) => {
+      layout[key] = {
+        gridcolor: "#eef1ef",
+        zerolinecolor: "#dfe5e1",
+        linecolor: "#dfe5e1",
+        automargin: true,
+        ...layout[key],
+      };
+    });
+
+  container.innerHTML = "";
+  container.dataset.mode = mode;
+
+  Plotly.newPlot(container, data, layout, {
+    responsive: true,
+    displaylogo: false,
+    // The modebar would cover the legend on small screens
+    displayModeBar: narrow ? false : "hover",
+    modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"],
+    toImageButtonOptions: { filename: "epiot_chart", scale: 2 },
+  });
+}
+
+// Replace the chart area with an explanatory message (errors, empty areas)
+export function showGraphMessage(title, detail = "") {
+  const container = document.getElementById("graph");
+  lastPlot = null;
+  container.innerHTML = `
+    <div class="graph-message" role="status">
+      <i class="fa fa-exclamation-circle" aria-hidden="true"></i>
+      <div class="graph-message__title"></div>
+      <div class="graph-message__detail"></div>
+    </div>
+  `;
+  container.querySelector(".graph-message__title").textContent = title;
+  container.querySelector(".graph-message__detail").textContent = detail;
+}
+
+// Re-lay out the current chart when crossing the narrow/wide breakpoint
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const container = document.getElementById("graph");
+    if (!lastPlot || !container || !container.querySelector(".plot-container")) {
+      return;
+    }
+    const columns = (lastPlot.layout.grid && lastPlot.layout.grid.columns) || 1;
+    if (layoutMode(container, columns) !== container.dataset.mode) {
+      const { data, layout } = lastPlot;
+      renderPlot(data, layout);
+    }
+  }, 150);
+});
+
 export function createGraph(groupData, cs_mode = true, startDate = null) {
   var data = [];
   var layout = {
@@ -166,11 +328,7 @@ export function createGraph(groupData, cs_mode = true, startDate = null) {
   //         tickangle: -45, // Rotate labels if needed
   //         };
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }
 
 export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
@@ -379,11 +537,7 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
     });
   });
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }
 
 export function createUserKPIGraph(groupData) {
@@ -629,11 +783,7 @@ export function createUserKPIGraph(groupData) {
   //         tickangle: -45, // Rotate labels if needed
   //         };
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }
 
 // Helper function to format date as 'DD/MM/YYYY'
@@ -879,11 +1029,7 @@ export function createGridKPIGraph(groupData) {
 
  
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }
 
 export function createMobilityKPIGraph(groupData) {
@@ -1094,11 +1240,7 @@ export function createMobilityKPIGraph(groupData) {
 
  
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }
 
 
@@ -1273,11 +1415,7 @@ export function createCityKPIGraph(groupData) {
     }
   });
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }
 
 
@@ -1479,9 +1617,5 @@ export function createEnvironmentKPIGraph(groupData) {
     }
   });
 
-  const container = document.getElementById("graph");
-  // Clear existing content
-  container.innerHTML = "";
-
-  Plotly.newPlot("graph", data, layout);
+  renderPlot(data, layout);
 }

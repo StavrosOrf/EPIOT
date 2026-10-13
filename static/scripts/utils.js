@@ -1,22 +1,14 @@
-// Function to animate the select message
+// Show a status message in the bottom action bar
 export function animateSelectMessage(newMessage) {
   const message = document.getElementById("select-message");
   if (!message) return;
 
-  const text = newMessage || message.innerText;
+  message.textContent = newMessage || message.textContent;
 
-  message.innerHTML = ""; // Clear current content
-
-  // Split each character into a span with a delay effect
-  text.split("").forEach((char, i) => {
-    const span = document.createElement("span");
-    span.style.setProperty("--i", i); // Set a custom property for animation delay
-    span.innerText = char;
-    if (char === " ") {
-      span.style.width = "10px"; // Add extra space for spaces
-    }
-    message.appendChild(span);
-  });
+  // Restart the fade-in animation
+  message.classList.remove("flash");
+  void message.offsetWidth;
+  message.classList.add("flash");
 }
 
 function generateLoadDataSheet(profile_data) {

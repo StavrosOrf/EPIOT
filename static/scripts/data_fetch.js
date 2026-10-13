@@ -4,7 +4,9 @@ import {
   createMobilityKPIGraph,
   createCityKPIGraph,
   createEnvironmentKPIGraph,
+  showGraphMessage,
 } from "./plotter.js";
+import { animateSelectMessage } from "./utils.js";
 export function get_KPIs(
   selected_polygons,
   selected_area_names,
@@ -34,7 +36,7 @@ export function get_KPIs(
       })
       .catch((error) => {
         console.error("Error fetching analysis data:", error);
-        animateSelectMessage("Error fetching data. Please try again!");
+        animateSelectMessage("Could not fetch data. Please try again");
       });
   });
 
@@ -56,7 +58,7 @@ export function get_KPIs(
         })
         .catch((error) => {
           console.error("Error fetching analysis data:", error);
-          animateSelectMessage("Error fetching data. Please try again!");
+          animateSelectMessage("Could not fetch data. Please try again");
 
           return null;
         });
@@ -123,6 +125,18 @@ export function get_KPIs(
       // Wait for all fetches to complete
       Promise.all(fetchPromises)
         .then((kpi_data) => {
+          const failed = kpi_data
+            .map((item, i) => (item.data ? null : selected_area_names[i]))
+            .filter((name) => name !== null);
+          if (failed.length) {
+            showGraphMessage(
+              "KPIs are not available for this selection",
+              `No session data could be computed for ${failed.join(", ")}. ` +
+                "Make sure each area contains chargers, or try a different date range."
+            );
+            return;
+          }
+
           for (let i = 0; i < kpi_data.length; i++) {
             // find area name from the selected_area_names
             let area_name = selected_area_names[i];
@@ -155,6 +169,7 @@ export function get_KPIs(
         })
         .catch((error) => {
           console.error("Error in Promise.all:", error);
+          showGraphMessage("Something went wrong while drawing the KPIs", String(error));
         });
     });
   });

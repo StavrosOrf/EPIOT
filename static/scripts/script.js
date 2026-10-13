@@ -8,16 +8,30 @@ import {
   createMobilityKPIGraph,
   createCityKPIGraph,
   createEnvironmentKPIGraph,
+  showGraphMessage,
 } from "./plotter.js";
 import { animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
 import { get_KPIs } from "./data_fetch.js";
 
 // Initialize Map using Leaflet.js
-var map = L.map("map").setView([52.3676, 4.9041], 16); // Centered on Amsterdam
+var map = L.map("map", { zoomControl: false }).setView([52.3676, 4.9041], 16); // Centered on Amsterdam
+L.control.zoom({ position: "topright" }).addTo(map);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
+
+// Keep --header-h in sync with the app bar, which wraps on small screens, so
+// the floating controls and the analysis panel are positioned below it.
+const appBar = document.getElementById("header-bar");
+function syncHeaderHeight() {
+  document.documentElement.style.setProperty(
+    "--header-h",
+    `${appBar.offsetHeight}px`
+  );
+}
+new ResizeObserver(syncHeaderHeight).observe(appBar);
+syncHeaderHeight();
 
 // restrict maximum zoom level to prevent too many hexagons
 map.setMaxZoom(16);
@@ -59,12 +73,7 @@ let datepicker = flatpickr("#datepicker", {
 let dateInput = document.getElementById("datepicker");
 let active_kpi = "user_kpi";
 
-// Trigger animation on page load
-window.addEventListener("load", function () {
-  animateSelectMessage("Draw area for analysis!");
-});
-
-animateSelectMessage("Draw area for analysis!");
+animateSelectMessage("Draw an area on the map to start");
 
 // Initialize Leaflet.draw
 var drawnItems = new L.FeatureGroup();
@@ -103,20 +112,24 @@ function setActive(btn) {
   btn && btn.classList.add('active');
 }
 function enable(handler, btn) {
+  // Clicking the active tool again switches it off
+  if (activeHandler === handler) {
+    clearActive();
+    hideHint();
+    return false;
+  }
   if (activeHandler && activeHandler.disable) activeHandler.disable();
   handler.enable();
   activeHandler = handler;
   setActive(btn);
+  return true;
 }
 function clearActive() {
-  if (activeHandler && activeHandler.disable) activeHandler.disable();
+  const handler = activeHandler;
   activeHandler = null;
   setActive(null);
+  if (handler && handler.disable) handler.disable();
 }
-
-btnPoly?.addEventListener('click', () => enable(polygonHandler, btnPoly));
-btnRect?.addEventListener('click', () => enable(rectangleHandler, btnRect));
-btnDel?.addEventListener('click', () => enable(deleteHandler, btnDel));
 
 // When a new shape is created, add to group and exit draw mode
 // map.on(L.Draw.Event.CREATED, (e) => {
@@ -146,18 +159,21 @@ function hideHint() {
 
 // Update your button listeners:
 btnPoly?.addEventListener('click', () => {
-  enable(polygonHandler, btnPoly);
-  showHint('Polygon: Click to add vertices, double-click to finish. Press Esc to cancel.');
+  if (enable(polygonHandler, btnPoly)) {
+    showHint('Polygon: click to add points, then click the first point (or double-click) to finish. Click the tool again or press Esc to cancel.');
+  }
 });
 
 btnRect?.addEventListener('click', () => {
-  enable(rectangleHandler, btnRect);
-  showHint('Rectangle: Click and drag on the map to draw. Release to finish. Press Esc to cancel.');
+  if (enable(rectangleHandler, btnRect)) {
+    showHint('Rectangle: click and drag on the map, release to finish. Click the tool again or press Esc to cancel.');
+  }
 });
 
 btnDel?.addEventListener('click', () => {
-  enable(deleteHandler, btnDel);
-  showHint('Delete: Click shapes to remove them. Click the trash again or press Esc to exit.');
+  if (enable(deleteHandler, btnDel)) {
+    showHint('Delete: click areas to remove them. Click the trash again or press Esc when done.');
+  }
 });
 
 // When a draw finishes or mode exits, hide the hint
@@ -166,11 +182,18 @@ map.on('draw:drawstop', hideHint);
 map.on('draw:deletestop', hideHint);
 map.on('draw:editstop', hideHint);
 
-// Also hide on ESC
+// When a shape is finished or deletion ends, release the toolbar button
+map.on(L.Draw.Event.CREATED, clearActive);
+map.on('draw:drawstop', clearActive);
+map.on('draw:deletestop', clearActive);
+
+// Also hide on ESC, and close the analysis panel if it is open
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (window.EPIOT.isLandingOpen?.()) return;
     hideHint();
     clearActive?.();
+    if (document.body.classList.contains("analysis-open")) closePanel();
   }
 });
 
@@ -270,9 +293,9 @@ map.on("draw:deleted", function (event) {
   console.log("selected_area_names after deletion event:", selected_area_names);
 
   if (selected_polygons.length == 0) {
-    animateSelectMessage("Draw area for analysis!");
+    animateSelectMessage("Draw an area on the map to start");
   } else {
-    animateSelectMessage("Area deleted! Analyse or select more areas!");
+    animateSelectMessage(`Area removed. ${selected_polygons.length} of 3 selected`);
   }
 });
 
@@ -345,9 +368,9 @@ map.on("draw:deletestop", function () {
   );
 
   if (selected_polygons.length == 0) {
-    animateSelectMessage("Draw area for analysis!");
+    animateSelectMessage("Draw an area on the map to start");
   } else {
-    animateSelectMessage("Area deleted! Analyse or select more areas!");
+    animateSelectMessage(`Area removed. ${selected_polygons.length} of 3 selected`);
   }
   map.fire("draw:stop");
 });
@@ -360,7 +383,7 @@ map.on(L.Draw.Event.CREATED, function (event) {
   console.log("Creation event:", event);
 
   if (selected_polygons.length > 2) {
-    animateSelectMessage("Only 3 areas can be selected at a time!");
+    animateSelectMessage("You can compare up to 3 areas. Delete one to draw another");
     return;
   }
 
@@ -400,7 +423,7 @@ map.on(L.Draw.Event.CREATED, function (event) {
     var isValid = turf.booleanValid(polygon);
     if (!isValid) {
       console.error("Invalid polygon!");
-      animateSelectMessage("Please redraw!");
+      animateSelectMessage("That shape is invalid (edges cross). Please redraw it");
       return; // Exit the handler
     }
 
@@ -423,7 +446,6 @@ map.on(L.Draw.Event.CREATED, function (event) {
       // For polygons and rectangles
       // get center shifted slightly left and top
       center = layer.getBounds().getCenter();
-      center = L.latLng(center.lat + 0.0005, center.lng - 0.0005);
     } else if (layer.getLatLng) {
       // For circles and markers
       center = layer.getLatLng();
@@ -513,7 +535,7 @@ map.on(L.Draw.Event.CREATED, function (event) {
       drawToolbar.style.boxShadow = "none";
     }
 
-    animateSelectMessage("Area selected! Analyse or select more areas!");
+    animateSelectMessage(`${selected_polygons.length} of 3 areas selected. Ready to analyse`);
 
     // Add glowing effect to the Analyse button
     const analyseButton = document.getElementById("calc-button");
@@ -549,26 +571,28 @@ map.on("load moveend", function () {
   }
 });
 
-// Handle location input
+// Handle location search (the form submits on Enter or the arrow button)
+const locationInput = document.getElementById("location-input");
 document
-  .getElementById("location-button")
-  .addEventListener("click", function () {
-    var location = document.getElementById("location-input").value;
+  .getElementById("input-container")
+  .addEventListener("submit", function (event) {
+    event.preventDefault();
+    var location = locationInput.value.trim();
+    if (!location) return;
 
-    if (location) {
-      // Use a simple geocoding service (for simplicity, this will not work in production)
-      fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${location}`
-      )
-        .then((response) => response.json())
-        .then((data) => {
-          if (data && data.length > 0) {
-            var lat = data[0].lat;
-            var lon = data[0].lon;
-            map.setView([lat, lon], 13);
-          }
-        });
-    }
+    fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(location)}`
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        if (data && data.length > 0) {
+          map.setView([data[0].lat, data[0].lon], 15);
+          locationInput.blur();
+        } else {
+          animateSelectMessage(`No results for "${location}"`);
+        }
+      })
+      .catch(() => animateSelectMessage("Location search is unavailable right now"));
   });
 
 ///////////////////////////////////////////////////////////
@@ -647,110 +671,44 @@ function initializeDropdown(comp_ids_list, groupNames) {
     groupDropdown.appendChild(optgroup);
   });
 
-  if (!toggle.checked) {
-    groupDropdown.options[groupDropdown.options.length] = new Option(
-      "Selected Charger IDs",
-      "",
-      true,
-      true
-    );
-  } else {
-    groupDropdown.options[groupDropdown.options.length] = new Option(
-      "Selected Transformer IDs",
-      "",
-      true,
-      true
-    );
+  // Placeholder shown until a specific ID is picked
+  const placeholder = new Option(
+    toggle.checked ? "Select a transformer…" : "Select a charger…",
+    "",
+    true,
+    true
+  );
+  placeholder.disabled = true;
+  groupDropdown.insertBefore(placeholder, groupDropdown.firstChild);
+}
 
-    // disable the default selected option
-    groupDropdown.options[groupDropdown.options.length - 1].disabled = true;
-  }
+// Picking an ID closes the panel and shows that charger/transformer on the map
+groupDropdown.addEventListener("change", function () {
+  const layer = toggle.checked ? transformerLayer : chargerLayer;
+  const highlight = toggle.checked ? highlightTrMarker : highlightCSMarker;
 
-  // Event listener for the dropdown menu
-  groupDropdown.addEventListener("change", function () {
-    clear_graph();
-    if (!toggle.checked) {
-      // find marker with the selected charger id
-      for (let i = 0; i < chargerLayer.getLayers().length; i++) {
-        let marker = chargerLayer.getLayers()[i];
-        if (marker.options.id == this.value) {
-          graphContainer.style.display = "none"; // Minimize the graph
-          fancyBarButton.style.display = "block"; // Show the fancy button when the graph is minimized
-          map.getContainer().style.filter = "none";
-          message.style.display = "block"; // Show the select charger message
+  closePanel();
 
-          // Re-enable the draw control if it was disabled
-          if (!draw_control_enabled) {
-            map.addControl(drawControl);
-            draw_control_enabled = true;
-          }
-
-          // Center the map on the marker
-          map.setView(marker.getLatLng(), 15);
-
-          // Open the marker's popup
-          marker.openPopup();
-
-          // Highlight the marker
-          highlightCSMarker(marker);
-        }
-      }
-    } else {
-      // find marker with the selected transformer id
-      for (let i = 0; i < transformerLayer.getLayers().length; i++) {
-        let marker = transformerLayer.getLayers()[i];
-        if (marker.options.id == this.value) {
-          graphContainer.style.display = "none"; // Minimize the graph
-          fancyBarButton.style.display = "block"; // Show the fancy button when the graph is minimized
-          map.getContainer().style.filter = "none";
-          message.style.display = "block"; // Show the select charger message
-
-          // Re-enable the draw control if it was disabled
-          if (!draw_control_enabled) {
-            map.addControl(drawControl);
-            draw_control_enabled = true;
-          }
-
-          // Center the map on the marker
-          map.setView(marker.getLatLng(), 15);
-
-          // Open the marker's popup
-          marker.openPopup();
-
-          // Highlight the marker
-          highlightTrMarker(marker);
-        }
-      }
-    }
-    inputContainer.style.display = "flex";
-    checkboxContainer.style.display = "flex";
-    headerButtons.style.display = "flex";
-    drawButtons.style.display = "inline-flex";
-
-    graphContainer.style.display = "none"; // Minimize the graph
-    fancyBarButton.style.display = "block"; // Show the fancy button when the graph is minimized
-    map.getContainer().style.filter = "none";
-    message.style.display = "block"; // Show the select charger message
-
-    // Re-enable the draw control if it was disabled
-    if (!draw_control_enabled) {
-      map.addControl(drawControl);
-      draw_control_enabled = true;
+  layer.eachLayer((marker) => {
+    if (marker.options.id == this.value) {
+      map.setView(marker.getLatLng(), 16);
+      marker.openPopup();
+      highlight(marker);
     }
   });
-}
+});
 
 // Function to highlight a marker
 var previousMarker = null;
 var defaultCSIcon = L.icon({
-  iconUrl: "http://127.0.0.1:5000/images/charger_icon.png",
+  iconUrl: "/images/charger_icon.png",
   iconSize: [25, 25],
   iconAnchor: [12.5, 25],
   popupAnchor: [1, -25],
 });
 
 var defaultTrIcon = L.icon({
-  iconUrl: "http://127.0.0.1:5000/images/transformer_icon.png",
+  iconUrl: "/images/transformer_icon.png",
   iconSize: [25, 25],
   iconAnchor: [12.5, 25],
   popupAnchor: [1, -25],
@@ -838,7 +796,7 @@ function calculateLoadProfiles() {
       })
       .catch((error) => {
         console.error("Error fetching analysis data:", error);
-        animateSelectMessage("Error fetching data. Please try again!");
+        animateSelectMessage("Could not fetch data. Please try again");
       });
   });
 
@@ -860,7 +818,7 @@ function calculateLoadProfiles() {
         })
         .catch((error) => {
           console.error("Error fetching analysis data:", error);
-          animateSelectMessage("Error fetching data. Please try again!");
+          animateSelectMessage("Could not fetch data. Please try again");
 
           return null;
         });
@@ -981,6 +939,18 @@ function calculateLoadProfiles() {
 
               load_profile_data = [];
 
+              const failed = load_profiles
+                .map((item, i) => (item.data && item.data.y ? null : selected_area_names[i]))
+                .filter((name) => name !== null);
+              if (failed.length) {
+                showGraphMessage(
+                  "Load profiles are not available for this selection",
+                  `The prediction failed for ${failed.join(", ")}. ` +
+                    "Try another date or charging strategy."
+                );
+                return;
+              }
+
               for (let i = 0; i < load_profiles.length; i++) {
                 // find area name from the selected_area_names
                 let area_name = selected_area_names[i];
@@ -1023,6 +993,7 @@ function calculateLoadProfiles() {
             })
             .catch((error) => {
               console.error("Error in Promise.all:", error);
+              showGraphMessage("Something went wrong while drawing the chart", String(error));
             });
         });
     });
@@ -1041,169 +1012,61 @@ document.getElementById("strategy").addEventListener("change", function () {
 });
 
 dateInput.addEventListener("change", () => {
-  if (active_tab == "KPIs") {
-    if (datepicker.selectedDates.length <= 1) {
-      return;
-    }
-  }
-  clear_graph();
-  if (active_tab == "Load Profiles") {
-    calculateLoadProfiles();
-  } else if (active_tab == "Flexibility") {
-    calculateLoadProfiles();
-  } else if (active_tab == "KPIs") {
-    charger_ids_list,
-      transformer_ids_list,
-      (kpi_data_list = get_KPIs(
-        selected_polygons,
-        selected_area_names,
-        datepicker,
-        active_kpi
-      ));
-  }
+  // A KPI range needs both a start and an end date
+  if (active_tab == "KPIs" && datepicker.selectedDates.length <= 1) return;
+  runActiveAnalysis();
 });
 
-// get aelement header-bar
-const headerBar = document.getElementById("header-bar");
-// get teh following elements input-container checkbox-container header-buttons
-const inputContainer = document.getElementById("input-container");
-const checkboxContainer = document.getElementById("checkbox-container");
-const headerButtons = document.getElementById("header-buttons");
 
-const drawButtons = document.getElementById("draw-toolbar-wrap");
+const analysisPanel = document.getElementById("graph-container");
+const minimizeButton = document.getElementById("minimize-btn");
 
+// Show the analysis panel. The map, toolbar and action bar react to the
+// body class in CSS.
+function openPanel() {
+  clearActive();
+  hideHint();
+  analysisPanel.hidden = false;
+  document.body.classList.add("analysis-open");
+  analysisButton.classList.remove("glow");
+}
+
+function closePanel() {
+  analysisPanel.hidden = true;
+  document.body.classList.remove("analysis-open");
+  $('[data-toggle="tooltip"]').tooltip("hide");
+}
+
+function runActiveAnalysis() {
+  clear_graph();
+  if (active_tab == "KPIs") {
+    kpi_data_list = get_KPIs(
+      selected_polygons,
+      selected_area_names,
+      datepicker,
+      active_kpi
+    );
+  } else {
+    calculateLoadProfiles();
+  }
+}
 
 analysisButton.addEventListener("click", function () {
-  // map.fire("draw:stop");
-
   if (selected_polygons.length == 0) {
-    animateSelectMessage("Please draw an area first!");
-    map.addControl(drawControl);
+    animateSelectMessage("Draw an area on the map first");
+    btnPoly?.focus();
     return;
   }
 
-  inputContainer.style.display = "none";
-  checkboxContainer.style.display = "none";
-  headerButtons.style.display = "none";
-
-  drawButtons.style.display = "none";
-
-  // remove the colorbar if it exists
-
-  colorbarControl.remove();
-  graphContainer.style.display = "block";
-  fancyBarButton.style.display = "none"; // Hide the fancy button when graph expands
-  // make map grayscale with a slow transition
-  map.getContainer().style.filter = "grayscale(65%)";
-  map.getContainer().style.transition = "filter 0.7s";
-  // Hide the select charger message
-  message.style.display = "none";
-
-  // Stop glowing effect on the Analyse button
-  const analyseButton = document.getElementById("calc-button");
-  if (analyseButton) {
-    analyseButton.classList.remove("glow");
-  }
-
-  // Disable the draw control
-  map.removeControl(drawControl);
-  draw_control_enabled = false;
-
-  clear_graph();
-  if (active_tab == "Load Profiles") {
-    calculateLoadProfiles();
-  } else if (active_tab == "Flexibility") {
-    calculateLoadProfiles();
-  } else if (active_tab == "KPIs") {
-    charger_ids_list,
-      transformer_ids_list,
-      (kpi_data_list = get_KPIs(
-        selected_polygons,
-        selected_area_names,
-        datepicker,
-        active_kpi
-      ));
-  }
+  openPanel();
+  runActiveAnalysis();
 });
 
-////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////
-
-// Toggle Graph Container and Fancy Button
-var graphContainer = document.getElementById("graph-container");
-var fancyBarButton = document.getElementById("fancy-bar-button");
-var minimizeButton = document.getElementById("minimize-btn");
-var message = document.getElementById("select-message");
-
-// Initially hide the fancy bar button
-// fancyBarButton.style.display = "none";
-graphContainer.style.display = "none"; // Initially hide the graph container
-
-// Minimize the graph when clicking outside the graph or on the map
+// Close the panel when clicking the visible map or the close button
 map.on("click", function () {
-  inputContainer.style.display = "flex";
-  checkboxContainer.style.display = "flex";
-  headerButtons.style.display = "flex";
-
-  drawButtons.style.display = "inline-flex";
-
-  graphContainer.style.display = "none"; // Minimize the graph
-  fancyBarButton.style.display = "block"; // Show the fancy button when the graph is minimized
-  map.getContainer().style.filter = "none";
-  message.style.display = "block"; // Show the select charger message
-
-  // Re-enable the draw control if it was disabled
-  if (!draw_control_enabled) {
-    map.addControl(drawControl);
-    draw_control_enabled = true;
-  }
+  if (document.body.classList.contains("analysis-open")) closePanel();
 });
-
-// Minimize the graph when clicking the minimize button
-minimizeButton.addEventListener("click", function () {
-  inputContainer.style.display = "flex";
-  checkboxContainer.style.display = "flex";
-  headerButtons.style.display = "flex";
-
-  drawButtons.style.display = "inline-flex";
-
-  graphContainer.style.display = "none"; // Minimize the graph
-  fancyBarButton.style.display = "block"; // Show the fancy button when the graph is minimized
-  map.getContainer().style.filter = "none";
-  message.style.display = "block"; // Show the select charger message
-
-  // Re-enable the draw control if it was disabled
-  if (!draw_control_enabled) {
-    map.addControl(drawControl);
-    draw_control_enabled = true;
-  }
-});
-
-// Create a colorbar control
-const colorbarControl = L.control({ position: "bottomright" });
-
-colorbarControl.onAdd = function () {
-  const div = L.DomUtil.create("div", "leaflet-colorbar");
-
-  // Add the gradient and labels
-  div.innerHTML = `
-    <div class="colorbar-container">
-      <div class="colorbar-gradient"></div>
-      <div class="colorbar-labels">
-        <span>0</span>
-        <span>25</span>
-        <span>50</span>
-        <span>75</span>
-        <span>100</span>
-      </div>
-    </div>
-  `;
-  return div;
-};
-
-// // Add the colorbar to the map
-// colorbarControl.addTo(map);
+minimizeButton.addEventListener("click", closePanel);
 
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
@@ -1240,251 +1103,128 @@ chargerCheckbox.addEventListener("change", toggleChargerLayer); // Attach event 
 transformerCheckbox.addEventListener("change", toggleTransformerLayer); // Attach event listener
 // flexibilityCheckbox.addEventListener("change", toggleFlexHeatmapLayer); // Attach event listener
 
-// Function to highlight active tab
+// ---------------------------------------------------------------------------
+// Tabs: Load profiles / Flexibility / KPIs (with KPI sub-tabs)
+// ---------------------------------------------------------------------------
+
+const kpiSubnav = document.getElementById("kpi-subnav");
+const strategyField = document.getElementById("str-dropdown");
+const viewToggleField = document.getElementById("toggle-div");
+const dateLabel = document.getElementById("date_label");
+
 function setActiveTab(activeId) {
-  var tabs = document.querySelectorAll(".tabs button");
-  tabs.forEach((tab) => tab.classList.remove("active"));
-  document.getElementById(activeId).classList.add("active");
+  document.querySelectorAll(".tabs .tab").forEach((tab) => {
+    const isActive = tab.id === activeId;
+    tab.classList.toggle("active", isActive);
+    tab.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
 }
 
-const kpisButton = document.getElementById("stats-tab");
-
-// Add event listeners for each tab
-document.getElementById("load-tab").addEventListener("click", function () {
+// Single-day picker for load/flexibility, date range for KPIs
+function resetDatepicker(rangeMode) {
   datepicker.destroy();
   datepicker = flatpickr("#datepicker", {
-    minDate: starting_date, // Set the minimum date to January 1, 2025
-    maxDate: today, // Set the maximum date to today
-    dateFormat: "Y-m-d", // Format the date as DD/MM/YYYY
-    defaultDate: today, // No default date selected
-    disableMobile: true, // Force desktop-style picker on mobile devices
+    mode: rangeMode ? "range" : "single",
+    minDate: starting_date,
+    maxDate: today,
+    dateFormat: "Y-m-d",
+    defaultDate: rangeMode ? [starting_date, today] : today,
+    disableMobile: true, // Same picker on every device
   });
-  const label = document.getElementById("date_label");
-  label.textContent = "Select Date:";
-  // make strategy-dropdown siplay none
-  document.getElementById("str-dropdown").style.display = "flex";
-
   dateInput = document.getElementById("datepicker");
+  dateLabel.textContent = rangeMode ? "Date range" : "Date";
+  // A range needs the full row on phones
+  dateInput.closest(".field").classList.toggle("field--wide", rangeMode);
+}
 
-  clear_graph();
-  calculateLoadProfiles();
+function showTab(tabId) {
+  if (tabId === "load-tab") active_tab = "Load Profiles";
+  else if (tabId === "flex-tab") active_tab = "Flexibility";
+  else active_tab = "KPIs";
 
-  setActiveTab("load-tab");
-  active_tab = "Load Profiles";
+  const isKpi = active_tab === "KPIs";
+  $(".tabs [data-toggle='tooltip']").tooltip("hide");
+  setActiveTab(tabId);
+  resetDatepicker(isKpi);
 
-  document.getElementById("toggle-flex-div").style.display = "none";
-  document.getElementById("toggle-div").style.display = "block";
+  kpiSubnav.hidden = !isKpi;
+  strategyField.hidden = isKpi;
+  // The charger/grid view only applies to load profiles
+  viewToggleField.hidden = active_tab !== "Load Profiles";
 
-  const kpiContainer = document.querySelector(".kpi-container");
-  if (kpiContainer) {
-    kpiContainer.classList.remove("show");
-    kpiContainer.replaceWith(kpisButton);
-  }
-  setActiveTab("load-tab");
-});
+  runActiveAnalysis();
+}
 
-document.getElementById("flex-tab").addEventListener("click", function () {
-  datepicker.destroy();
-  flatpickr("#datepicker", {
-    minDate: starting_date, // Set the minimum date to January 1, 2025
-    maxDate: today, // Set the maximum date to today
-    dateFormat: "Y-m-d", // Format the date as DD/MM/YYYY
-    defaultDate: today, // No default date selected
-    disableMobile: true, // Force desktop-style picker on mobile devices
+document.getElementById("load-tab").addEventListener("click", () => showTab("load-tab"));
+document.getElementById("flex-tab").addEventListener("click", () => showTab("flex-tab"));
+document.getElementById("stats-tab").addEventListener("click", () => showTab("stats-tab"));
+
+const kpiRenderers = {
+  user_kpi: createUserKPIGraph,
+  grid_kpi: createGridKPIGraph,
+  environment_kpi: createEnvironmentKPIGraph,
+  mobility_kpi: createMobilityKPIGraph,
+  city_kpi: createCityKPIGraph,
+};
+
+kpiSubnav.querySelectorAll(".subtab").forEach((button) => {
+  button.addEventListener("click", () => {
+    active_kpi = button.dataset.kpi;
+    kpiSubnav
+      .querySelectorAll(".subtab")
+      .forEach((b) => b.classList.toggle("active", b === button));
+    // KPI data is already loaded for the selected range; only redraw
+    if (kpi_data_list && kpi_data_list.length) {
+      kpiRenderers[active_kpi](kpi_data_list);
+    }
   });
-  const label = document.getElementById("date_label");
-  label.textContent = "Select Date:";
-  // make strategy-dropdown siplay none
-  document.getElementById("str-dropdown").style.display = "flex";
-
-  dateInput = document.getElementById("datepicker");
-  setActiveTab("flex-tab");
-  active_tab = "Flexibility";
-  clear_graph();
-  calculateLoadProfiles();
-
-  document.getElementById("toggle-flex-div").style.display = "block";
-  document.getElementById("toggle-flex-div").style.visibility = "hidden";
-  document.getElementById("toggle-div").style.display = "none";
-  // document.getElementById("toggle-flex_div").style.display = "none";
-
-  const kpiContainer = document.querySelector(".kpi-container");
-  if (kpiContainer) {
-    kpiContainer.classList.remove("show");
-    kpiContainer.replaceWith(kpisButton);
-  }
-  setActiveTab("flex-tab");
 });
 
 document.getElementById("download-btn").addEventListener("click", function () {
   generateAndDownloadExcel(charger_ids_list, load_profile_data, kpi_data_list);
 });
 
-$(document).ready(function () {
-  $('[data-toggle="tooltip"]').tooltip();
+$(function () {
+  // The tab strip scrolls horizontally, which Bootstrap would otherwise use as
+  // the positioning boundary, flipping the tooltip on top of the tabs.
+  const tooltipOptions = { container: "body", boundary: "window" };
+  $(".tabs [data-toggle='tooltip']").tooltip({ ...tooltipOptions, trigger: "hover" });
+  $(".info-dot[data-toggle='tooltip']").tooltip({ ...tooltipOptions, trigger: "hover focus" });
 });
 
+// Enter runs the analysis, unless the user is typing in or activating a control
 document.addEventListener("keydown", function (event) {
-  if (event.key === "Enter") {
-    // Simulate a button click
-    document.getElementById("calc-button").click();
-  }
+  if (event.key !== "Enter") return;
+  if (window.EPIOT.isLandingOpen?.()) return;
+  if (event.target.closest("input, select, textarea, button, a")) return;
+  if (document.body.classList.contains("analysis-open")) return;
+  analysisButton.click();
 });
 
-// document.addEventListener("DOMContentLoaded", function () {
-// const kpisButton = document.getElementById("stats-tab");
-document.getElementById("stats-tab").addEventListener("click", function () {
-  datepicker.destroy();
-  datepicker = flatpickr("#datepicker", {
-    mode: "range",
-    minDate: starting_date, // Set the minimum date to January 1, 2025
-    maxDate: today, // Set the maximum date to today
-    dateFormat: "Y-m-d", // Format the date as DD/MM/YYYY
-    defaultDate: [starting_date, today], // Set the default date to today
-  });
-  const label = document.getElementById("date_label");
-  label.textContent = "Select Date Range:";
-  // make strategy-dropdown siplay none
-  document.getElementById("str-dropdown").style.display = "none";
-  clear_graph();
-
-  charger_ids_list,
-    transformer_ids_list,
-    (kpi_data_list = get_KPIs(
-      selected_polygons,
-      selected_area_names,
-      datepicker,
-      active_kpi
-    ));
-
-  setActiveTab("stats-tab");
-
-  document.getElementById("toggle-flex-div").style.display = "none";
-  document.getElementById("toggle-div").style.display = "none";
-
-  active_tab = "KPIs";
-
-  // 1) Create the container
-  const kpiContainer = document.createElement("div");
-  kpiContainer.classList.add("kpi-container");
-
-  // 2) Create the umbrella text
-  const umbrella = document.createElement("div");
-  umbrella.classList.add("kpi-umbrella");
-  umbrella.textContent = "KPIs ";
-
-  // 3) Create the 5 new buttons
-  const userBtn = document.createElement("button");
-  userBtn.textContent = "User";
-
-  const gridBtn = document.createElement("button");
-  gridBtn.textContent = "Grid";
-
-  const envBtn = document.createElement("button");
-  envBtn.textContent = "Env.";
-
-  const mobilityBtn = document.createElement("button");
-  mobilityBtn.textContent = "Mobility";
-
-  const cityBtn = document.createElement("button");
-  cityBtn.textContent = "City";
-
-  userBtn.addEventListener("click", function () {
-    console.log("User button clicked!");
-    console.log("KPI data list:", kpi_data_list);
-    active_kpi = "user_kpi";
-    createUserKPIGraph(kpi_data_list);
-    //  make the button active
-    userBtn.classList.add("active");
-    gridBtn.classList.remove("active");
-    envBtn.classList.remove("active");
-    mobilityBtn.classList.remove("active");
-    cityBtn.classList.remove("active");
-  });
-
-  gridBtn.addEventListener("click", function () {
-    active_kpi = "grid_kpi";
-    createGridKPIGraph(kpi_data_list);
-
-    //  make the button active
-    userBtn.classList.remove("active");
-    gridBtn.classList.add("active");
-    envBtn.classList.remove("active");
-    mobilityBtn.classList.remove("active");
-    cityBtn.classList.remove("active");
-  });
-
-  envBtn.addEventListener("click", function () {
-    active_kpi = "environment_kpi";
-    createEnvironmentKPIGraph(kpi_data_list);
-    //  make the button active
-    userBtn.classList.remove("active");
-    gridBtn.classList.remove("active");
-    envBtn.classList.add("active");
-    mobilityBtn.classList.remove("active");
-    cityBtn.classList.remove("active");
-  });
-
-  mobilityBtn.addEventListener("click", function () {
-    active_kpi = "mobility_kpi";
-    createMobilityKPIGraph(kpi_data_list);
-    //  make the button active
-    userBtn.classList.remove("active");
-    gridBtn.classList.remove("active");
-    envBtn.classList.remove("active");
-    mobilityBtn.classList.add("active");
-    cityBtn.classList.remove("active");
-  });
-
-  cityBtn.addEventListener("click", function () {
-    active_kpi = "city_kpi";
-    createCityKPIGraph(kpi_data_list);
-    //  make the button active
-    userBtn.classList.remove("active");
-    gridBtn.classList.remove("active");
-    envBtn.classList.remove("active");
-    mobilityBtn.classList.remove("active");
-    cityBtn.classList.add("active");
-  });
-
-  userBtn.classList.add("active");
-
-  // 4) Append them to the container
-  kpiContainer.appendChild(umbrella);
-  kpiContainer.appendChild(userBtn);
-  kpiContainer.appendChild(gridBtn);
-  kpiContainer.appendChild(envBtn);
-  kpiContainer.appendChild(mobilityBtn);
-  kpiContainer.appendChild(cityBtn);
-
-  // 5) Replace the old "KPIs" button with the new container
-  kpisButton.replaceWith(kpiContainer);
-
-  // 6) Force a reflow, then add the "show" class for the transition
-  requestAnimationFrame(() => {
-    kpiContainer.classList.add("show");
-  });
-});
+let loadingTimer = null;
 
 function clear_graph() {
   const container = document.getElementById("graph");
 
   // Replace the container's content with the loading animation
   container.innerHTML = `
-    <div class="loading-container">
+    <div class="loading-container" role="status">
       <div class="spinner"></div>
-      <div class="text">Calculating...</div>
-      <div class="timer" id="timer">Time passed: 0 seconds</div>
+      <div class="text">Calculating…</div>
+      <div class="timer" id="timer">0 s</div>
     </div>
   `;
 
-  // Start a timer to update the "Time passed" message
+  // Count the elapsed seconds while the loading message is on screen
+  clearInterval(loadingTimer);
   let secondsPassed = 0;
   const timerElement = document.getElementById("timer");
-
-  const timerInterval = setInterval(() => {
+  loadingTimer = setInterval(() => {
+    if (!timerElement.isConnected) {
+      clearInterval(loadingTimer);
+      return;
+    }
     secondsPassed++;
-    timerElement.textContent = `Time passed: ${secondsPassed} second${secondsPassed !== 1 ? "s" : ""
-      }`;
+    timerElement.textContent = `${secondsPassed} s`;
   }, 1000);
 }

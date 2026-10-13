@@ -11,6 +11,7 @@
   window.EPIOT = window.EPIOT || {};
   window.EPIOT.openLanding = () => openOverlay();
   window.EPIOT.closeLanding = () => closeOverlay();
+  window.EPIOT.isLandingOpen = () => !overlay.classList.contains("hidden");
 
   // Decide if we should show on first load
   const urlParams = new URLSearchParams(window.location.search);
@@ -28,15 +29,16 @@
   btnContinue?.addEventListener("click", closeOverlay);
 
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeOverlay();
+    if (e.key === "Escape" && !overlay.classList.contains("hidden")) closeOverlay();
   });
 
   // Utils
   function openOverlay() {
     overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
     document.body.classList.add("landing-no-scroll");
     // Focus the continue button for accessibility
-    setTimeout(() => btnContinue?.focus(), 0);
+    setTimeout(() => btnContinue?.focus({ preventScroll: true }), 0);
   }
 
   function closeOverlay() {
