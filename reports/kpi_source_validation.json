@@ -1,0 +1,61 @@
+{
+  "python_tests": 99,
+  "javascript_tests": 13,
+  "selected_point_ids": [
+    19291,
+    22929
+  ],
+  "stored_sessions_before": 318163,
+  "stored_sessions_after": 318163,
+  "browser_visual_check": "not performed: previously unavailable browser helper",
+  "api_validation": [
+    {
+      "source": "simple",
+      "status": 200,
+      "range": {
+        "day_count": 2,
+        "elapsed_hours": 48.0,
+        "end_date": "2026-10-14",
+        "inclusive": true,
+        "start_date": "2026-10-13",
+        "timezone": "Europe/Amsterdam"
+      },
+      "session_count": 6,
+      "energy_kwh": 86.37035227872889,
+      "repeated_cache_hits": 4,
+      "matches_target_day_load_profiles": true
+    },
+    {
+      "source": "spatial",
+      "status": 200,
+      "range": {
+        "day_count": 2,
+        "elapsed_hours": 48.0,
+        "end_date": "2026-10-14",
+        "inclusive": true,
+        "start_date": "2026-10-13",
+        "timezone": "Europe/Amsterdam"
+      },
+      "session_count": 5,
+      "energy_kwh": 58.82994705148022,
+      "repeated_cache_hits": 4,
+      "matches_target_day_load_profiles": true
+    },
+    {
+      "source": "cpft",
+      "status": 200,
+      "range": {
+        "day_count": 2,
+        "elapsed_hours": 48.0,
+        "end_date": "2026-10-14",
+        "inclusive": true,
+        "start_date": "2026-10-13",
+        "timezone": "Europe/Amsterdam"
+      },
+      "session_count": 1,
+      "energy_kwh": 4.411955098406627,
+      "repeated_cache_hits": 4,
+      "matches_target_day_load_profiles": true
+    }
+  ]
+}

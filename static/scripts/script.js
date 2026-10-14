@@ -12,6 +12,8 @@ import {
 } from "./plotter.js";
 import { animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
 import { get_KPIs } from "./data_fetch.js";
+import { pickerOptions } from "./date_selection.js";
+import { initLocationSearch } from "./location_search.js";
 
 // Initialize Map using Leaflet.js
 var map = L.map("map", { zoomControl: false }).setView([52.3676, 4.9041], 16); // Centered on Amsterdam
@@ -60,15 +62,12 @@ let kpi_data_list = [];
 var active_tab = "Load Profiles";
 // get today's date
 var today = new Date();
-const starting_date = new Date("2025-09-01");
+const starting_date = new Date(2025, 8, 1);
+let pickerRangeMode = false;
+let selectedTargetDate = today;
+let selectedKpiRange = null;
 // Initialize Flatpickr on the input field
-let datepicker = flatpickr("#datepicker", {
-  minDate: starting_date, // Set the minimum date to January 1, 2025
-  maxDate: today, // Set the maximum date to today
-  dateFormat: "Y-m-d", // Format the date as DD/MM/YYYY
-  defaultDate: today, // No default date selected
-  disableMobile: true, // Force desktop-style picker on mobile devices
-});
+let datepicker = flatpickr("#datepicker", pickerOptions(false, starting_date, today, [today], onDateSelectionChange));
 
 let dateInput = document.getElementById("datepicker");
 let active_kpi = "user_kpi";
@@ -145,26 +144,63 @@ function clearActive() {
 // keep it; adding to drawnItems here won’t break your existing code.
 
 const hintEl = document.getElementById('draw-hint');
+const drawTools = document.getElementById('draw-toolbar-wrap');
+const drawCount = document.getElementById('draw-count');
+let hintTimer = null;
+let alertTimer = null;
 
-function showHint(text) {
+function showHint(text, { alert = false, timeout = 0 } = {}) {
   if (!hintEl) return;
-  hintEl.textContent = text;
+  clearTimeout(hintTimer);
+  if (alert) {
+    hintEl.innerHTML = `<strong>Start here.</strong> ${text}`;
+  } else {
+    hintEl.textContent = text;
+  }
+  hintEl.classList.toggle('draw-hint--alert', alert);
   hintEl.hidden = false;
+  if (timeout) hintTimer = setTimeout(hideHint, timeout);
 }
 
 function hideHint() {
   if (!hintEl) return;
+  clearTimeout(hintTimer);
   hintEl.hidden = true;
+}
+
+// Pulse the draw tools while there is nothing to analyse yet
+function syncDrawPrompt() {
+  const empty = selected_polygons.length === 0;
+  drawTools?.classList.toggle('draw-tools--prompt', empty);
+  if (drawCount) drawCount.textContent = `${selected_polygons.length}/3`;
+  if (empty) document.getElementById('calc-button')?.classList.remove('glow');
+}
+
+// Analyse was pressed without an area: shake the draw tools and explain
+function flagDrawTools() {
+  if (!drawTools) return;
+  clearActive();
+  drawTools.classList.remove('draw-tools--alert');
+  void drawTools.offsetWidth; // restart the animation
+  drawTools.classList.add('draw-tools--alert');
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => drawTools.classList.remove('draw-tools--alert'), 4000);
+  showHint('Draw a polygon or rectangle around the area you want to analyse.', {
+    alert: true,
+    timeout: 4000,
+  });
 }
 
 // Update your button listeners:
 btnPoly?.addEventListener('click', () => {
+  drawTools?.classList.remove('draw-tools--alert');
   if (enable(polygonHandler, btnPoly)) {
     showHint('Polygon: click to add points, then click the first point (or double-click) to finish. Click the tool again or press Esc to cancel.');
   }
 });
 
 btnRect?.addEventListener('click', () => {
+  drawTools?.classList.remove('draw-tools--alert');
   if (enable(rectangleHandler, btnRect)) {
     showHint('Rectangle: click and drag on the map, release to finish. Click the tool again or press Esc to cancel.');
   }
@@ -528,13 +564,6 @@ map.on(L.Draw.Event.CREATED, function (event) {
     console.log("selected_polygons:", selected_polygons);
     console.log("selected_area_names:", selected_area_names);
 
-    // Stop glowing effect on the draw toolbar
-    const drawToolbar = document.querySelector(".leaflet-draw-toolbar");
-    if (drawToolbar) {
-      drawToolbar.style.animation = "none";
-      drawToolbar.style.boxShadow = "none";
-    }
-
     animateSelectMessage(`${selected_polygons.length} of 3 areas selected. Ready to analyse`);
 
     // Add glowing effect to the Analyse button
@@ -544,6 +573,9 @@ map.on(L.Draw.Event.CREATED, function (event) {
     }
   }
 });
+
+// Registered after the handlers above, so selected_polygons is up to date
+map.on("draw:created draw:deleted draw:deletestop", syncDrawPrompt);
 
 // Load the charger and transformer markers
 fetch_markers(
@@ -571,29 +603,8 @@ map.on("load moveend", function () {
   }
 });
 
-// Handle location search (the form submits on Enter or the arrow button)
-const locationInput = document.getElementById("location-input");
-document
-  .getElementById("input-container")
-  .addEventListener("submit", function (event) {
-    event.preventDefault();
-    var location = locationInput.value.trim();
-    if (!location) return;
-
-    fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(location)}`
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        if (data && data.length > 0) {
-          map.setView([data[0].lat, data[0].lon], 15);
-          locationInput.blur();
-        } else {
-          animateSelectMessage(`No results for "${location}"`);
-        }
-      })
-      .catch(() => animateSelectMessage("Location search is unavailable right now"));
-  });
+// Location search with suggested places and type-ahead results
+initLocationSearch(map, { onError: animateSelectMessage });
 
 ///////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
@@ -771,7 +782,12 @@ function onTrPopupClose(e) {
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 
+let profileRequestVersion = 0;
 function calculateLoadProfiles() {
+  const requestVersion = ++profileRequestVersion;
+  const sessionSource = document.getElementById("session-source").value;
+  const demandAssumption = document.getElementById("demand-assumption").value;
+  const selectedDate = dateInput.value;
   // allocate a list with selectedpolygons.length elements
   charger_ids_list = Array(selected_polygons.length).fill(null);
   transformer_ids_list = Array(selected_polygons.length).fill(null);
@@ -889,16 +905,22 @@ function calculateLoadProfiles() {
 
           // Function to fetch aggregate load data for a single charger
           function fetchAggregateLoadForCharger(chargerId, area_name) {
-            let url = `/stations/aggregate_load?selected_markers=${encodeURIComponent(
-              chargerId
-            )}&strategy=${encodeURIComponent(chargingStrategy)}
-        &date=${encodeURIComponent(dateInput.value)}
-        `;
+            const query = {
+              selected_markers: chargerId, strategy: chargingStrategy,
+              date: selectedDate, session_source: sessionSource, demand_assumption: demandAssumption,
+            };
+            let url = "/stations/aggregate_load";
 
             return fetch(url, {
-              method: "GET",
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(query),
             })
-              .then((response) => response.json())
+              .then(async (response) => {
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+                return data;
+              })
               .then((data) => {
                 // #return the area_name too
                 data.area_name = area_name;
@@ -909,7 +931,7 @@ function calculateLoadProfiles() {
                   `Error fetching data for charger ${chargerId}:`,
                   error
                 );
-                return null; // Return null in case of an error
+                return { error: error.message, area_name };
               });
           }
 
@@ -934,6 +956,7 @@ function calculateLoadProfiles() {
           // Wait for all fetches to complete
           Promise.all(fetchPromises)
             .then((load_profiles) => {
+              if (requestVersion !== profileRequestVersion) return;
               // load_profiles is an array of { chargerId, data }
               console.log("Respones:", load_profiles);
 
@@ -945,8 +968,8 @@ function calculateLoadProfiles() {
               if (failed.length) {
                 showGraphMessage(
                   "Load profiles are not available for this selection",
-                  `The prediction failed for ${failed.join(", ")}. ` +
-                    "Try another date or charging strategy."
+                  load_profiles.map((item) => item.data?.error).filter(Boolean).join(" ") ||
+                    `The prediction failed for ${failed.join(", ")}. Try another session source, date or charging strategy.`
                 );
                 return;
               }
@@ -954,20 +977,30 @@ function calculateLoadProfiles() {
               for (let i = 0; i < load_profiles.length; i++) {
                 // find area name from the selected_area_names
                 let area_name = selected_area_names[i];
+                const response = load_profiles[i].data;
+                const split = response.past_steps ?? 144;
                 let temp_data = {
                   groupName: area_name,
                   // get 144 values for the y-axis y data
-                  pastData: load_profiles[i].data.y.slice(0, 144),
-                  futureData: load_profiles[i].data.y.slice(144),
-                  past_up_flex: load_profiles[i].data.up_flex.slice(0, 144),
-                  past_down_flex: load_profiles[i].data.down_flex.slice(0, 144),
-                  future_up_flex: load_profiles[i].data.up_flex.slice(144),
-                  future_down_flex: load_profiles[i].data.down_flex.slice(144),
+                  pastData: response.y.slice(0, split),
+                  futureData: response.y.slice(split),
+                  past_up_flex: response.up_flex.slice(0, split),
+                  past_down_flex: response.down_flex.slice(0, split),
+                  future_up_flex: response.up_flex.slice(split),
+                  future_down_flex: response.down_flex.slice(split),
+                  pastTimes: response.timestamps?.slice(0, split),
+                  futureTimes: response.timestamps?.slice(split),
+                  source: response.source,
+                  targetDate: selectedDate,
                   number_of_chargers: charger_ids_list[i].length,
                   number_of_transformers: transformer_ids_list[i].length,
                 };
                 load_profile_data.push(temp_data);
               }
+              const metadata = load_profiles[0]?.data?.source;
+              document.getElementById("session-source-note").textContent = metadata
+                ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.`
+                : "No charging points in this selection.";
 
               if (active_tab == "Load Profiles") {
                 if (toggle.checked) {
@@ -1011,11 +1044,21 @@ document.getElementById("strategy").addEventListener("change", function () {
   }
 });
 
-dateInput.addEventListener("change", () => {
-  // A KPI range needs both a start and an end date
-  if (active_tab == "KPIs" && datepicker.selectedDates.length <= 1) return;
+for (const id of ["session-source", "demand-assumption"]) {
+  document.getElementById(id).addEventListener("change", () => runActiveAnalysis());
+}
+
+function onDateSelectionChange(dates) {
+  if (pickerRangeMode && dates.length !== 2) {
+    ++profileRequestVersion;
+    kpi_data_list = [];
+    showGraphMessage("Select a KPI date range", "Choose both a start date and an end date.");
+    return;
+  }
+  if (pickerRangeMode) selectedKpiRange = dates.slice();
+  else if (dates.length) selectedTargetDate = dates[0];
   runActiveAnalysis();
-});
+}
 
 
 const analysisPanel = document.getElementById("graph-container");
@@ -1037,16 +1080,38 @@ function closePanel() {
   $('[data-toggle="tooltip"]').tooltip("hide");
 }
 
-function runActiveAnalysis() {
-  clear_graph();
+async function runActiveAnalysis() {
   if (active_tab == "KPIs") {
-    kpi_data_list = get_KPIs(
-      selected_polygons,
-      selected_area_names,
-      datepicker,
-      active_kpi
-    );
+    const requestVersion = ++profileRequestVersion;
+    kpi_data_list = [];
+    load_profile_data = [];
+    if (datepicker.selectedDates.length !== 2) {
+      showGraphMessage("Select a KPI date range", "Choose both a start date and an end date.");
+      return;
+    }
+    clear_graph();
+    try {
+      const result = await get_KPIs(selected_polygons.slice(), selected_area_names.slice(),
+        datepicker.selectedDates.slice(), {
+          sessionSource: document.getElementById("session-source").value,
+          demandAssumption: document.getElementById("demand-assumption").value,
+        });
+      if (requestVersion !== profileRequestVersion) return;
+      kpi_data_list = result;
+      charger_ids_list = result.map(group => group.chargerIds);
+      transformer_ids_list = result.map(group => group.transformerIds);
+      const metadata = result[0]?.source;
+      document.getElementById("session-source-note").textContent = metadata
+        ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.`
+        : "No charging points in this selection.";
+      renderActiveKpi();
+    } catch (error) {
+      if (requestVersion !== profileRequestVersion) return;
+      showGraphMessage("KPIs are not available for this selection", error.message);
+    }
   } else {
+    kpi_data_list = [];
+    clear_graph();
     calculateLoadProfiles();
   }
 }
@@ -1054,6 +1119,7 @@ function runActiveAnalysis() {
 analysisButton.addEventListener("click", function () {
   if (selected_polygons.length == 0) {
     animateSelectMessage("Draw an area on the map first");
+    flagDrawTools();
     btnPoly?.focus();
     return;
   }
@@ -1122,17 +1188,17 @@ function setActiveTab(activeId) {
 
 // Single-day picker for load/flexibility, date range for KPIs
 function resetDatepicker(rangeMode) {
+  if (pickerRangeMode && datepicker.selectedDates.length === 2) selectedKpiRange = datepicker.selectedDates.slice();
+  if (!pickerRangeMode && datepicker.selectedDates.length) selectedTargetDate = datepicker.selectedDates[0];
   datepicker.destroy();
-  datepicker = flatpickr("#datepicker", {
-    mode: rangeMode ? "range" : "single",
-    minDate: starting_date,
-    maxDate: today,
-    dateFormat: "Y-m-d",
-    defaultDate: rangeMode ? [starting_date, today] : today,
-    disableMobile: true, // Same picker on every device
-  });
+  pickerRangeMode = rangeMode;
+  today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - 6);
+  datepicker = flatpickr("#datepicker", pickerOptions(rangeMode, starting_date, today,
+    rangeMode ? (selectedKpiRange || [weekStart, today]) : [selectedTargetDate], onDateSelectionChange));
   dateInput = document.getElementById("datepicker");
-  dateLabel.textContent = rangeMode ? "Date range" : "Date";
+  dateLabel.textContent = rangeMode ? "Date range" : "Target date";
   // A range needs the full row on phones
   dateInput.closest(".field").classList.toggle("field--wide", rangeMode);
 }
@@ -1149,6 +1215,9 @@ function showTab(tabId) {
 
   kpiSubnav.hidden = !isKpi;
   strategyField.hidden = isKpi;
+  document.getElementById("session-source-field").hidden = false;
+  document.getElementById("demand-assumption-field").hidden = false;
+  document.getElementById("session-source-note").textContent = "Synthetic scenarios with assumed demand, not verified local charging forecasts.";
   // The charger/grid view only applies to load profiles
   viewToggleField.hidden = active_tab !== "Load Profiles";
 
@@ -1167,6 +1236,22 @@ const kpiRenderers = {
   city_kpi: createCityKPIGraph,
 };
 
+function renderActiveKpi() {
+  if (!kpi_data_list.length) {
+    showGraphMessage("Select an area for KPIs", "Draw an area containing charging points.");
+    return;
+  }
+  if (active_kpi === "environment_kpi" && kpi_data_list.every(group => !group.kpi.environment.covered_steps)) {
+    showGraphMessage("Environmental data are unavailable for this range", "Choose dates with stored grid-mix data. Other KPIs use the selected session source.");
+    return;
+  }
+  kpiRenderers[active_kpi](kpi_data_list);
+  if (active_kpi === "environment_kpi") {
+    const metadata = kpi_data_list[0].source;
+    document.getElementById("session-source-note").textContent = `${metadata.label}. ${metadata.note} Environmental values use the available grid-mix hours in this range.`;
+  }
+}
+
 kpiSubnav.querySelectorAll(".subtab").forEach((button) => {
   button.addEventListener("click", () => {
     active_kpi = button.dataset.kpi;
@@ -1175,7 +1260,7 @@ kpiSubnav.querySelectorAll(".subtab").forEach((button) => {
       .forEach((b) => b.classList.toggle("active", b === button));
     // KPI data is already loaded for the selected range; only redraw
     if (kpi_data_list && kpi_data_list.length) {
-      kpiRenderers[active_kpi](kpi_data_list);
+      renderActiveKpi();
     }
   });
 });

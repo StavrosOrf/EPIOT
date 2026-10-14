@@ -46,10 +46,17 @@ ml = [
     "torch",
     "scikit-learn",
 ]
+# Existing CPFT checkpoints, evaluated with this Keras/TensorFlow combination.
+cpft = [
+    "tensorflow==2.20.0",
+    "keras==3.13.2",
+    "numpy>=1.26,<2.3",
+]
 
 [dependency-groups]
 dev = [
     "pytest",
+    "openpyxl",  # checkpoint/export reconciliation in the CPFT tests
 ]
 
 [tool.uv]
@@ -67,3 +74,6 @@ pythonpath = ["."]
 # OneDrive-synced checkouts deny the directory swap pytest uses to write its
 # cache, so keep the cache out of the working tree.
 addopts = "-p no:cacheprovider"
+markers = [
+    "reflex_live: opt-in external ReFlex optimisation (REFLEX_LIVE=1)",
+]

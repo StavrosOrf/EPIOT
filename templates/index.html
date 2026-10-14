@@ -243,48 +243,157 @@
 
     <!-- App bar -->
     <header id="header-bar" class="app-bar">
-      <div class="app-bar__brand">
-        <a href="" id="logo" class="logo" aria-label="EPIOT home">
-          <span class="logo__mark" aria-hidden="true"
-            ><i class="fa fa-bolt"></i
-          ></span>
-          <span class="logo__text">EPIOT</span>
-        </a>
-        <button
-          type="button"
-          id="open-landing-header"
-          class="link-btn"
-          onclick="window.EPIOT.openLanding()"
-        >
-          About
-        </button>
-      </div>
+      <a href="" id="logo" class="logo" aria-label="EPIOT home">
+        <span class="logo__mark" aria-hidden="true"
+          ><i class="fa fa-bolt"></i
+        ></span>
+        <span class="logo__text">EPIOT</span>
+      </a>
+      <span class="app-bar__divider" aria-hidden="true"></span>
 
+      <!-- Step 1: find a place -->
       <form
         id="input-container"
         class="search"
         role="search"
         autocomplete="off"
       >
-        <i class="fa fa-search search__icon" aria-hidden="true"></i>
-        <input
-          type="search"
-          id="location-input"
-          class="search__input"
-          placeholder="Search a location…"
-          aria-label="Search a location"
-        />
-        <button
-          type="submit"
-          id="location-button"
-          class="search__btn"
-          aria-label="Go to location"
-        >
-          <i class="fa fa-arrow-right" aria-hidden="true"></i>
-        </button>
+        <div class="search__field">
+          <i class="fa fa-search search__icon" aria-hidden="true"></i>
+          <input
+            type="text"
+            id="location-input"
+            class="search__input"
+            placeholder="Search a place in Amsterdam…"
+            aria-label="Search a place"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="search-results"
+            spellcheck="false"
+          />
+          <button
+            type="button"
+            id="search-clear"
+            class="search__clear"
+            aria-label="Clear search"
+            hidden
+          >
+            <i class="fa fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div
+          id="search-results"
+          class="search__menu"
+          role="listbox"
+          aria-label="Places"
+          hidden
+        ></div>
       </form>
 
+      <!-- Step 2: draw the areas to analyse -->
+      <div id="draw-toolbar-wrap" class="draw-tools draw-tools--prompt">
+        <div
+          id="draw-toolbar"
+          class="draw-toolbar"
+          role="toolbar"
+          aria-label="Area selection tools"
+        >
+          <span class="draw-toolbar__label" aria-hidden="true">
+            <i class="fa fa-pencil" aria-hidden="true"></i>
+            <span>Draw area</span>
+          </span>
+          <span
+            id="draw-count"
+            class="draw-toolbar__count"
+            title="Areas drawn (up to 3)"
+            >0/3</span
+          >
+          <button
+            id="btn-draw-polygon"
+            class="draw-btn"
+            title="Draw polygon"
+            aria-label="Draw polygon"
+          >
+            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+              <path
+                d="M6 9 L11 5 L20 9 L18 18 L7 19 Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linejoin="round"
+              />
+              <circle cx="6" cy="9" r="1.5" />
+              <circle cx="11" cy="5" r="1.5" />
+              <circle cx="20" cy="9" r="1.5" />
+              <circle cx="18" cy="18" r="1.5" />
+              <circle cx="7" cy="19" r="1.5" />
+            </svg>
+          </button>
+          <button
+            id="btn-draw-rectangle"
+            class="draw-btn"
+            title="Draw rectangle"
+            aria-label="Draw rectangle"
+          >
+            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+              <rect
+                x="4.5"
+                y="6.5"
+                width="15"
+                height="11"
+                rx="2"
+                ry="2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <circle cx="4.5" cy="6.5" r="1.5" />
+              <circle cx="19.5" cy="6.5" r="1.5" />
+              <circle cx="19.5" cy="17.5" r="1.5" />
+              <circle cx="4.5" cy="17.5" r="1.5" />
+            </svg>
+          </button>
+          <span class="draw-toolbar__sep" aria-hidden="true"></span>
+          <button
+            id="btn-draw-delete"
+            class="draw-btn draw-btn--danger"
+            title="Delete shapes"
+            aria-label="Delete shapes"
+          >
+            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+              <path
+                d="M3 6h18M8 6V4h8v2M7 6l1 14h8l1-14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <path
+                d="M10 10v8M14 10v8"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div
+          id="draw-hint"
+          class="draw-hint"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></div>
+      </div>
+
+      <!-- Forces the second row on narrow screens -->
+      <span class="app-bar__break" aria-hidden="true"></span>
+
+      <!-- Map display settings -->
       <div id="checkbox-container" class="layer-toggles" role="group" aria-label="Map layers">
+        <span class="layer-toggles__label">Show</span>
         <label class="chip-toggle" title="Show charging stations">
           <input type="checkbox" id="charger-checkbox" checked />
           <img
@@ -304,94 +413,18 @@
           <span>Transformers</span>
         </label>
       </div>
-    </header>
 
-    <!-- Draw toolbar (floating, left side of the map) -->
-    <div id="draw-toolbar-wrap" class="draw-toolbar-wrap">
-      <div
-        id="draw-toolbar"
-        class="draw-toolbar"
-        role="toolbar"
-        aria-label="Area selection tools"
+      <button
+        type="button"
+        id="open-landing-header"
+        class="help-btn"
+        title="About EPIOT and how to use it"
+        onclick="window.EPIOT.openLanding()"
       >
-        <button
-          id="btn-draw-polygon"
-          class="draw-btn"
-          title="Draw polygon"
-          aria-label="Draw polygon"
-        >
-          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-            <path
-              d="M6 9 L11 5 L20 9 L18 18 L7 19 Z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linejoin="round"
-            />
-            <circle cx="6" cy="9" r="1.5" />
-            <circle cx="11" cy="5" r="1.5" />
-            <circle cx="20" cy="9" r="1.5" />
-            <circle cx="18" cy="18" r="1.5" />
-            <circle cx="7" cy="19" r="1.5" />
-          </svg>
-        </button>
-        <button
-          id="btn-draw-rectangle"
-          class="draw-btn"
-          title="Draw rectangle"
-          aria-label="Draw rectangle"
-        >
-          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-            <rect
-              x="4.5"
-              y="6.5"
-              width="15"
-              height="11"
-              rx="2"
-              ry="2"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            />
-            <circle cx="4.5" cy="6.5" r="1.5" />
-            <circle cx="19.5" cy="6.5" r="1.5" />
-            <circle cx="19.5" cy="17.5" r="1.5" />
-            <circle cx="4.5" cy="17.5" r="1.5" />
-          </svg>
-        </button>
-        <span class="draw-toolbar__sep" aria-hidden="true"></span>
-        <button
-          id="btn-draw-delete"
-          class="draw-btn draw-btn--danger"
-          title="Delete shapes"
-          aria-label="Delete shapes"
-        >
-          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-            <path
-              d="M3 6h18M8 6V4h8v2M7 6l1 14h8l1-14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-            />
-            <path
-              d="M10 10v8M14 10v8"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-            />
-          </svg>
-        </button>
-      </div>
-      <div
-        id="draw-hint"
-        class="draw-hint"
-        role="status"
-        aria-live="polite"
-        hidden
-      ></div>
-    </div>
+        <i class="fa fa-question-circle-o" aria-hidden="true"></i>
+        <span>About</span>
+      </button>
+    </header>
 
     <!-- Status + primary action (bottom of the map) -->
     <div id="fancy-bar-button" class="action-bar">
@@ -414,6 +447,13 @@
       hidden
     >
       <header class="panel__header">
+        <div class="panel__brand">
+          <span class="logo__mark" aria-hidden="true"
+            ><i class="fa fa-bolt"></i
+          ></span>
+          <span class="logo__text">EPIOT</span>
+        </div>
+        <span class="panel__divider" aria-hidden="true"></span>
         <div class="panel__title">
           <h2 id="panel-title">Analysis</h2>
           <span
@@ -421,7 +461,7 @@
             data-toggle="tooltip"
             data-placement="bottom"
             tabindex="0"
-            title="The depicted graphs show the predicted values using DRIVE2X's Machine Learning models."
+            title="Choose a session source to compare synthetic charging scenarios. These are not calibrated forecasts of observed local charging."
             ><i class="fa fa-info-circle" aria-hidden="true"></i
             ><span class="sr-only">About these predictions</span></span
           >
@@ -479,6 +519,22 @@
       </div>
 
       <div class="panel__controls">
+        <div class="field" id="session-source-field">
+          <label for="session-source" class="field__label">Session source</label>
+          <select id="session-source" class="control" aria-describedby="session-source-note">
+            <option value="simple">Simple session sampler</option>
+            <option value="spatial">Spatial session sampler</option>
+            <option value="cpft">CPFT tool — synthetic history</option>
+          </select>
+        </div>
+        <div class="field" id="demand-assumption-field">
+          <label for="demand-assumption" class="field__label">Demand scenario</label>
+          <select id="demand-assumption" class="control">
+            <option value="low">Low demand</option>
+            <option value="base" selected>Base demand</option>
+            <option value="high">High demand</option>
+          </select>
+        </div>
         <div id="toggle-div" class="field field--segmented">
           <span class="field__label">View</span>
           <input type="checkbox" id="toggle" class="toggle-checkbox" />
@@ -499,7 +555,7 @@
         </div>
 
         <div class="field">
-          <label id="date_label" for="datepicker" class="field__label">Date</label>
+          <label id="date_label" for="datepicker" class="field__label">Target date</label>
           <input
             type="text"
             id="datepicker"
@@ -522,6 +578,7 @@
         </div>
       </div>
 
+      <p id="session-source-note" class="session-source-note" role="status">Synthetic scenarios with assumed demand, not verified local charging forecasts.</p>
       <div class="panel__body">
         <div id="graph"></div>
       </div>

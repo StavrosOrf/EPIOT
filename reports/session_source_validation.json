@@ -1,0 +1,16 @@
+{
+  "target_date": "2026-10-15",
+  "prepared_points_by_source": {
+    "cpft": 1399,
+    "simple": 1399,
+    "spatial": 1399
+  },
+  "stored_sessions": 318163,
+  "spatial_matched_points": 1163,
+  "spatial_fallback_points": 236,
+  "model_inference": "existing best_availability.keras and best_kwh.keras, synthetic spatial histories",
+  "api_all_point_selection": "HTTP 200 for every source; all 1399 points fetched from cache",
+  "browser_visual_check": "not completed: browser helper could not initialize its kernel assets",
+  "python_tests": 81,
+  "javascript_tests": 5
+}

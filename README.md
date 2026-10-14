@@ -124,10 +124,10 @@ https://docs.djangoproject.com/en/5.1/ref/contrib/gis/install/spatialite/
 
 The current development team consists of:
 
-- Babak Ravanbach (DLR, product owner)
 - Stavros Orfanoudakis (TU Delft, lead developper)
-- Arellano Ruiz, Eugenio Salvador (DLR, developper)
+- Babak Ravanbach (DLR, product owner)
 
 Past developpers:
+- Arellano Ruiz, Eugenio Salvador (DLR, developper)
 - Elif Turhan (DLR, developper)
 - Niklas Wulff (DLR, developper)

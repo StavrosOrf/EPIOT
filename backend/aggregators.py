@@ -3,13 +3,11 @@ import numpy as np
 import datetime
 import polars as pl
 from itertools import compress
-import json
-import time
-from collections import defaultdict as Dict
 
-from backend.api_calls.reflex import create_ReFlex_Query
+from backend.api_calls.reflex import (
+    ReflexClient, aggregate_reflex_results, create_ReFlex_Query,
+)
 from backend.api_calls.prices import retrieve_day_ahead_prices
-import requests
 
 
 def simulate_uncontrolled_profiles_from_sessions(chargers, charging_sessions, start_date):
@@ -260,82 +258,17 @@ def simulate_avg_charging_profiles_from_sessions(chargers, charging_sessions, st
 
 
 def simulate_cost_optimal_operation(chargers, charging_sessions, start_date):
+    """Return the ReFlex schedule and instantaneous flexibility in average kW."""
+    if not charging_sessions:
+        return [0.0] * 288, [0.0] * 288, [0.0] * 288
     prices = retrieve_day_ahead_prices(start_date, days_ahead=2)
-
-    # print(prices)
-    # print(f'len prices: {len(prices)}')
-
-    agg_load_profile = np.zeros(288)
-    agg_up_flex = np.zeros(288)
-    agg_down_flex = np.zeros(288)
-
-    # return prices.tolist(), agg_up_flex.tolist(), agg_down_flex.tolist()
-
-    query_body, availability = create_ReFlex_Query(chargers,
-                                                   charging_sessions,
-                                                   prices, 
-                                                   start_date)
-    # save query_body to a file
-    # with open('query_body.json', 'w') as f:
-    #     json.dump(query_body, f)
-
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
-    api_url = "https://drive2x-reflex.hesi.energy/services/run/single"
-
-    response = requests.post(api_url,
-                             headers=headers,
-                             verify=False,
-                             data=json.dumps(query_body))
-    # print(f'Response: {response}')
-    run_id = response.json()["id"]
-    # print(f'Run ID: {run_id}')
-
-    api_run_status_url = "https://drive2x-reflex.hesi.energy/services/run/info/:id"
-
-    status_response = requests.get(api_run_status_url.replace(":id", run_id),
-                                   headers=headers,
-                                   verify=False)
-    while status_response.json()["runStatus"] != "completed":
-        status_response = requests.get(api_run_status_url.replace(":id", run_id),
-                                       headers=headers,
-                                       verify=False)
-        # print(f'Status: {status_response.json()["runStatus"]}')
-        time.sleep(1)  # Think about async implementation
-
-    api_get_results_url = "https://drive2x-reflex.hesi.energy/services/run/results/:id"
-    results = requests.get(api_get_results_url.replace(":id", run_id),
-                           headers=headers,
-                           verify=False)
-    print(f'Results: {results}')
-
-    keys = results.json()['devicePlans'].keys()
-
-    agg_load_profile = np.zeros(288)
-    agg_up_flex = np.zeros(288)
-    agg_down_flex = np.zeros(288)
-
-    for key in keys:
-        load_profile = list(results.json()['devicePlans'][key])
-        power_limit = chargers[int(key)]
-        if power_limit is None or power_limit <= 0:
-            power_limit = 11
-
-        load_profile = np.array(load_profile)
-
-        assert (load_profile >= 0).all(), "Load profile must be positive"
-        # convert to kWh/10min from joules
-        load_profile = load_profile / 3.6e6
-        agg_load_profile += load_profile  # / 6
-
-        ch_availability = availability[int(key)]
-        agg_up_flex += np.ones(len(load_profile)) * \
-            power_limit*ch_availability - load_profile
-        agg_down_flex += - load_profile
-
-    return agg_load_profile.tolist(), agg_up_flex.tolist(), agg_down_flex.tolist()
+    query, availability = create_ReFlex_Query(
+        chargers, charging_sessions, prices, start_date,
+    )
+    if not query["assets"]["evChargePoints"]:
+        return [0.0] * 288, [0.0] * 288, [0.0] * 288
+    results = ReflexClient().run(query)
+    return aggregate_reflex_results(query, availability, results)
 
 
 def time_forecast(date=None):

@@ -1,0 +1,10 @@
+[Unit]
+Description=Prepare tomorrow's EPIOT scenarios daily
+
+[Timer]
+OnCalendar=*-*-* 18:00:00 Europe/Amsterdam
+Persistent=true
+Unit=epiot-session-scenarios.service
+
+[Install]
+WantedBy=timers.target

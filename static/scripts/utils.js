@@ -16,10 +16,11 @@ function generateLoadDataSheet(profile_data) {
   const wsData = [
     [
       "Area Name",
-      "Timestamp",
-      "EV Load (kWh)",
+      "Timestamp (UTC)",
+      "EV Load (kW)",
       "Upward Flexibility (kW)",
       "Downward Flexibility (kW)",
+      "Session source", "Demand assumption", "Synthetic",
     ],
   ];
 
@@ -55,7 +56,9 @@ function generateLoadDataSheet(profile_data) {
       const upFlex = combinedUpFlex[t];
       const downFlex = combinedDownFlex[t];
 
-      const timestamp = new Date(startTime.getTime() + (t + 6) * 10 * 60000); // 10 minutes in milliseconds
+      const suppliedTimes = group.pastTimes?.concat(group.futureTimes);
+      const timestamp = suppliedTimes ? new Date(suppliedTimes[t])
+        : new Date(startTime.getTime() + t * 10 * 60000);
 
       // Format timestamp as desired (e.g., 'YYYY-MM-DD HH:mm:ss')
       const formattedTimestamp = timestamp
@@ -63,7 +66,8 @@ function generateLoadDataSheet(profile_data) {
         .replace("T", " ")
         .substring(0, 19);
 
-      wsData.push([groupName, formattedTimestamp, evLoad, upFlex, downFlex]);
+      wsData.push([groupName, formattedTimestamp, evLoad, upFlex, downFlex,
+        group.source?.label || "Stored sessions", group.source?.assumption || "", group.source?.synthetic ?? ""]);
     }
   }
 
@@ -94,11 +98,18 @@ function generateChargerIdSheet(selectedChargerIds, profile_data) {
 }
 
 function generateKPIsSheet(kpi_data_list) {
+  const group = kpi_data_list;
   kpi_data_list = kpi_data_list.kpi;
   const wsData = [];
 
   // Add a header row (optional)
   wsData.push(["KPI Category", "Values"]);
+  wsData.push(["Session source", group.source?.label || kpi_data_list.source?.label || "Stored sessions"]);
+  wsData.push(["Demand assumption", kpi_data_list.source?.assumption || ""]);
+  wsData.push(["Synthetic", kpi_data_list.source?.synthetic ?? ""]);
+  wsData.push(["Start date (inclusive)", kpi_data_list.range?.start_date || ""]);
+  wsData.push(["End date (inclusive)", kpi_data_list.range?.end_date || ""]);
+  wsData.push(["Timezone", kpi_data_list.range?.timezone || ""]);
 
   // Push each distribution array as a separate row
   wsData.push(["arrival_dist_wd", ...kpi_data_list.arrival_dist_wd]);
@@ -153,19 +164,19 @@ export function generateAndDownloadExcel(selectedChargerIds, profile_data, kpi_d
   // Second Sheet: Charger IDs
   const chargerIdSheet = generateChargerIdSheet(
     selectedChargerIds,
-    profile_data
+    profile_data.length ? profile_data : kpi_data_list
   );
 
   // Create a new Workbook
   const wb = XLSX.utils.book_new();
 
   // Append the sheets to the workbook
-  XLSX.utils.book_append_sheet(wb, loadDataSheet, "Load Data");
+  if (profile_data.length) XLSX.utils.book_append_sheet(wb, loadDataSheet, "Load Data");
   XLSX.utils.book_append_sheet(wb, chargerIdSheet, "Charger IDs");
 
   for (let i = 0; i < kpi_data_list.length; i++) {
     // find area name from the selected_area_names
-    let area_name = profile_data[i].groupName;
+    let area_name = kpi_data_list[i].groupName;
     var kpisSheet = generateKPIsSheet(kpi_data_list[i]);
     var name = area_name + "_KPIs";
     XLSX.utils.book_append_sheet(wb, kpisSheet, name);

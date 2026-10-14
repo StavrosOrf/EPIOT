@@ -207,20 +207,22 @@ export function createGraph(groupData, cs_mode = true, startDate = null) {
     startDate.setHours(0, 0, 0, 0);
   }
   // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 288 }, (_, i) => {
+  var defaultTimeSteps = Array.from({ length: 288 }, (_, i) => {
     let date = new Date(startDate.getTime());
     date.setMinutes(date.getMinutes() + i * 10);
     return date;
   });
 
   groupData.forEach((dataItem, index) => {
+    const timeSteps = dataItem.pastTimes ? dataItem.pastTimes.concat(dataItem.futureTimes) : defaultTimeSteps;
+    const pastSteps = dataItem.pastData.length;
     // Create traces for past and future data as step plots
     var pastTrace = {
-      x: timeSteps.slice(0, 144),
+      x: timeSteps.slice(0, pastSteps),
       y: dataItem.pastData,
       mode: "lines",
       line: { color: "green", shape: "hv" }, // Step plot
-      name: "Yesterday (" + formatDate(timeSteps[0]) + ")",
+      name: "Previous day (" + formatDate(new Date(timeSteps[0])) + ")",
       xaxis: "x" + (index + 1),
       yaxis: "y" + (index + 1),
       legendgroup: "group",
@@ -228,11 +230,11 @@ export function createGraph(groupData, cs_mode = true, startDate = null) {
     };
 
     var futureTrace = {
-      x: timeSteps.slice(144),
+      x: timeSteps.slice(pastSteps),
       y: dataItem.futureData,
       mode: "lines",
       line: { color: "blue", shape: "hv" }, // Step plot
-      name: "Today (" + formatDate(timeSteps[144]) + ")",
+      name: "Target day (" + formatDate(new Date(timeSteps[pastSteps])) + ")",
       xaxis: "x" + (index + 1),
       yaxis: "y" + (index + 1),
       legendgroup: "group",
@@ -252,6 +254,7 @@ export function createGraph(groupData, cs_mode = true, startDate = null) {
       //   matches: "x", // Match x-axes to the main x-axis
       showticklabels: showXLabels, // Show tick labels only on the last subplot
       tickangle: -45, // Rotate labels if needed
+      title: dataItem.pastTimes ? "Time (UTC)" : undefined,
     };
 
     layout["yaxis" + (index + 1)] = {
@@ -268,7 +271,7 @@ export function createGraph(groupData, cs_mode = true, startDate = null) {
         yref: "y" + (index + 1) + " domain",
         x0: timeSteps[0],
         y0: 0,
-        x1: timeSteps[143],
+        x1: timeSteps[pastSteps - 1],
         y1: 1,
         fillcolor: "rgba(150, 150, 150, 0.2)",
         layer: "below",
@@ -278,9 +281,9 @@ export function createGraph(groupData, cs_mode = true, startDate = null) {
         type: "rect",
         xref: "x",
         yref: "y" + (index + 1) + " domain",
-        x0: timeSteps[144],
+        x0: timeSteps[pastSteps],
         y0: 0,
-        x1: timeSteps[287],
+        x1: timeSteps[timeSteps.length - 1],
         y1: 1,
         fillcolor: "rgba(220, 220, 220, 0.2)",
         layer: "below",
@@ -395,16 +398,18 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
   }
 
   // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 288 }, (_, i) => {
+  var defaultTimeSteps = Array.from({ length: 288 }, (_, i) => {
     let date = new Date(startDate.getTime());
     date.setMinutes(date.getMinutes() + i * 10);
     return date;
   });
 
   groupData.forEach((dataItem, index) => {
+    const timeSteps = dataItem.pastTimes ? dataItem.pastTimes.concat(dataItem.futureTimes) : defaultTimeSteps;
+    const pastSteps = dataItem.pastData.length;
     // Create traces for past and future data as step plots
     var pastTrace_up = {
-      x: timeSteps.slice(0, 144),
+      x: timeSteps.slice(0, pastSteps),
       y: dataItem.past_up_flex,
       mode: "lines",
       fill: "tozeroy", // Fills the area under the line to the x-axis
@@ -417,7 +422,7 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
     };
 
     var pastTrace_down = {
-      x: timeSteps.slice(0, 144),
+      x: timeSteps.slice(0, pastSteps),
       y: dataItem.past_down_flex,
       mode: "lines",
       fill: "tozeroy", // Fills the area under the line to the x-axis
@@ -430,7 +435,7 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
     };
 
     var futureTrace_up = {
-      x: timeSteps.slice(144),
+      x: timeSteps.slice(pastSteps),
       y: dataItem.future_up_flex,
       mode: "lines",
       fill: "tozeroy", // Fills the area under the line to the x-axis
@@ -443,7 +448,7 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
     };
 
     var futureTrace_down = {
-      x: timeSteps.slice(144),
+      x: timeSteps.slice(pastSteps),
       y: dataItem.future_down_flex,
       mode: "lines",
       fill: "tozeroy", // Fills the area under the line to the x-axis
@@ -468,6 +473,7 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
       //   matches: "x", // Match x-axes to the main x-axis
       showticklabels: showXLabels, // Show tick labels only on the last subplot
       tickangle: -45, // Rotate labels if needed
+      title: dataItem.pastTimes ? "Time (UTC)" : undefined,
     };
 
     layout["yaxis" + (index + 1)] = {
@@ -484,7 +490,7 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
         yref: "y" + (index + 1) + " domain",
         x0: timeSteps[0],
         y0: 0,
-        x1: timeSteps[143],
+        x1: timeSteps[pastSteps - 1],
         y1: 1,
         fillcolor: "rgba(150, 150, 150, 0.2)",
         layer: "below",
@@ -494,9 +500,9 @@ export function createFlexGraph(groupData, flex_mode = true, startDate = null) {
         type: "rect",
         xref: "x",
         yref: "y" + (index + 1) + " domain",
-        x0: timeSteps[144],
+        x0: timeSteps[pastSteps],
         y0: 0,
-        x1: timeSteps[287],
+        x1: timeSteps[timeSteps.length - 1],
         y1: 1,
         fillcolor: "rgba(220, 220, 220, 0.2)",
         layer: "below",
@@ -893,7 +899,7 @@ export function createGridKPIGraph(groupData) {
     };
 
     var dist_2_wd = {
-      x: [0,20,40,60,80,100,120,140,160,180,200],
+      x: Array.from({length: 10}, (_, i) => 10+20*i),
       y: dataItem.kpi.daily_consumption_dist_wd,
       type: "scatter",
       mode: "lines",
@@ -908,7 +914,7 @@ export function createGridKPIGraph(groupData) {
     };
 
     var dist_2_we = {
-      x: [0,20,40,60,80,100,120,140,160,180,200],
+      x: Array.from({length: 10}, (_, i) => 10+20*i),
       y: dataItem.kpi.daily_consumption_dist_we,
       type: "scatter",
       mode: "lines",
@@ -922,7 +928,7 @@ export function createGridKPIGraph(groupData) {
     };
 
     var dist_3_wd = {
-      x: [0,10,20,30,40,50,60,70,80,90,100],
+      x: Array.from({length: 10}, (_, i) => 5+10*i),
       y: dataItem.kpi.consumption_dist_wd,
       type: "scatter",
       mode: "lines",
@@ -937,7 +943,7 @@ export function createGridKPIGraph(groupData) {
     };
 
     var dist_3_we = {
-      x: [0,10,20,30,40,50,60,70,80,90,100],
+      x: Array.from({length: 10}, (_, i) => 5+10*i),
       y: dataItem.kpi.consumption_dist_we,
       type: "scatter",
       mode: "lines",
@@ -1297,11 +1303,7 @@ export function createCityKPIGraph(groupData) {
   );
 
   // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 48 }, (_, i) => {
-    let date = new Date(startDate.getTime());
-    date.setHours(date.getHours() + i/2);
-    return date.getHours();
-  });
+  var timeSteps = Array.from({ length: 48 }, (_, i) => i/2);
   // console.log(timeSteps);
   groupData.forEach((dataItem, index) => {
     // Create traces for past and future data as step plots
@@ -1336,7 +1338,7 @@ export function createCityKPIGraph(groupData) {
     };
 
     var dist_2_wd = {
-      x: [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100],
+      x: Array.from({length: 20}, (_, i) => 2.5+5*i),
       y: dataItem.kpi.occupation_ratio_dist
       ,
       type: "scatter",

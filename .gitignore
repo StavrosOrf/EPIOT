@@ -23,3 +23,10 @@ logs/
 # Virtualenv. On OneDrive checkouts this is a junction to a directory
 # outside the synced tree - see README, "Environment setup".
 .venv/
+
+_build/
+
+# Ship the verified CPFT preprocessing bundle; keep other input data ignored.
+!backend/data/
+backend/data/*
+!backend/data/cpft_preprocessing.json

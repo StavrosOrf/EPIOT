@@ -1,7 +1,8 @@
 /* ==========================================================================
    EPIOT – main stylesheet
-   Map-first layout: floating app bar, draw toolbar, bottom action bar and an
-   analysis panel that becomes a full-screen sheet on small screens.
+   Map-first layout: floating app bar (with the draw tools), bottom action bar
+   and an analysis panel that replaces the app bar while it is open and becomes
+   a full-screen sheet on small screens.
    ========================================================================== */
 
 :root {
@@ -10,6 +11,8 @@
   --brand-50: #e8f5ed;
   --brand-100: #cfe9d9;
   --danger: #c0392b;
+  --attention: #e59a0b;
+  --attention-50: #fff6e3;
 
   --surface: #ffffff;
   --surface-2: #f5f7f6;
@@ -233,18 +236,28 @@ body.analysis-open #map {
   background: var(--surface-2);
 }
 
-.link-btn {
-  padding: 6px 10px;
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
   font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
   background: none;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.link-btn:hover {
+.help-btn .fa {
+  font-size: 17px;
+}
+
+.help-btn:hover {
   color: var(--brand-600);
   background: var(--brand-50);
 }
@@ -262,7 +275,7 @@ body.analysis-open #map {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 16px;
+  gap: 10px 12px;
   padding: 8px 12px;
   background: var(--surface-glass);
   backdrop-filter: blur(12px);
@@ -272,18 +285,25 @@ body.analysis-open #map {
   box-shadow: var(--shadow);
 }
 
-.app-bar__brand {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+/* Left: brand, then the workflow (find a place, draw areas). Right: what the
+   map shows and help. A break element wraps them onto two rows when narrow. */
+.app-bar__divider {
   flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+.app-bar__break {
+  display: none;
 }
 
 .logo {
   display: inline-flex;
   align-items: center;
+  flex: none;
   gap: 8px;
-  padding-right: 6px;
+  padding-right: 2px;
   color: var(--text);
   text-decoration: none;
 }
@@ -314,11 +334,15 @@ body.analysis-open #map {
 /* Search */
 .search {
   position: relative;
+  flex: 1 1 280px;
+  max-width: 420px;
+  margin: 0;
+}
+
+.search__field {
+  position: relative;
   display: flex;
   align-items: center;
-  flex: 1 1 260px;
-  max-width: 440px;
-  margin: 0;
 }
 
 .search__icon {
@@ -331,19 +355,16 @@ body.analysis-open #map {
 .search__input {
   width: 100%;
   height: 40px;
-  padding: 0 44px 0 38px;
+  padding: 0 40px 0 38px;
   font-size: 14px;
   color: var(--text);
   background: var(--surface-2);
   border: 1px solid transparent;
   border-radius: 999px;
   outline: none;
+  text-overflow: ellipsis;
   transition: border-color 0.15s ease, background-color 0.15s ease,
     box-shadow 0.15s ease;
-}
-
-.search__input::-webkit-search-cancel-button {
-  display: none;
 }
 
 .search__input:focus {
@@ -352,49 +373,207 @@ body.analysis-open #map {
   box-shadow: 0 0 0 3px rgba(31, 138, 76, 0.15);
 }
 
-.search__btn {
+.search__clear {
   position: absolute;
-  right: 4px;
+  right: 6px;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  color: #fff;
-  background: var(--brand);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: none;
   border: none;
   border-radius: 50%;
   cursor: pointer;
 }
 
-.search__btn:hover {
-  background: var(--brand-600);
+.search__clear:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 
-/* Layer toggles */
-.layer-toggles {
+/* Suggestions dropdown */
+.search__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: var(--z-hint);
+  width: max(100%, 380px);
+  max-width: calc(100vw - var(--gap) * 2);
+  max-height: min(440px, 60vh);
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  animation: message-in 0.15s ease;
+}
+
+.search__group {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.search__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.search__option[aria-selected="true"] {
+  background: var(--brand-50);
+}
+
+.search__option-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.search__option[aria-selected="true"] .search__option-icon {
+  color: var(--brand-600);
+  background: var(--surface);
+}
+
+.search__option-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search__option-name,
+.search__option-meta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search__option-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.search__option-name mark {
+  padding: 0;
+  font-weight: 700;
+  color: var(--brand-600);
+  background: none;
+}
+
+.search__option-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.search__status {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.search__spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--brand-100);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.search__footer {
+  margin-top: 4px;
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* Short-lived marker on the place that was picked */
+.search-pin span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: var(--brand);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+  animation: search-pin 1.4s ease-out infinite;
+}
+
+@keyframes search-pin {
+  0% {
+    box-shadow: var(--shadow), 0 0 0 0 rgba(31, 138, 76, 0.5);
+  }
+  100% {
+    box-shadow: var(--shadow), 0 0 0 18px rgba(31, 138, 76, 0);
+  }
+}
+
+/* Layer toggles: one grouped control, as they set what the map shows */
+.layer-toggles {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  height: 40px;
   margin-left: auto;
+  padding: 3px 3px 3px 12px;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+
+.layer-toggles__label {
+  margin-right: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .chip-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
+  height: 32px;
   margin: 0;
   padding: 0 12px 0 8px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
   cursor: pointer;
   user-select: none;
   transition: background-color 0.15s ease, border-color 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chip-toggle:hover {
+  color: var(--text);
 }
 
 .chip-toggle input {
@@ -413,8 +592,9 @@ body.analysis-open #map {
 
 .chip-toggle:has(input:checked) {
   color: var(--brand-600);
-  background: var(--brand-50);
+  background: var(--surface);
   border-color: var(--brand-100);
+  box-shadow: var(--shadow-sm);
 }
 
 .chip-toggle:has(input:checked) .chip-toggle__icon {
@@ -427,66 +607,97 @@ body.analysis-open #map {
   outline-offset: 2px;
 }
 
-body.analysis-open .search,
-body.analysis-open .layer-toggles {
+/* The analysis panel takes over the top of the screen and carries the brand */
+body.analysis-open .app-bar {
   display: none;
 }
 
 /* --------------------------------------------------------------------------
-   Draw toolbar (left side of the map)
+   Draw tools (in the app bar)
    -------------------------------------------------------------------------- */
 
-.draw-toolbar-wrap {
-  position: fixed;
-  top: calc(var(--header-h) + var(--gap) * 2 + var(--safe-top));
-  left: var(--gap);
-  z-index: var(--z-map-ui);
+.draw-tools {
+  position: relative;
+  flex: none;
 }
 
 .draw-toolbar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 6px;
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  gap: 2px;
+  height: 40px;
+  padding: 3px 4px 3px 14px;
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
+  border-radius: 999px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.draw-toolbar__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--brand-600);
+}
+
+.draw-toolbar__label .fa {
+  font-size: 14px;
+}
+
+.draw-toolbar__count {
+  margin-right: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-600);
+  background: var(--surface);
+  border-radius: 999px;
 }
 
 .draw-toolbar__sep {
-  width: 24px;
-  height: 1px;
-  margin: 2px 0;
-  background: var(--border);
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--brand-100);
 }
 
 .draw-btn {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 32px;
   padding: 0;
-  color: var(--text);
+  color: var(--brand-600);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .draw-btn:hover {
   color: var(--brand-600);
-  background: var(--brand-50);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .draw-btn.active {
   color: #fff;
   background: var(--brand);
   border-color: var(--brand);
+  box-shadow: 0 2px 6px rgba(31, 138, 76, 0.35);
+}
+
+.draw-btn--danger {
+  color: var(--text-muted);
 }
 
 .draw-btn--danger:hover {
@@ -498,11 +709,12 @@ body.analysis-open .layer-toggles {
   color: #fff;
   background: var(--danger);
   border-color: var(--danger);
+  box-shadow: 0 2px 6px rgba(192, 57, 43, 0.35);
 }
 
 .draw-btn .icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .draw-btn .icon circle {
@@ -510,25 +722,99 @@ body.analysis-open .layer-toggles {
   stroke: none;
 }
 
+/* Gentle pulse while no area has been drawn yet (handed over to the Analyse
+   button once there is one) */
+.draw-tools--prompt .draw-toolbar:not(:has(.draw-btn.active)) {
+  animation: draw-prompt 2.4s ease-in-out infinite;
+}
+
+@keyframes draw-prompt {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(31, 138, 76, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(31, 138, 76, 0);
+  }
+}
+
+/* Analyse was pressed without an area: point firmly at the tools */
+.draw-tools--alert .draw-toolbar,
+.draw-tools--alert .draw-toolbar:not(:has(.draw-btn.active)) {
+  background: var(--attention-50);
+  border-color: var(--attention);
+  box-shadow: 0 0 0 3px rgba(229, 154, 11, 0.35);
+  animation: draw-alert 0.6s ease 3;
+}
+
+.draw-tools--alert .draw-toolbar__label,
+.draw-tools--alert .draw-btn:not(.draw-btn--danger) {
+  color: #9a5b00;
+}
+
+@keyframes draw-alert {
+  0%,
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 3px rgba(229, 154, 11, 0.35);
+  }
+  15% {
+    transform: translateX(-4px);
+  }
+  30% {
+    transform: translateX(4px);
+    box-shadow: 0 0 0 8px rgba(229, 154, 11, 0.2);
+  }
+  45% {
+    transform: translateX(-3px);
+  }
+  60% {
+    transform: translateX(2px);
+  }
+}
+
+/* Instructions drop down below the tools */
 .draw-hint {
   position: absolute;
-  top: 0;
-  left: calc(100% + 10px);
+  top: calc(100% + 12px);
+  left: 0;
   width: max-content;
-  max-width: min(320px, calc(100vw - 90px));
+  max-width: min(340px, calc(100vw - var(--gap) * 4));
   padding: 10px 12px;
   font-size: 13px;
   line-height: 1.4;
   color: #f2f7f4;
-  background: rgba(20, 26, 23, 0.9);
+  background: rgba(20, 26, 23, 0.92);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow);
   z-index: var(--z-hint);
   pointer-events: none;
+  animation: message-in 0.2s ease;
 }
 
-body.analysis-open .draw-toolbar-wrap {
-  display: none;
+.draw-hint::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 28px;
+  border: 6px solid transparent;
+  border-top: 0;
+  border-bottom-color: rgba(20, 26, 23, 0.92);
+}
+
+.draw-hint--alert {
+  color: #4a3200;
+  background: var(--attention-50);
+  border: 1px solid var(--attention);
+}
+
+.draw-hint--alert::before {
+  top: -7px;
+  border-bottom-color: var(--attention);
+}
+
+.draw-hint strong {
+  font-weight: 700;
 }
 
 /* --------------------------------------------------------------------------
@@ -591,7 +877,7 @@ body.analysis-open .action-bar {
 
 .panel {
   position: fixed;
-  top: calc(var(--header-h) + var(--gap) * 2 + var(--safe-top));
+  top: calc(var(--gap) + var(--safe-top));
   bottom: calc(var(--gap) + var(--safe-bottom));
   left: 50%;
   z-index: var(--z-panel);
@@ -627,9 +913,24 @@ body.analysis-open .action-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 16px;
-  padding: 12px 12px 12px 20px;
+  gap: 8px 14px;
+  padding: 10px 12px 10px 16px;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
+}
+
+.panel__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.panel__divider {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--border);
 }
 
 .panel__title {
@@ -640,8 +941,9 @@ body.analysis-open .action-bar {
 
 .panel__title h2 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .info-dot {
@@ -741,6 +1043,14 @@ body.analysis-open .action-bar {
   gap: 12px 16px;
   padding: 14px 20px;
   background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.session-source-note {
+  margin: 0;
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1018,12 +1328,44 @@ select.control {
    Responsive
    -------------------------------------------------------------------------- */
 
-/* Tablets and narrow laptops: header wraps onto two rows */
-@media (max-width: 900px) {
-  .layer-toggles {
-    margin-left: 0;
+/* Narrow laptops and tablets: brand, layers and help on the first row; the
+   workflow (search, draw) gets the full second row */
+@media (max-width: 1100px) {
+  .logo {
+    order: 1;
   }
 
+  .app-bar__divider {
+    display: none;
+  }
+
+  .layer-toggles {
+    order: 2;
+  }
+
+  .help-btn {
+    order: 3;
+  }
+
+  .app-bar__break {
+    display: block;
+    order: 4;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .search {
+    order: 5;
+    flex: 1 1 220px;
+    max-width: none;
+  }
+
+  .draw-tools {
+    order: 6;
+  }
+}
+
+@media (max-width: 900px) {
   .panel__controls {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
@@ -1041,24 +1383,49 @@ select.control {
     border-radius: var(--radius);
   }
 
-  .app-bar__brand {
-    flex: 1 1 auto;
-    justify-content: space-between;
+  .draw-toolbar {
+    padding-left: 12px;
+  }
+
+  .draw-toolbar__label span,
+  .draw-toolbar__count {
+    /* The pencil alone marks the group; buttons keep their titles and the
+       bottom bar reports how many areas are drawn */
+    display: none;
   }
 
   .search {
-    order: 3;
-    flex-basis: 100%;
+    /* Let the dropdown span the whole app bar instead of the narrow box */
+    position: static;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .search__menu {
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    width: auto;
     max-width: none;
   }
 
   .layer-toggles {
-    order: 2;
+    padding-left: 3px;
+  }
+
+  .layer-toggles__label,
+  .help-btn span {
+    display: none;
+  }
+
+  .help-btn {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
   }
 
   .chip-toggle {
-    height: 34px;
-    padding: 0 10px 0 6px;
+    padding: 0 8px;
   }
 
   .chip-toggle span {
@@ -1111,7 +1478,18 @@ select.control {
   }
 
   .panel__header {
-    padding: 8px 8px 8px 16px;
+    gap: 8px 10px;
+    padding: 8px 8px 8px 12px;
+  }
+
+  .panel__brand .logo__mark {
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+  }
+
+  .panel__brand .logo__text {
+    font-size: 17px;
   }
 
   .panel__title {
@@ -1171,14 +1549,6 @@ select.control {
 
 /* Short landscape screens (phones on their side) */
 @media (max-height: 520px) and (orientation: landscape) {
-  .panel {
-    top: var(--gap);
-  }
-
-  body.analysis-open .app-bar {
-    display: none;
-  }
-
   .panel__controls {
     padding-top: 8px;
     padding-bottom: 8px;

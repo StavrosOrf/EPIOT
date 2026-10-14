@@ -1,479 +1,116 @@
-from json import JSONDecodeError
-from flask import abort, jsonify, request
-import geojson as gj
-from shapely.geometry import shape
-from shapely.errors import GeometryTypeError
-from backend.models import ChargingPoint, Location, Operator
-from backend.utils import stations_to_geojson
-from flask import current_app, Blueprint
-from backend.views import get_day_before
+"""KPI endpoint with inclusive local dates and selectable session sources."""
 
-from sqlalchemy import select, func, extract, and_
-import numpy as np
-from backend.models import ChargingPoint, Location, Operator, Session, PowerMix
-from backend.utils import find_charger_availability
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from backend.aggregators import (
-    simulate_uncontrolled_profiles_from_sessions,
-    simulate_delayed_profiles_from_sessions,
-    simulate_avg_charging_profiles_from_sessions
-)
+from flask import Blueprint, current_app, jsonify, request
+from sqlalchemy import select
+
+from backend.cpft import day_window
+from backend.cpft_runtime import CPFTUnavailable
+from backend.kpi.statistics import calculate_kpis, days_between
+from backend.models import ChargingPoint, Location, Session, PowerMix
+from backend.scenario_sampling import ScenarioSession, UTC
+from backend.session_sources import SessionSourceService, SOURCE_LABELS
+from backend.spatial_profiles import DEFAULT_ATLAS
 
 kpi_data = Blueprint("kpi", "kpi")
 
 
-@kpi_data.route("/user", methods=["GET"])
+def calendar_date(value, zone):
+    """Accept calendar dates and convert legacy aware timestamps to local dates."""
+    if not isinstance(value, str) or not value:
+        raise ValueError("Both a start date and an end date are required")
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.astimezone(zone).date() if parsed.tzinfo else parsed.date()
+
+
+@kpi_data.route("/user", methods=["GET", "POST"])
 def get_user_kpi():
-    db = current_app.config["station_data.db"]
-    cfg = current_app.config["aggregator_config"]
-    selected_markers = request.args.get("selected_markers", "")
-    selected_markers = selected_markers.strip()
-
-    if selected_markers == "undefined":
-        print("No markers selected!!!")
-        return jsonify({"x": np.arange(144).tolist()})
-
-    selected_markers = selected_markers.split(
-        ",") if selected_markers != "" else []
-    if len(selected_markers) > 0:
-        selected_markers = tuple(selected_markers)
-        statement = (
-            select(
-                ChargingPoint.id,
-                ChargingPoint.power,
-                ChargingPoint.type,
-                Operator.name,
-                Location.latitude,
-                Location.longitude,
-                Location.street,
-            )
-            .join(ChargingPoint.column)
-            .join(Location)
-            .join(Operator)
-        ).filter(ChargingPoint.id.in_(selected_markers))
-        query_result = db.session.execute(statement)
-        # make diuctionary from query_result with id as key and power as value
-        chargers = {row[0]: row[1] for row in query_result}
-
-        start_date = request.args.get("start_date", "")
-        end_date = request.args.get("end_date", "")
-
-        # Parse datetime strings to extract just the date part
-        if start_date:
-            # Handle ISO datetime strings like "2025-09-02T22:00:00.000Z"
-            if 'T' in start_date:
-                # Extract just the date part
-                start_date = start_date.split('T')[0]
-        if end_date:
-            if 'T' in end_date:
-                end_date = end_date.split('T')[0]  # Extract just the date part
-
-        statement = (
-            select(
-                Session.cp_id,
-                Session.start,
-                Session.end,
-                Session.consumption
-            )
-            .filter(
-                and_(
-                    Session.start >= start_date,  # Sessions starting on or after start_date
-                    Session.end <= end_date,  # Sessions ending on or before end_date
-                    # Filter by cp_id in selected_markers
-                    Session.cp_id.in_(selected_markers)
-                )
-            )
-        )
-
-        # Execute the query
-        charging_sessions = db.session.execute(statement).all()
-        charging_sessions = [s for s in charging_sessions]
-
-        print(f'Analyzing {len(charging_sessions)} charging sessions')
-        # print(f'Chargers: {chargers}')
-        print(f'Start date: {start_date}, end date: {end_date}')
-
-        # Convert date strings to datetime objects for calculations
-        start_date_obj = datetime.fromisoformat(start_date)
-        end_date_obj = datetime.fromisoformat(end_date)
-
-        print(f'Number of days: {(end_date_obj - start_date_obj).days}')
-        # iterate over all days between start_date and end_date
-
-        co2_intensities_uncontrolled = np.zeros(24)
-        co2_intensities_delayed = np.zeros(24)
-        co2_intensities_avg = np.zeros(24)
-
-        renewable_energy_uncontrolled = 0
-        renewable_energy_delayed = 0
-        renewable_energy_avg = 0
-
-        total_energy_consumed_uncontrolled = 0
-        total_energy_consumed_delayed = 0
-        total_energy_consumed_avg = 0
-
-        #Calculate CO2 intensities for each day in the range
-        for day in range(0, (end_date_obj - start_date_obj).days, 2):
-
-            current_date = start_date_obj + timedelta(days=day)
-            current_date_str = current_date.strftime('%Y-%m-%d')
-            next_date = current_date + timedelta(days=2)
-            next_date_str = next_date.strftime('%Y-%m-%d')
-            # print(f'Analyzing day: {current_date_str}')
-
-            # Query the database and find PowerMixes for the current day and the next day
-            current_day_start = datetime.combine(
-                current_date.date(), datetime.min.time())
-            next_day_end = datetime.combine(
-                next_date.date(), datetime.max.time())
-            # print(f'Querying PowerMix from {current_day_start} to {next_day_end}')
-
-            power_mix_statement = (
-                select(
-                    PowerMix.datetime,
-                    PowerMix.renewable_percentage,
-                    PowerMix.co2_intensity,
-                    PowerMix.fossil_free_percentage,
-                    PowerMix.power_consumption_total
-                )
-                .filter(
-                    and_(
-                        PowerMix.country_zone == "NL",  # Netherlands
-                        PowerMix.datetime >= current_day_start,
-                        PowerMix.datetime <= next_day_end
-                    )
-                )
-                .order_by(PowerMix.datetime)
-            )
-
-            power_mix_data = db.session.execute(power_mix_statement).all()
-
-            if power_mix_data:
-                print(
-                    f'Found {len(power_mix_data)} PowerMix entries for {current_date_str} to {next_date_str}')
-
-                # Extract data for analysis
-                renewable_percentages = [pm[1] for pm in power_mix_data]
-                co2_intensities = [pm[2] for pm in power_mix_data]
-                fossil_free_percentages = [pm[3]
-                                           for pm in power_mix_data if pm[3] is not None]
-                total_power_consumption = [pm[4]
-                                           for pm in power_mix_data if pm[4] is not None]
-                if len(renewable_percentages) <= 24:
-
-                    renewable_percentages = [0]*24 + renewable_percentages
-                    co2_intensities = [0]*24 + co2_intensities
-                    fossil_free_percentages = [0]*24 + fossil_free_percentages
-                    total_power_consumption = [0]*24 + total_power_consumption
-                    
-                if len(renewable_percentages) < 48:
-                    renewable_percentages = renewable_percentages + [0]*(48 - len(renewable_percentages))
-                    co2_intensities = co2_intensities + [0]*(48 - len(co2_intensities))
-                    fossil_free_percentages = fossil_free_percentages + [0]*(48 - len(fossil_free_percentages))
-                    total_power_consumption = total_power_consumption + [0]*(48 - len(total_power_consumption))
-
-            else:
-                continue
-
-            load_profile, _, _ = simulate_uncontrolled_profiles_from_sessions(
-                chargers,
-                charging_sessions,
-                start_date=current_date_str)
-            # print(f'Uncontrolled load profile sum: {np.sum(load_profile)} kWh')
-
-            # calculate total energy per hour
-            total_energy_per_hour_afap = np.zeros(48)
-            for i in range(48):
-                total_energy_per_hour_afap[i] = np.sum(
-                    np.array(load_profile[i*6:(i+1)*6])/6)
-
-            co2_intensities_uncontrolled += np.array(
-                co2_intensities[:24]) * total_energy_per_hour_afap[:24]
-            co2_intensities_uncontrolled += np.array(
-                co2_intensities[24:]) * total_energy_per_hour_afap[24:]
-            
-            # print(f'Renewable percentages: {renewable_percentages}')
-            # print(f'Total energy per hour AFAP: {total_energy_per_hour_afap}')
-            # print(f'Sum total energy per hour AFAP: {np.sum(total_energy_per_hour_afap)} kWh')
-            
-            renewable_energy_uncontrolled += np.sum(np.array(renewable_percentages)/100 * total_energy_per_hour_afap)                        
-            if np.sum(np.array(renewable_percentages)) != 0:
-                total_energy_consumed_uncontrolled += np.sum(total_energy_per_hour_afap)
-            
-            
-            # print(f'Renewable percentages: {renewable_percentages}')
-            # print(f'Sum total energy per hour AFAP: {np.sum(total_energy_per_hour_afap)} kWh')
-
-            load_profile, _, _ = simulate_delayed_profiles_from_sessions(
-                chargers,
-                charging_sessions,
-                start_date=current_date_str)
-            # print(f'Delayed load profile sum: {np.sum(load_profile)} kWh')
-            # calculate total energy per hour
-            total_energy_per_hour_delayed = np.zeros(48)
-            for i in range(48):
-                total_energy_per_hour_delayed[i] = np.sum(
-                    np.array(load_profile[i*6:(i+1)*6])/6)
-            co2_intensities_delayed += np.array(
-                co2_intensities[:24]) * total_energy_per_hour_delayed[:24]
-            co2_intensities_delayed += np.array(
-                co2_intensities[24:]) * total_energy_per_hour_delayed[24:]
-            renewable_energy_delayed += np.sum(np.array(renewable_percentages)/100 * total_energy_per_hour_delayed)
-            if np.sum(np.array(renewable_percentages)) != 0:
-                total_energy_consumed_delayed += np.sum(total_energy_per_hour_delayed)
-            
-            load_profile, _, _ = simulate_avg_charging_profiles_from_sessions(
-                chargers,
-                charging_sessions,
-                start_date=current_date_str)
-            # print(f'Average load profile sum: {np.sum(load_profile)} kWh')
-            # calculate total energy per hour
-            total_energy_per_hour_avg = np.zeros(48)
-            for i in range(48):
-                total_energy_per_hour_avg[i] = np.sum(
-                    np.array(load_profile[i*6:(i+1)*6])/6)
-            co2_intensities_avg += np.array(
-                co2_intensities[:24]) * total_energy_per_hour_avg[:24]
-            co2_intensities_avg += np.array(
-                co2_intensities[24:]) * total_energy_per_hour_avg[24:]
-            renewable_energy_avg += np.sum(np.array(renewable_percentages)/100 * total_energy_per_hour_avg)
-            if np.sum(np.array(renewable_percentages)) != 0:
-                total_energy_consumed_avg += np.sum(total_energy_per_hour_avg)
-
-        ####################################################################
-
-        start_times = [s[1].hour for s in charging_sessions]
-        # find the duration of each session in minutes
-        durations = [(s[2] - s[1]).seconds/60 for s in charging_sessions]
-        departure_times = [s[2].hour for s in charging_sessions]
-        energy_consumed = [s[3] for s in charging_sessions]
-        day_of_week = [s[1].weekday() for s in charging_sessions]
-        # season = [s[1].month for s in charging_sessions]
-        # # 0 = winter, 1 = spring, 2 = summer, 3 = fall
-        # season = [0 if s in [12, 1, 2] else 1 if s in [3, 4, 5]
-        #           else 2 if s in [6, 7, 8] else 3 for s in season]
-
-        # daily energy consumption (kWh) per charging station (when the station is used)
-        daily_consumption_we = {}
-        daily_consumption_wd = {}
-        for i, s in enumerate(charging_sessions):
-            if day_of_week[i] >= 5:
-                pair = (s[1].date(), s[3])
-                if pair not in daily_consumption_we:
-                    daily_consumption_we[pair] = 0
-                daily_consumption_we[pair] += s[3]
-            else:
-                pair = (s[1].date(), s[3])
-                if pair not in daily_consumption_wd:
-                    daily_consumption_wd[pair] = 0
-                daily_consumption_wd[pair] += s[3]
-
-        daily_consumption_dist = {}
-        for day_type in ['weekday', 'weekend']:
-            if day_type == 'weekday':
-                daily_consumption_dist[day_type], _ = np.histogram(
-                    [e for e in daily_consumption_wd.values()],
-                    bins=10,
-                    density=False,
-                    range=(0, 200)
-                )
-            else:
-                daily_consumption_dist[day_type], _ = np.histogram(
-                    [e for e in daily_consumption_we.values()],
-                    bins=10,
-                    density=False,
-                    range=(0, 200)
-                )
-        hour_of_arrival_consumption_wd = np.array([0]*24)
-        hour_counter_wd = np.array([1]*24)
-        hour_of_arrival_consumption_we = np.array([0]*24)
-        hour_counter_we = np.array([1]*24)
-        for day_type in ['weekday', 'weekend']:
-            for i, s in enumerate(charging_sessions):
-                if day_of_week[i] < 5:
-                    hour_of_arrival_consumption_wd[s[1].hour] += s[3]
-                    hour_counter_wd[s[1].hour] += 1
-                else:
-                    hour_of_arrival_consumption_we[s[1].hour] += s[3]
-                    hour_counter_we[s[1].hour] += 1
-
-        # use numpy to calculate the histogram of the start times
-        start_times_dist = {}
-
-        for day_type in ['weekday', 'weekend']:
-            if day_type == 'weekday':
-                start_times_dist[day_type], _ = np.histogram(
-                    [s for i, s in enumerate(
-                        start_times) if day_of_week[i] < 5],
-                    bins=24,
-                    density=False,
-                    range=(0, 24)
-                )
-            else:
-                start_times_dist[day_type], _ = np.histogram(
-                    [s for i, s in enumerate(
-                        start_times) if day_of_week[i] >= 5],
-                    bins=24,
-                    density=False,
-                    range=(0, 24)
-                )
-
-        durations_dist = {}
-        durations = [d/60 for d in durations]  # convert to hours
-        for day_type in ['weekday', 'weekend']:
-            if day_type == 'weekday':
-                durations_dist[day_type], _ = np.histogram(
-                    [d for i, d in enumerate(
-                        durations) if day_of_week[i] < 5],
-                    bins=24,
-                    density=False,
-                    range=(0, 24)
-                )
-            else:
-                durations_dist[day_type], _ = np.histogram(
-                    [d for i, d in enumerate(
-                        durations) if day_of_week[i] >= 5],
-                    bins=24,
-                    density=False,
-                    range=(0, 24)
-                )
-
-        consumption_dist = {}
-        for day_type in ['weekday', 'weekend']:
-            if day_type == 'weekday':
-                consumption_dist[day_type], _ = np.histogram(
-                    [e for i, e in enumerate(
-                        energy_consumed) if day_of_week[i] < 5],
-                    bins=10,
-                    density=False,
-                    range=(0, 100)
-                )
-            else:
-                consumption_dist[day_type], _ = np.histogram(
-                    [e for i, e in enumerate(
-                        energy_consumed) if day_of_week[i] >= 5],
-                    bins=10,
-                    density=False,
-                    range=(0, 100)
-                )
-
-        # calculate daily aggreagetd consumption per charging station
-        daily_consumption = {}
-        for day_type in ['weekday', 'weekend']:
-            if day_type == 'weekday':
-                daily_consumption[day_type] = np.zeros(24)
-                for i, e in enumerate(energy_consumed):
-                    daily_consumption[day_type][day_of_week[i]] += e
-            else:
-                daily_consumption[day_type] = np.zeros(24)
-                for i, e in enumerate(energy_consumed):
-                    daily_consumption[day_type][day_of_week[i]] += e
-
-        departure_times_dist = {}
-        for day_type in ['weekday', 'weekend']:
-            if day_type == 'weekday':
-                departure_times_dist[day_type], _ = np.histogram(
-                    [s for i, s in enumerate(
-                        departure_times) if day_of_week[i] < 5],
-                    bins=24,
-                    density=False,
-                    range=(0, 24)
-                )
-            else:
-                departure_times_dist[day_type], _ = np.histogram(
-                    [s for i, s in enumerate(
-                        departure_times) if day_of_week[i] >= 5],
-                    bins=24,
-                    density=False,
-                    range=(0, 24)
-                )
-
-        start_datetime = datetime.fromisoformat(
-            start_date.replace("Z", "+01:00"))
-        end_datetime = datetime.fromisoformat(end_date.replace("Z", "+01:00"))
-
-        number_of_days = (end_datetime - start_datetime).days + 1
-        if start_datetime.tzinfo is not None:
-            start_datetime = start_datetime.replace(tzinfo=None)
-            end_datetime = end_datetime.replace(tzinfo=None)
-
-        number_of_charging_stations = len(selected_markers)
-        daily_number_of_sessions = np.zeros(
-            (number_of_days, number_of_charging_stations))
-
-        for i, s in enumerate(charging_sessions):
-            day = (s[1] - start_datetime).days
-            daily_number_of_sessions[day][selected_markers.index(
-                f'{s[0]}')] += 1
-
-        starting_day = start_datetime.weekday()
-        print(f'starting day: {starting_day}')
-        day_of_the_week_sessions = {}
-        day_of_the_week_sessions_dist = {}
-        for i in range(7):
-            day_of_the_week_sessions[starting_day] = daily_number_of_sessions[starting_day::7].tolist(
-            )
-            day_of_the_week_sessions[starting_day] = [
-                item for sublist in day_of_the_week_sessions[starting_day] for item in sublist]
-
-            day_of_the_week_sessions_dist[starting_day], _ = np.histogram(
-                day_of_the_week_sessions[starting_day],
-                bins=5,
-                density=True,
-                range=(0, 5)
-            )
-            starting_day = (starting_day + 1) % 7
-        # sort the dictionary by key
-        day_of_the_week_sessions_dist = dict(
-            sorted(day_of_the_week_sessions_dist.items()))
-
-        weekday_availability, weekend_availability, occupation_ratio = find_charger_availability(
-            charging_sessions, start_datetime, end_datetime)
-
-        # weekday_availability turn to weekly occupancy
-        weekday_availability = np.array(weekday_availability)
-        weekday_availability = (np.max(
-            weekday_availability)+0.1*np.max(weekday_availability) - weekday_availability)
-
-        weekend_availability = np.array(weekend_availability)
-        weekend_availability = (
-            np.max(weekend_availability) + 0.1*np.max(weekend_availability) - weekend_availability)
-
-        occupation_ratio = np.array(occupation_ratio)
-        occupation_ratio_dist, _ = np.histogram(
-            occupation_ratio,
-            bins=20,
-            density=True,
-            range=(0, 1)
-        )
-        
-        return jsonify({"arrival_dist_wd": start_times_dist['weekday'].tolist(),
-                        "arrival_dist_we": start_times_dist['weekend'].tolist(),
-                        "duration_dist_wd": durations_dist['weekday'].tolist(),
-                        "duration_dist_we": durations_dist['weekend'].tolist(),
-                        "consumption_dist_wd": consumption_dist['weekday'].tolist(),
-                        "consumption_dist_we": consumption_dist['weekend'].tolist(),
-                        "departure_dist_wd": departure_times_dist['weekday'].tolist(),
-                        "departure_dist_we": departure_times_dist['weekend'].tolist(),
-                        "daily_consumption_dist_wd": daily_consumption_dist['weekday'].tolist(),
-                        "daily_consumption_dist_we": daily_consumption_dist['weekend'].tolist(),
-                        "hour_of_arrival_consumption_wd": (hour_of_arrival_consumption_wd/hour_counter_wd).tolist(),
-                        "hour_of_arrival_consumption_we": (hour_of_arrival_consumption_we/hour_counter_we).tolist(),
-                        "sessions_per_day_0": day_of_the_week_sessions_dist[0].tolist(),
-                        "sessions_per_day_1": day_of_the_week_sessions_dist[1].tolist(),
-                        "sessions_per_day_2": day_of_the_week_sessions_dist[2].tolist(),
-                        "sessions_per_day_3": day_of_the_week_sessions_dist[3].tolist(),
-                        "sessions_per_day_4": day_of_the_week_sessions_dist[4].tolist(),
-                        "sessions_per_day_5": day_of_the_week_sessions_dist[5].tolist(),
-                        "sessions_per_day_6": day_of_the_week_sessions_dist[6].tolist(),
-                        "weekday_availability": weekday_availability.tolist(),
-                        "weekend_availability": weekend_availability.tolist(),
-                        "occupation_ratio_dist": occupation_ratio_dist.tolist(),
-                        "co2_intensities_uncontrolled": (co2_intensities_uncontrolled).tolist(),
-                        "co2_intensities_delayed": (co2_intensities_delayed).tolist(),
-                        "co2_intensities_avg": (co2_intensities_avg).tolist(),
-                        "renewable_energy_shared_uncontrolled": renewable_energy_uncontrolled * 100 / (total_energy_consumed_uncontrolled if total_energy_consumed_uncontrolled > 0 else 1),
-                        "renewable_energy_shared_delayed": renewable_energy_delayed * 100 / (total_energy_consumed_delayed if total_energy_consumed_delayed > 0 else 1),
-                        "renewable_energy_shared_avg": renewable_energy_avg * 100 / (total_energy_consumed_avg if total_energy_consumed_avg > 0 else 1)
-                    })
+    arguments = request.get_json(silent=True) if request.method == "POST" else request.args
+    if arguments is None or not hasattr(arguments, "get"):
+        return jsonify(error="Expected a JSON object"), 400
+    try:
+        timezone_name = current_app.config.get("SESSION_SCENARIO_TIMEZONE", "Europe/Amsterdam")
+        zone = ZoneInfo(timezone_name)
+        start_date = calendar_date(arguments.get("start_date"), zone)
+        end_date = calendar_date(arguments.get("end_date"), zone)
+        if end_date < start_date:
+            raise ValueError("The end date must be on or after the start date")
+        if end_date > datetime.now(zone).date():
+            raise ValueError("KPI dates cannot be after today")
+        source = str(arguments.get("session_source", "database")).strip()
+        if source not in {"database", *SOURCE_LABELS}:
+            raise ValueError("Unknown session source")
+        assumption = arguments.get("demand_assumption", "base")
+        if assumption not in {"low", "base", "high"}:
+            raise ValueError("Unknown demand assumption")
+        seed = int(arguments.get("seed", 42))
+        if not 0 <= seed <= 2**32-1:
+            raise ValueError("Seed must be an integer between 0 and 4294967295")
+        markers = arguments.get("selected_markers", [])
+        if isinstance(markers, str):
+            markers = markers.strip().split(",") if markers.strip() else []
+        if not isinstance(markers, list):
+            raise ValueError("Selected markers must be IDs or a comma-separated string")
+        ids = sorted({int(value) for value in markers})
+        db = current_app.config["station_data.db"]
+        rows = list(db.session.execute(select(ChargingPoint.id, ChargingPoint.power, ChargingPoint.type,
+            Location.latitude, Location.longitude).join(ChargingPoint.column).join(Location)
+            .where(ChargingPoint.id.in_(ids))))
+        if len(rows) != len(ids):
+            raise ValueError("One or more selected charging points are unavailable")
+        chargers = [dict(id=row[0], power=row[1], type=row[2], latitude=row[3], longitude=row[4]) for row in rows]
+        left, _ = day_window(start_date, timezone_name)
+        _, right = day_window(end_date, timezone_name)
+        mix = db.session.execute(select(PowerMix.datetime, PowerMix.renewable_percentage, PowerMix.co2_intensity)
+            .where(PowerMix.country_zone == "NL", PowerMix.datetime >= left.replace(tzinfo=None),
+                   PowerMix.datetime < right.replace(tzinfo=None)).order_by(PowerMix.datetime)).all()
+        metadata = dict(source=source, label=SOURCE_LABELS.get(source, "Stored sessions"),
+            synthetic=source != "database", assumption=assumption if source != "database" else None,
+            seed=seed, point_count=len(chargers), cache_hits=0,
+            note="Synthetic scenarios with assumed demand, not verified local charging forecasts."
+                 if source != "database" else "Stored session dataset; local charging observations are not verified.")
+        if source == "database":
+            # Existing Session timestamps are local, timezone-free datetimes.
+            local_left = datetime.combine(start_date, time.min)
+            local_right = datetime.combine(end_date+timedelta(days=1), time.min)
+            stored = db.session.execute(select(Session.cp_id, Session.start, Session.end, Session.consumption)
+                .where(Session.cp_id.in_(ids), Session.start < local_right, Session.end > local_left)).all()
+            records = [ScenarioSession(cp_id, start.replace(tzinfo=zone).astimezone(UTC),
+                       end.replace(tzinfo=zone).astimezone(UTC), float(energy or 0))
+                       for cp_id, start, end, energy in stored if start and end and end > start and (energy or 0) >= 0]
+            daily = ((day, records) for day in days_between(start_date, end_date))
+        elif not chargers:
+            daily = ((day, []) for day in days_between(start_date, end_date))
+        else:
+            service = current_app.extensions.get("session_source_service")
+            if service is None:
+                service = SessionSourceService(
+                    cache_path=current_app.config.get("SESSION_SCENARIO_CACHE", Path(current_app.instance_path)/"session_scenarios.sqlite"),
+                    atlas_path=current_app.config.get("SESSION_SCENARIO_ATLAS", DEFAULT_ATLAS),
+                    daily_arrivals=float(current_app.config.get("SESSION_DAILY_ARRIVALS", 2.)))
+                current_app.extensions["session_source_service"] = service
+            def scenarios():
+                for day in days_between(start_date, end_date):
+                    records, daily_metadata = service.get(chargers, day, source=source, assumption=assumption,
+                        seed=seed, timezone_name=timezone_name)
+                    metadata["cache_hits"] += daily_metadata["cache_hits"]
+                    metadata["label"], metadata["note"] = daily_metadata["label"], daily_metadata["note"]
+                    yield day, records
+            daily = scenarios()
+        output = calculate_kpis(chargers, daily, start_date, end_date, timezone_name, mix)
+        metadata["point_days"] = len(chargers)*output["range"]["day_count"]
+        output["source"] = metadata
+        return jsonify(output)
+    except (ValueError, TypeError, KeyError) as exc:
+        return jsonify(error=str(exc)), 400
+    except CPFTUnavailable as exc:
+        return jsonify(error=str(exc)), 503
+    except (OSError, RuntimeError) as exc:
+        current_app.logger.exception("KPI session source failed")
+        return jsonify(error=f"KPI session source is unavailable: {exc}"), 503
