@@ -1,0 +1,1166 @@
+{
+  "executed_at_utc": "2026-10-13T20:33:17.674690+00:00",
+  "runtime_seconds": 74.41127409995534,
+  "versions": {
+    "tensorflow": "2.20.0",
+    "keras": "3.13.2",
+    "numpy": "2.2.6",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.6.1",
+    "openpyxl": "3.1.5"
+  },
+  "source_sha256": {
+    "others\\CPFT-main\\CPFT-tool\\Station_2_39_139_28.csv": "cd4262dd0c327607a5fd6028a9f6a6689b2d0a6bc112718bf21327cfbbf32d41",
+    "others\\CPFT-main\\CPFT-tool\\CPFT_VS_Code_Python\\outputs\\EV_forecasting_upgraded_results.xlsx": "b54140b1e87f5bec0e06604fc650c6bc6456cf0208d0be20ed74303a6f194bbe",
+    "others\\CPFT-main\\CPFT-tool\\CPFT_VS_Code_Python\\outputs\\best_availability.keras": "04304f3d3029ea362736774e8c999f8d6f8b2771b8d46a846c294f2961eefe38",
+    "others\\CPFT-main\\CPFT-tool\\CPFT_VS_Code_Python\\outputs\\best_kwh.keras": "3d4acb00667defc81f0f1b684869df584e36278d62d8c1e8ef14767161b94fd3",
+    "others\\CPFT-main\\CPFT-tool\\CPFT_VS_Code_Python\\CPFT_pipeline_VS_Code_Python.py": "d54b12afa107ae4585e637ecf0b8c1a5fba475b2225eb2a8f01a5613d67fd54d"
+  },
+  "source_station": "2-39-139-28",
+  "station_timezone": "America/Los_Angeles",
+  "sessions": 1808,
+  "charging_end_after_disconnect": 48,
+  "preprocessing": {
+    "export_features_match": true,
+    "maximum_feature_difference": 2.137537449844398e-07,
+    "training_rows_for_scalers": 17719,
+    "validation_rows_before_windows": 5906,
+    "training_end_inclusive": "2020-05-09 20:00:00+00:00",
+    "clipping_bounds": {
+      "kWhDelivered": [
+        -3.9864948853903845,
+        5.529228897143022
+      ],
+      "connected_minutes": [
+        -58.979466518234574,
+        109.52912420622559
+      ]
+    },
+    "future_connection_feature_proxies": {
+      "occupancy_count": 1.0378038850761893,
+      "connected_minutes": 51.836679461827764
+    }
+  },
+  "checkpoint_checks": {
+    "scaler_matches_embedded_checkpoint_metadata": true,
+    "availability_input": [
+      72,
+      35
+    ],
+    "energy_input": [
+      72,
+      42
+    ],
+    "parameters": {
+      "availability": 118274,
+      "energy": 270433
+    },
+    "preserved_occupancy_blend": true,
+    "blend_weight": 0.11939028650522232
+  },
+  "checkpoint_export_reconciliation": {
+    "maximum_occupancy_probability_difference": 3.874301910955502e-07,
+    "maximum_energy_difference_kwh": 1.430511474609375e-06,
+    "predictions_reproduce_saved_export": true,
+    "threshold_reselected_on_validation": 0.48499999999999993,
+    "exported_threshold": 0.4849999999999999,
+    "validation_start": "2020-05-11 02:00:00+00:00",
+    "validation_end": "2021-01-11 13:00:00+00:00",
+    "validation_occupancy_f1": 0.8079800498753117
+  },
+  "one_hour_ahead": {
+    "occupancy": {
+      "n": 5893,
+      "accuracy": 0.9158323434583404,
+      "precision": 0.8369565217391305,
+      "recall": 0.8279569892473119,
+      "f1": 0.8324324324324325,
+      "true_positive": 1232,
+      "true_negative": 4165,
+      "false_positive": 240,
+      "false_negative": 256,
+      "observed_occupied_hours": 1488,
+      "predicted_occupied_hours": 1472,
+      "observed_occupied_segments": 225,
+      "predicted_occupied_segments": 253,
+      "auc": 0.9477718074524306,
+      "brier_score": 0.06838781884463013
+    },
+    "energy_ungated": {
+      "n": 5836,
+      "mae": 0.21857421887812772,
+      "rmse": 0.6261003521700701,
+      "r2": 0.5071417349214045,
+      "mean_bias": -0.050188074335425326,
+      "actual_total_kwh": 1607.1220577972006,
+      "predicted_total_kwh": 1314.2244559756582,
+      "total_bias_percent": -18.22497553315906
+    },
+    "energy_predicted_occupancy_gated": {
+      "n": 5836,
+      "mae": 0.20929314335618704,
+      "rmse": 0.6705773846824908,
+      "r2": 0.4346310502763413,
+      "mean_bias": -0.08756794238205702,
+      "actual_total_kwh": 1607.1220577972006,
+      "predicted_total_kwh": 1096.0755460555156,
+      "total_bias_percent": -31.798861154463275
+    },
+    "baselines": {
+      "Last hour": {
+        "occupancy": {
+          "n": 5893,
+          "accuracy": 0.9236382148311556,
+          "precision": 0.8487903225806451,
+          "recall": 0.8487903225806451,
+          "f1": 0.8487903225806451,
+          "true_positive": 1263,
+          "true_negative": 4180,
+          "false_positive": 225,
+          "false_negative": 225,
+          "observed_occupied_hours": 1488,
+          "predicted_occupied_hours": 1488,
+          "observed_occupied_segments": 225,
+          "predicted_occupied_segments": 225
+        },
+        "energy": {
+          "n": 5836,
+          "mae": 0.2399608963063505,
+          "rmse": 0.7703889912260525,
+          "r2": 0.2538016505351013,
+          "mean_bias": -5.469313221037226e-19,
+          "actual_total_kwh": 1607.1220577972006,
+          "predicted_total_kwh": 1607.1220577972003,
+          "total_bias_percent": -1.986091336567358e-16
+        }
+      },
+      "Previous day": {
+        "occupancy": {
+          "n": 5893,
+          "accuracy": 0.7342609876124215,
+          "precision": 0.4736129905277402,
+          "recall": 0.47043010752688175,
+          "f1": 0.4720161834120027,
+          "true_positive": 700,
+          "true_negative": 3627,
+          "false_positive": 778,
+          "false_negative": 788,
+          "observed_occupied_hours": 1488,
+          "predicted_occupied_hours": 1478,
+          "observed_occupied_segments": 225,
+          "predicted_occupied_segments": 225
+        },
+        "energy": {
+          "n": 5836,
+          "mae": 0.4493927173962661,
+          "rmse": 1.173791440982652,
+          "r2": -0.7322717567219654,
+          "mean_bias": -0.0008875942426319403,
+          "actual_total_kwh": 1607.1220577972006,
+          "predicted_total_kwh": 1601.9420577972005,
+          "total_bias_percent": -0.3223152824558928
+        }
+      },
+      "Previous week": {
+        "occupancy": {
+          "n": 5893,
+          "accuracy": 0.7676904802307822,
+          "precision": 0.5414057063326374,
+          "recall": 0.5228494623655914,
+          "f1": 0.5319658119658119,
+          "true_positive": 778,
+          "true_negative": 3746,
+          "false_positive": 659,
+          "false_negative": 710,
+          "observed_occupied_hours": 1488,
+          "predicted_occupied_hours": 1437,
+          "observed_occupied_segments": 225,
+          "predicted_occupied_segments": 219
+        },
+        "energy": {
+          "n": 5836,
+          "mae": 0.42876255123560825,
+          "rmse": 1.1628372805028533,
+          "r2": -0.7000905031350948,
+          "mean_bias": -0.007384793976683979,
+          "actual_total_kwh": 1607.1220577972006,
+          "predicted_total_kwh": 1564.0244001492729,
+          "total_bias_percent": -2.6816667370616174
+        }
+      }
+    }
+  },
+  "day_ahead": {
+    "CPFT": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.6650594110556225,
+        "precision": 0.3837602706621556,
+        "recall": 0.5423497267759563,
+        "f1": 0.44947636569487687,
+        "true_positive": 794,
+        "true_negative": 3068,
+        "false_positive": 1275,
+        "false_negative": 670,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 2069,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 83,
+        "auc": 0.7144546088234442,
+        "brier_score": 0.24879652337774136
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.2946389371655332,
+        "rmse": 0.9201690903551002,
+        "r2": -0.06229442897194937,
+        "mean_bias": -0.23343820978938684,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 245.37837355023112,
+        "total_bias_percent": -84.6729909359264
+      }
+    },
+    "Last hour": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.5918718787670053,
+        "precision": 0.30541237113402064,
+        "recall": 0.48565573770491804,
+        "f1": 0.375,
+        "true_positive": 711,
+        "true_negative": 2726,
+        "false_positive": 1617,
+        "false_negative": 753,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 2328,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 52
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.3046681632923329,
+        "rmse": 0.9702490748446255,
+        "r2": -0.18107124795853813,
+        "mean_bias": -0.24151299908986978,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 198.48807208232648,
+        "total_bias_percent": -87.60188831680578
+      }
+    },
+    "Previous day (recursive)": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.737385913552609,
+        "precision": 0.47915242652084755,
+        "recall": 0.47882513661202186,
+        "f1": 0.47898872565767,
+        "true_positive": 701,
+        "true_negative": 3581,
+        "false_positive": 762,
+        "false_negative": 763,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 1463,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 256
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.40607942276747855,
+        "rmse": 1.1339340253549146,
+        "r2": -0.6131887951041639,
+        "mean_bias": -0.057855108393165273,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 1264.9894433580898,
+        "total_bias_percent": -20.98527517406554
+      }
+    },
+    "Previous week": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.768038574134665,
+        "precision": 0.5412844036697247,
+        "recall": 0.5239071038251366,
+        "f1": 0.5324540090246442,
+        "true_positive": 767,
+        "true_negative": 3693,
+        "false_positive": 650,
+        "false_negative": 697,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 1417,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 217
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.4270492937852609,
+        "rmse": 1.1609431810813566,
+        "r2": -0.6909530623026505,
+        "mean_bias": -0.009151826700176975,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 1547.8094001492725,
+        "total_bias_percent": -3.3195616944218242
+      }
+    },
+    "Always zero": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.7478904770105046,
+        "precision": null,
+        "recall": 0.0,
+        "f1": 0.0,
+        "true_positive": 0,
+        "true_negative": 4343,
+        "false_positive": 0,
+        "false_negative": 1464,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 0,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 0
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.2756938277591184,
+        "rmse": 0.9343799638409205,
+        "r2": -0.09535944373007155,
+        "mean_bias": -0.2756938277591184,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 0.0,
+        "total_bias_percent": -100.0
+      }
+    }
+  },
+  "connection_proxy_sensitivity": {
+    "full_hour": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.6237299810573446,
+        "precision": 0.351340206185567,
+        "recall": 0.5819672131147541,
+        "f1": 0.43815890974543587,
+        "true_positive": 852,
+        "true_negative": 2770,
+        "false_positive": 1573,
+        "false_negative": 612,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 2425,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 81,
+        "auc": 0.6959213935118255,
+        "brier_score": 0.28677981630399557
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.2892703561797365,
+        "rmse": 0.9202609391445906,
+        "r2": -0.06250651026878007,
+        "mean_bias": -0.24293351804750898,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 190.23911849531578,
+        "total_bias_percent": -88.11714067816092
+      }
+    },
+    "carry_last_activity": {
+      "occupancy": {
+        "n": 5807,
+        "accuracy": 0.6282073359738247,
+        "precision": 0.32476046394351993,
+        "recall": 0.43989071038251365,
+        "f1": 0.37365825355381493,
+        "true_positive": 644,
+        "true_negative": 3004,
+        "false_positive": 1339,
+        "false_negative": 820,
+        "observed_occupied_hours": 1464,
+        "predicted_occupied_hours": 1983,
+        "observed_occupied_segments": 222,
+        "predicted_occupied_segments": 180,
+        "auc": 0.6608965152138546,
+        "brier_score": 0.2679212353173622
+      },
+      "energy": {
+        "n": 5807,
+        "mae": 0.330781786580496,
+        "rmse": 0.9641570183184244,
+        "r2": -0.1662862523995916,
+        "mean_bias": -0.18459538196625086,
+        "actual_total_kwh": 1600.9540577972004,
+        "predicted_total_kwh": 529.0086747191817,
+        "total_bias_percent": -66.95666111449442
+      }
+    }
+  },
+  "next_day_test": {
+    "days": 242,
+    "hours": 5807,
+    "issue_hour_local": 18,
+    "first_target": "2021-01-14",
+    "last_target": "2021-09-12",
+    "leads": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30
+    ],
+    "day_lengths": {
+      "24": 241,
+      "23": 1
+    }
+  },
+  "daily_energy": {
+    "n": 242,
+    "mae": 6.017154615940808,
+    "rmse": 9.18711467669939,
+    "r2": -0.5688491681258745,
+    "mean_bias": -5.601552414243676,
+    "actual_total_kwh": 1600.9540577972007,
+    "predicted_total_kwh": 245.37837355023112,
+    "total_bias_percent": -84.67299093592639
+  },
+  "smoke_test": false,
+  "no_training": true,
+  "original_sources_unchanged": true,
+  "day_ahead_ungated_energy": {
+    "n": 5807,
+    "mae": 0.30611793256482767,
+    "rmse": 0.913051017902156,
+    "r2": -0.04592299808258504,
+    "mean_bias": -0.21477293427274116,
+    "actual_total_kwh": 1600.9540577972004,
+    "predicted_total_kwh": 353.76762847539226,
+    "total_bias_percent": -77.90269953391719
+  },
+  "day_ahead_lead_metrics": {
+    "7": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.7479338842975206,
+        "precision": 0.09836065573770492,
+        "recall": 0.5,
+        "f1": 0.1643835616438356,
+        "true_positive": 6,
+        "true_negative": 175,
+        "false_positive": 55,
+        "false_negative": 6,
+        "observed_occupied_hours": 12,
+        "predicted_occupied_hours": 61,
+        "observed_occupied_segments": 10,
+        "predicted_occupied_segments": 36,
+        "auc": 0.7409420289855072,
+        "brier_score": 0.1373371687872193
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.05556469294716684,
+        "rmse": 0.36096901951296895,
+        "r2": -0.019987107156865358,
+        "mean_bias": -0.03461329606527937,
+        "actual_total_kwh": 10.927167589992274,
+        "predicted_total_kwh": 2.5507499421946678,
+        "total_bias_percent": -76.65680588141807
+      }
+    },
+    "8": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.7644628099173554,
+        "precision": 0.08771929824561403,
+        "recall": 0.5,
+        "f1": 0.14925373134328357,
+        "true_positive": 5,
+        "true_negative": 180,
+        "false_positive": 52,
+        "false_negative": 5,
+        "observed_occupied_hours": 10,
+        "predicted_occupied_hours": 57,
+        "observed_occupied_segments": 9,
+        "predicted_occupied_segments": 34,
+        "auc": 0.6931034482758621,
+        "brier_score": 0.12992675558755956
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.03813758936010625,
+        "rmse": 0.3230948123510928,
+        "r2": -0.010840715581548643,
+        "mean_bias": -0.020415446449632835,
+        "actual_total_kwh": 7.098956916482629,
+        "predicted_total_kwh": 2.1584188756714835,
+        "total_bias_percent": -69.59526728976219
+      }
+    },
+    "9": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.7603305785123967,
+        "precision": 0.05263157894736842,
+        "recall": 0.42857142857142855,
+        "f1": 0.09375,
+        "true_positive": 3,
+        "true_negative": 181,
+        "false_positive": 54,
+        "false_negative": 4,
+        "observed_occupied_hours": 7,
+        "predicted_occupied_hours": 57,
+        "observed_occupied_segments": 6,
+        "predicted_occupied_segments": 34,
+        "auc": 0.6632218844984803,
+        "brier_score": 0.14171439685528617
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.024836819557934924,
+        "rmse": 0.23457590776636048,
+        "r2": -0.0062378777777709615,
+        "mean_bias": -0.010351300022695744,
+        "actual_total_kwh": 4.272028161117822,
+        "predicted_total_kwh": 1.767013555625451,
+        "total_bias_percent": -58.63759579798524
+      }
+    },
+    "10": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.7603305785123967,
+        "precision": 0.05263157894736842,
+        "recall": 0.42857142857142855,
+        "f1": 0.09375,
+        "true_positive": 3,
+        "true_negative": 181,
+        "false_positive": 54,
+        "false_negative": 4,
+        "observed_occupied_hours": 7,
+        "predicted_occupied_hours": 57,
+        "observed_occupied_segments": 6,
+        "predicted_occupied_segments": 34,
+        "auc": 0.5775075987841946,
+        "brier_score": 0.16317974942367053
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.021201034497434344,
+        "rmse": 0.23032887142617764,
+        "r2": -0.0045339648894520135,
+        "mean_bias": -0.00828178878905089,
+        "actual_total_kwh": 3.5823903928774783,
+        "predicted_total_kwh": 1.578197505927162,
+        "total_bias_percent": -55.94568618024041
+      }
+    },
+    "11": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.768595041322314,
+        "precision": 0.05263157894736842,
+        "recall": 0.6,
+        "f1": 0.0967741935483871,
+        "true_positive": 3,
+        "true_negative": 183,
+        "false_positive": 54,
+        "false_negative": 2,
+        "observed_occupied_hours": 5,
+        "predicted_occupied_hours": 57,
+        "observed_occupied_segments": 5,
+        "predicted_occupied_segments": 34,
+        "auc": 0.6573839662447257,
+        "brier_score": 0.17570179361887875
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.0216435852987928,
+        "rmse": 0.23071495410752152,
+        "r2": -0.00790443435607302,
+        "mean_bias": -0.0078586986656083,
+        "actual_total_kwh": 3.5823903928774783,
+        "predicted_total_kwh": 1.6805853158002697,
+        "total_bias_percent": -53.08759985674327
+      }
+    },
+    "12": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.7644628099173554,
+        "precision": 0.05263157894736842,
+        "recall": 0.5,
+        "f1": 0.09523809523809523,
+        "true_positive": 3,
+        "true_negative": 182,
+        "false_positive": 54,
+        "false_negative": 3,
+        "observed_occupied_hours": 6,
+        "predicted_occupied_hours": 57,
+        "observed_occupied_segments": 6,
+        "predicted_occupied_segments": 34,
+        "auc": 0.6292372881355932,
+        "brier_score": 0.19576881613229621
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.020202095838973422,
+        "rmse": 0.1828662478398299,
+        "r2": -0.02608063738193267,
+        "mean_bias": -0.003159693684014988,
+        "actual_total_kwh": 2.8372625166666112,
+        "predicted_total_kwh": 2.0726166451349837,
+        "total_bias_percent": -26.95012770372689
+      }
+    },
+    "13": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.743801652892562,
+        "precision": 0.12280701754385964,
+        "recall": 0.3684210526315789,
+        "f1": 0.18421052631578946,
+        "true_positive": 7,
+        "true_negative": 173,
+        "false_positive": 50,
+        "false_negative": 12,
+        "observed_occupied_hours": 19,
+        "predicted_occupied_hours": 57,
+        "observed_occupied_segments": 17,
+        "predicted_occupied_segments": 34,
+        "auc": 0.7335378805758792,
+        "brier_score": 0.22185409389815244
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.07957663972120008,
+        "rmse": 0.4239022011289268,
+        "r2": -0.027859480177806706,
+        "mean_bias": -0.058138399713002296,
+        "actual_total_kwh": 16.885969975732078,
+        "predicted_total_kwh": 2.8164772451855216,
+        "total_bias_percent": -83.32060728976029
+      }
+    },
+    "14": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6776859504132231,
+        "precision": 0.26229508196721313,
+        "recall": 0.32653061224489793,
+        "f1": 0.2909090909090909,
+        "true_positive": 16,
+        "true_negative": 148,
+        "false_positive": 45,
+        "false_negative": 33,
+        "observed_occupied_hours": 49,
+        "predicted_occupied_hours": 61,
+        "observed_occupied_segments": 25,
+        "predicted_occupied_segments": 36,
+        "auc": 0.7217933805646611,
+        "brier_score": 0.2622593049723156
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.2739431920400738,
+        "rmse": 0.8038261272603647,
+        "r2": -0.09557419683907464,
+        "mean_bias": -0.24716771913726734,
+        "actual_total_kwh": 64.66171309999127,
+        "predicted_total_kwh": 4.8471250687725815,
+        "total_bias_percent": -92.50387155490746
+      }
+    },
+    "15": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6776859504132231,
+        "precision": 0.46835443037974683,
+        "recall": 0.5068493150684932,
+        "f1": 0.4868421052631579,
+        "true_positive": 37,
+        "true_negative": 127,
+        "false_positive": 42,
+        "false_negative": 36,
+        "observed_occupied_hours": 73,
+        "predicted_occupied_hours": 79,
+        "observed_occupied_segments": 36,
+        "predicted_occupied_segments": 45,
+        "auc": 0.7236767447515603,
+        "brier_score": 0.2506976926262941
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.6094627391976993,
+        "rmse": 1.2847863114380276,
+        "r2": -0.15513485051392495,
+        "mean_bias": -0.5786749084577254,
+        "actual_total_kwh": 155.11468527959596,
+        "predicted_total_kwh": 15.075357432826419,
+        "total_bias_percent": -90.28115396962389
+      }
+    },
+    "16": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6942148760330579,
+        "precision": 0.5816326530612245,
+        "recall": 0.6333333333333333,
+        "f1": 0.6063829787234043,
+        "true_positive": 57,
+        "true_negative": 111,
+        "false_positive": 41,
+        "false_negative": 33,
+        "observed_occupied_hours": 90,
+        "predicted_occupied_hours": 98,
+        "observed_occupied_segments": 38,
+        "predicted_occupied_segments": 42,
+        "auc": 0.7214181286549708,
+        "brier_score": 0.25148884807104954
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.6178446730440948,
+        "rmse": 1.2825982207737259,
+        "r2": -0.10611108999476282,
+        "mean_bias": -0.5030741312460303,
+        "actual_total_kwh": 156.5902756336158,
+        "predicted_total_kwh": 34.84633587207645,
+        "total_bias_percent": -77.74680724516467
+      }
+    },
+    "17": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6487603305785123,
+        "precision": 0.6190476190476191,
+        "recall": 0.5909090909090909,
+        "f1": 0.6046511627906976,
+        "true_positive": 65,
+        "true_negative": 92,
+        "false_positive": 40,
+        "false_negative": 45,
+        "observed_occupied_hours": 110,
+        "predicted_occupied_hours": 105,
+        "observed_occupied_segments": 43,
+        "predicted_occupied_segments": 41,
+        "auc": 0.6794077134986226,
+        "brier_score": 0.28050780665665714
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.6058759981679479,
+        "rmse": 1.2126008584625478,
+        "r2": -0.2702287575186548,
+        "mean_bias": -0.33021184694748584,
+        "actual_total_kwh": 120.61412638208657,
+        "predicted_total_kwh": 40.702859420794994,
+        "total_bias_percent": -66.25365482327108
+      }
+    },
+    "18": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6157024793388429,
+        "precision": 0.5904761904761905,
+        "recall": 0.5535714285714286,
+        "f1": 0.5714285714285714,
+        "true_positive": 62,
+        "true_negative": 87,
+        "false_positive": 43,
+        "false_negative": 50,
+        "observed_occupied_hours": 112,
+        "predicted_occupied_hours": 105,
+        "observed_occupied_segments": 51,
+        "predicted_occupied_segments": 41,
+        "auc": 0.6442307692307693,
+        "brier_score": 0.31810359051460396
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.580919959423438,
+        "rmse": 1.3331510692617805,
+        "r2": -0.17108382677085987,
+        "mean_bias": -0.3898984991668419,
+        "actual_total_kwh": 121.66599442735752,
+        "predicted_total_kwh": 27.31055762898177,
+        "total_bias_percent": -77.55284230608254
+      }
+    },
+    "19": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6157024793388429,
+        "precision": 0.638095238095238,
+        "recall": 0.5491803278688525,
+        "f1": 0.5903083700440529,
+        "true_positive": 67,
+        "true_negative": 82,
+        "false_positive": 38,
+        "false_negative": 55,
+        "observed_occupied_hours": 122,
+        "predicted_occupied_hours": 105,
+        "observed_occupied_segments": 48,
+        "predicted_occupied_segments": 41,
+        "auc": 0.6380464480874317,
+        "brier_score": 0.3156122006839602
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.5876564095911142,
+        "rmse": 1.353717194699638,
+        "r2": -0.1814007326312883,
+        "mean_bias": -0.489488950808634,
+        "actual_total_kwh": 134.002682267059,
+        "predicted_total_kwh": 15.546356171369549,
+        "total_bias_percent": -88.39847388995794
+      }
+    },
+    "20": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.5991735537190083,
+        "precision": 0.5943396226415094,
+        "recall": 0.5384615384615384,
+        "f1": 0.5650224215246636,
+        "true_positive": 63,
+        "true_negative": 82,
+        "false_positive": 43,
+        "false_negative": 54,
+        "observed_occupied_hours": 117,
+        "predicted_occupied_hours": 106,
+        "observed_occupied_segments": 52,
+        "predicted_occupied_segments": 41,
+        "auc": 0.6291282051282051,
+        "brier_score": 0.3223397183771732
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.48818150795341053,
+        "rmse": 1.259609275828341,
+        "r2": -0.1347354602259141,
+        "mean_bias": -0.4158128152432965,
+        "actual_total_kwh": 110.89902185557665,
+        "predicted_total_kwh": 10.272320566698903,
+        "total_bias_percent": -90.73723068533779
+      }
+    },
+    "21": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.5909090909090909,
+        "precision": 0.5754716981132075,
+        "recall": 0.5304347826086957,
+        "f1": 0.5520361990950227,
+        "true_positive": 61,
+        "true_negative": 82,
+        "false_positive": 45,
+        "false_negative": 54,
+        "observed_occupied_hours": 115,
+        "predicted_occupied_hours": 106,
+        "observed_occupied_segments": 54,
+        "predicted_occupied_segments": 41,
+        "auc": 0.603012666894899,
+        "brier_score": 0.32874353413682633
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.2867525558228691,
+        "rmse": 0.8319629609823399,
+        "r2": -0.10471384954933383,
+        "mean_bias": -0.22036444095167368,
+        "actual_total_kwh": 62.586572860246584,
+        "predicted_total_kwh": 9.258378149941558,
+        "total_bias_percent": -85.2070855986712
+      }
+    },
+    "22": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6115702479338843,
+        "precision": 0.5794392523364486,
+        "recall": 0.5585585585585585,
+        "f1": 0.5688073394495413,
+        "true_positive": 62,
+        "true_negative": 86,
+        "false_positive": 45,
+        "false_negative": 49,
+        "observed_occupied_hours": 111,
+        "predicted_occupied_hours": 107,
+        "observed_occupied_segments": 52,
+        "predicted_occupied_segments": 42,
+        "auc": 0.6229282717832336,
+        "brier_score": 0.30851386729751434
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.2794458931644762,
+        "rmse": 0.9563137453258221,
+        "r2": -0.05851290112512908,
+        "mean_bias": -0.2305263555613489,
+        "actual_total_kwh": 63.31765349500319,
+        "predicted_total_kwh": 7.530275449156756,
+        "total_bias_percent": -88.10714700640159
+      }
+    },
+    "23": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.5867768595041323,
+        "precision": 0.5233644859813084,
+        "recall": 0.5333333333333333,
+        "f1": 0.5283018867924528,
+        "true_positive": 56,
+        "true_negative": 86,
+        "false_positive": 51,
+        "false_negative": 49,
+        "observed_occupied_hours": 105,
+        "predicted_occupied_hours": 107,
+        "observed_occupied_segments": 57,
+        "predicted_occupied_segments": 41,
+        "auc": 0.6017379214459506,
+        "brier_score": 0.3226941046488384
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.23027908694916033,
+        "rmse": 0.8147852387895905,
+        "r2": -0.04816352371825916,
+        "mean_bias": -0.17800176927759734,
+        "actual_total_kwh": 50.38005923990514,
+        "predicted_total_kwh": 7.303631074726577,
+        "total_bias_percent": -85.50293273783707
+      }
+    },
+    "24": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.5785123966942148,
+        "precision": 0.48148148148148145,
+        "recall": 0.5306122448979592,
+        "f1": 0.5048543689320388,
+        "true_positive": 52,
+        "true_negative": 88,
+        "false_positive": 56,
+        "false_negative": 46,
+        "observed_occupied_hours": 98,
+        "predicted_occupied_hours": 108,
+        "observed_occupied_segments": 53,
+        "predicted_occupied_segments": 42,
+        "auc": 0.5897108843537415,
+        "brier_score": 0.31798460498796605
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.295467634625231,
+        "rmse": 0.8819856010363416,
+        "r2": -0.09958114983225452,
+        "mean_bias": -0.2364383814780643,
+        "actual_total_kwh": 65.13411248105693,
+        "predicted_total_kwh": 7.916024163365359,
+        "total_bias_percent": -87.84657706717414
+      }
+    },
+    "25": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.5950413223140496,
+        "precision": 0.42201834862385323,
+        "recall": 0.5679012345679012,
+        "f1": 0.4842105263157895,
+        "true_positive": 46,
+        "true_negative": 98,
+        "false_positive": 63,
+        "false_negative": 35,
+        "observed_occupied_hours": 81,
+        "predicted_occupied_hours": 109,
+        "observed_occupied_segments": 50,
+        "predicted_occupied_segments": 42,
+        "auc": 0.5642972164711295,
+        "brier_score": 0.31303061929005427
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.38952129752064774,
+        "rmse": 1.0642570502807236,
+        "r2": -0.11242732967981617,
+        "mean_bias": -0.33591489308717126,
+        "actual_total_kwh": 90.41748989042696,
+        "predicted_total_kwh": 9.126085763331497,
+        "total_bias_percent": -89.90672515418088
+      }
+    },
+    "26": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6074380165289256,
+        "precision": 0.44954128440366975,
+        "recall": 0.5833333333333334,
+        "f1": 0.5077720207253886,
+        "true_positive": 49,
+        "true_negative": 98,
+        "false_positive": 60,
+        "false_negative": 35,
+        "observed_occupied_hours": 84,
+        "predicted_occupied_hours": 109,
+        "observed_occupied_segments": 48,
+        "predicted_occupied_segments": 43,
+        "auc": 0.5940325497287523,
+        "brier_score": 0.29736942523475535
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.5434339900801745,
+        "rmse": 1.2482353364546392,
+        "r2": -0.1728839016886614,
+        "mean_bias": -0.48689335005663265,
+        "actual_total_kwh": 128.71108675450418,
+        "predicted_total_kwh": 10.882896040799091,
+        "total_bias_percent": -91.54470969423444
+      }
+    },
+    "27": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6074380165289256,
+        "precision": 0.33962264150943394,
+        "recall": 0.5901639344262295,
+        "f1": 0.4311377245508982,
+        "true_positive": 36,
+        "true_negative": 111,
+        "false_positive": 70,
+        "false_negative": 25,
+        "observed_occupied_hours": 61,
+        "predicted_occupied_hours": 106,
+        "observed_occupied_segments": 44,
+        "predicted_occupied_segments": 44,
+        "auc": 0.6016665157141563,
+        "brier_score": 0.2743998520902074
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.5193444395669222,
+        "rmse": 1.3506668331167317,
+        "r2": -0.1118759844492827,
+        "mean_bias": -0.45030766831664293,
+        "actual_total_kwh": 121.0229423235369,
+        "predicted_total_kwh": 12.0484865909093,
+        "total_bias_percent": -90.044460695147
+      }
+    },
+    "28": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6033057851239669,
+        "precision": 0.20202020202020202,
+        "recall": 0.5405405405405406,
+        "f1": 0.29411764705882354,
+        "true_positive": 20,
+        "true_negative": 126,
+        "false_positive": 79,
+        "false_negative": 17,
+        "observed_occupied_hours": 37,
+        "predicted_occupied_hours": 99,
+        "observed_occupied_segments": 31,
+        "predicted_occupied_segments": 46,
+        "auc": 0.6239947264337509,
+        "brier_score": 0.24243689102741542
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.23862255303835533,
+        "rmse": 0.8306455467804552,
+        "r2": -0.048929254337137795,
+        "mean_bias": -0.18333895218096238,
+        "actual_total_kwh": 52.6826045604968,
+        "predicted_total_kwh": 8.314578132703895,
+        "total_bias_percent": -84.21760237165941
+      }
+    },
+    "29": {
+      "occupancy": {
+        "n": 242,
+        "accuracy": 0.6528925619834711,
+        "precision": 0.10843373493975904,
+        "recall": 0.47368421052631576,
+        "f1": 0.17647058823529413,
+        "true_positive": 9,
+        "true_negative": 149,
+        "false_positive": 74,
+        "false_negative": 10,
+        "observed_occupied_hours": 19,
+        "predicted_occupied_hours": 83,
+        "observed_occupied_segments": 16,
+        "predicted_occupied_segments": 45,
+        "auc": 0.5902761387774369,
+        "brier_score": 0.20977723925038913
+      },
+      "energy": {
+        "n": 242,
+        "mae": 0.14139721727609617,
+        "rmse": 0.6703106089154728,
+        "r2": -0.0330651269743365,
+        "mean_bias": -0.09701071086614108,
+        "actual_total_kwh": 28.93721731023226,
+        "predicted_total_kwh": 5.460625280626114,
+        "total_bias_percent": -81.12940431665062
+      }
+    },
+    "30": {
+      "occupancy": {
+        "n": 241,
+        "accuracy": 0.6887966804979253,
+        "precision": 0.0821917808219178,
+        "recall": 0.42857142857142855,
+        "f1": 0.13793103448275862,
+        "true_positive": 6,
+        "true_negative": 160,
+        "false_positive": 67,
+        "false_negative": 8,
+        "observed_occupied_hours": 14,
+        "predicted_occupied_hours": 73,
+        "observed_occupied_segments": 12,
+        "predicted_occupied_segments": 39,
+        "auc": 0.6010069225928257,
+        "brier_score": 0.18942916724326106
+      },
+      "energy": {
+        "n": 241,
+        "mae": 0.12130663811986604,
+        "rmse": 0.6313181571800254,
+        "r2": -0.029117729444469775,
+        "mean_bias": -0.08596361963963345,
+        "actual_total_kwh": 25.029653990762338,
+        "predicted_total_kwh": 4.312421657610681,
+        "total_bias_percent": -82.77075001035868
+      }
+    }
+  },
+  "evaluation_label_issues": {
+    "energy_positive_while_unoccupied_hours": 0,
+    "energy_positive_while_unoccupied_kwh": 0.0
+  },
+  "information_cutoff": {
+    "origins_with_ongoing_sessions": 55,
+    "maximum_ongoing_sessions": 1,
+    "energy_policy": "Only records disconnected and finished charging by issue contribute historical energy. Ongoing-session historical energy is zero because live meter readings are absent.",
+    "publication_assumption": "Completed session records and connection/disconnection events are assumed available immediately; ingestion delays are not recorded."
+  },
+  "focused_test_results": {
+    "tests": 51,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

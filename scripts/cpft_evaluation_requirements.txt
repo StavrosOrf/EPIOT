@@ -1,0 +1,9 @@
+# Isolated checkpoint evaluation, Python 3.12. No model training.
+# Keras matches the version recorded inside both supplied .keras archives.
+tensorflow==2.20.0
+keras==3.13.2
+numpy==2.2.6
+pandas==2.2.3
+scikit-learn==1.6.1
+openpyxl==3.1.5
+matplotlib==3.10.8

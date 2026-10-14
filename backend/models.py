@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, DateTime, String, Float, Integer
+from sqlalchemy import ForeignKey, Date, DateTime, String, Float, Integer, Boolean
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.orm import relationship
@@ -110,3 +110,38 @@ class GammaDistribution(Model):
     hour: Mapped[int] = mapped_column(Integer, nullable=False)
     shape: Mapped[float] = mapped_column(Float, nullable=False)
     scale: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class ForecastRun(Model):
+    """One explicitly identified forecast batch; timestamps are stored as UTC."""
+
+    __tablename__ = "forecast_runs"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    target_date = mapped_column(Date, nullable=False)
+    timezone: Mapped[str] = mapped_column(String, nullable=False)
+    issued_at = mapped_column(DateTime, nullable=False)
+    model_version: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class ForecastHour(Model):
+    __tablename__ = "forecast_hourly"
+    run_id: Mapped[str] = mapped_column(ForeignKey("forecast_runs.id"), primary_key=True)
+    cp_id: Mapped[int] = mapped_column(ForeignKey("charging_points.id"), primary_key=True)
+    timestamp = mapped_column(DateTime, primary_key=True)
+    occupancy_probability: Mapped[float] = mapped_column(Float, nullable=False)
+    occupied: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    energy_kwh: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class ForecastSession(Model):
+    """Approximate sessions derived from CPFT hourly occupancy, not observations."""
+
+    __tablename__ = "forecast_sessions"
+    run_id: Mapped[str] = mapped_column(ForeignKey("forecast_runs.id"), primary_key=True)
+    cp_id: Mapped[int] = mapped_column(ForeignKey("charging_points.id"), primary_key=True)
+    session_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    start = mapped_column(DateTime, nullable=False)
+    end = mapped_column(DateTime, nullable=False)
+    energy_kwh: Mapped[float] = mapped_column(Float, nullable=False)
+    start_censored: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    end_censored: Mapped[bool] = mapped_column(Boolean, nullable=False)

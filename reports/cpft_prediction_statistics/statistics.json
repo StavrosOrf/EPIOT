@@ -1,0 +1,301 @@
+{
+  "analyzed_at_utc": "2026-10-13T20:04:29.470519+00:00",
+  "source_workbook": "others/CPFT-main/CPFT-tool/CPFT_VS_Code_Python/outputs/EV_forecasting_upgraded_results.xlsx",
+  "source_sha256": "b54140b1e87f5bec0e06604fc650c6bc6456cf0208d0be20ed74303a6f194bbe",
+  "source_sessions": {
+    "station_ids": [
+      "2-39-139-28"
+    ],
+    "source_timezones": [
+      "America/Los_Angeles"
+    ],
+    "raw_sessions": 1808,
+    "usable_sessions": 1808,
+    "first_connection": "2018-04-25 14:43:50+00:00",
+    "last_disconnect": "2021-09-14 01:53:20+00:00"
+  },
+  "library_versions": {
+    "numpy": "2.5.4",
+    "pandas": "3.0.1",
+    "openpyxl": "3.1.5",
+    "matplotlib": "3.11.2",
+    "sqlalchemy": "2.1.4",
+    "geoalchemy2": "0.20.0"
+  },
+  "occupancy": {
+    "CPFT": {
+      "n": 5893,
+      "accuracy": 0.9158323434583404,
+      "precision": 0.8369565217391305,
+      "recall": 0.8279569892473119,
+      "f1": 0.8324324324324325,
+      "true_positive": 1232,
+      "true_negative": 4165,
+      "false_positive": 240,
+      "false_negative": 256,
+      "observed_occupied_hours": 1488,
+      "predicted_occupied_hours": 1472,
+      "observed_occupied_segments": 225,
+      "predicted_occupied_segments": 253,
+      "auc": 0.9477718074524306,
+      "brier_score": 0.06838782012023159
+    },
+    "Last hour": {
+      "n": 5893,
+      "accuracy": 0.9236382148311556,
+      "precision": 0.8487903225806451,
+      "recall": 0.8487903225806451,
+      "f1": 0.8487903225806451,
+      "true_positive": 1263,
+      "true_negative": 4180,
+      "false_positive": 225,
+      "false_negative": 225,
+      "observed_occupied_hours": 1488,
+      "predicted_occupied_hours": 1488,
+      "observed_occupied_segments": 225,
+      "predicted_occupied_segments": 225
+    },
+    "Previous day": {
+      "n": 5893,
+      "accuracy": 0.7342609876124215,
+      "precision": 0.4736129905277402,
+      "recall": 0.47043010752688175,
+      "f1": 0.4720161834120027,
+      "true_positive": 700,
+      "true_negative": 3627,
+      "false_positive": 778,
+      "false_negative": 788,
+      "observed_occupied_hours": 1488,
+      "predicted_occupied_hours": 1478,
+      "observed_occupied_segments": 225,
+      "predicted_occupied_segments": 225
+    },
+    "Previous week": {
+      "n": 5893,
+      "accuracy": 0.7676904802307822,
+      "precision": 0.5414057063326374,
+      "recall": 0.5228494623655914,
+      "f1": 0.5319658119658119,
+      "true_positive": 778,
+      "true_negative": 3746,
+      "false_positive": 659,
+      "false_negative": 710,
+      "observed_occupied_hours": 1488,
+      "predicted_occupied_hours": 1437,
+      "observed_occupied_segments": 225,
+      "predicted_occupied_segments": 219
+    },
+    "Always zero": {
+      "n": 5893,
+      "accuracy": 0.7474970303750212,
+      "precision": null,
+      "recall": 0.0,
+      "f1": 0.0,
+      "true_positive": 0,
+      "true_negative": 4405,
+      "false_positive": 0,
+      "false_negative": 1488,
+      "observed_occupied_hours": 1488,
+      "predicted_occupied_hours": 0,
+      "observed_occupied_segments": 225,
+      "predicted_occupied_segments": 0
+    }
+  },
+  "energy": {
+    "CPFT": {
+      "n": 5836,
+      "mae": 0.21857422049973121,
+      "rmse": 0.6261003540735156,
+      "r2": 0.5071417418541577,
+      "mean_bias": -0.0501880753754156,
+      "actual_total_kwh": 1607.1220657858066,
+      "predicted_total_kwh": 1314.2244578948812,
+      "total_bias_percent": -18.224975820222614
+    },
+    "Last hour": {
+      "n": 5836,
+      "mae": 0.23996090028364073,
+      "rmse": 0.7703889954414881,
+      "r2": 0.2538016574024319,
+      "mean_bias": -1.368849602355485e-09,
+      "actual_total_kwh": 1607.1220657858066,
+      "predicted_total_kwh": 1607.1220577972003,
+      "total_bias_percent": -4.970752657447062e-07
+    },
+    "Previous day": {
+      "n": 5836,
+      "mae": 0.44939271876381154,
+      "rmse": 1.1737914468549235,
+      "r2": -0.7322717391548286,
+      "mean_bias": -0.0008875956114815446,
+      "actual_total_kwh": 1607.1220657858066,
+      "predicted_total_kwh": 1601.9420577972003,
+      "total_bias_percent": -0.32231577792900973
+    },
+    "Previous week": {
+      "n": 5836,
+      "mae": 0.428762553033534,
+      "rmse": 1.162837288280472,
+      "r2": -0.7000904916258619,
+      "mean_bias": -0.007384795345533584,
+      "actual_total_kwh": 1607.1220657858066,
+      "predicted_total_kwh": 1564.0244001492727,
+      "total_bias_percent": -2.6816672208069816
+    },
+    "Always zero": {
+      "n": 5836,
+      "mae": 0.27538075150545005,
+      "rmse": 0.9333801111945077,
+      "r2": -0.09534574150247543,
+      "mean_bias": -0.27538075150545005,
+      "actual_total_kwh": 1607.1220657858066,
+      "predicted_total_kwh": 0.0,
+      "total_bias_percent": -100.0
+    }
+  },
+  "test_periods": {
+    "occupancy_start": "2021-01-11 14:00:00+00:00",
+    "occupancy_end": "2021-09-14 02:00:00+00:00",
+    "energy_start": "2021-01-13 23:00:00+00:00",
+    "energy_end": "2021-09-14 02:00:00+00:00"
+  },
+  "daily_totals_of_one_step_predictions": {
+    "n": 243,
+    "mae": 2.2599369727179357,
+    "rmse": 3.81379578315908,
+    "r2": 0.7437884665198607,
+    "mean_bias": -1.206006461087718,
+    "actual_total_kwh": 1607.1220657858066,
+    "predicted_total_kwh": 1314.0624957414911,
+    "total_bias_percent": -18.235053595697053
+  },
+  "reported_metrics_reconciled": {
+    "occupancy_f1": true,
+    "occupancy_auc": true,
+    "energy_mae": true,
+    "energy_rmse": true
+  },
+  "unclipped_sensitivity": {
+    "changed_test_bins": 42,
+    "cpft": {
+      "n": 5836,
+      "mae": 0.22356762411630984,
+      "rmse": 0.6489691774420037,
+      "r2": 0.5062022020767616,
+      "mean_bias": -0.055181479255160856,
+      "actual_total_kwh": 1636.2635708280002,
+      "predicted_total_kwh": 1314.2244578948812,
+      "total_bias_percent": -19.68137155129335
+    }
+  },
+  "future": {
+    "start": "2021-09-14 03:00:00+00:00",
+    "end_exclusive": "2021-09-21 03:00:00+00:00",
+    "hours": 168,
+    "occupied_hours": 15,
+    "occupancy_rate": 0.08928571428571429,
+    "energy_kwh": 0.7631990230218855,
+    "previous_week_energy_kwh": 51.7426576479277,
+    "previous_week_occupied_hours": 64,
+    "energy_change_from_previous_week_percent": -98.52501000583518,
+    "ground_truth_available": false,
+    "blocks": [
+      {
+        "day": 1,
+        "forecast_kwh": 0.2919304988466904,
+        "previous_week_kwh": 7.888734181628029
+      },
+      {
+        "day": 2,
+        "forecast_kwh": 0.14585174610038745,
+        "previous_week_kwh": 9.212265818371973
+      },
+      {
+        "day": 3,
+        "forecast_kwh": 0.12865649674152557,
+        "previous_week_kwh": 11.730968101211072
+      },
+      {
+        "day": 4,
+        "forecast_kwh": 0.0,
+        "previous_week_kwh": 9.198031898788926
+      },
+      {
+        "day": 5,
+        "forecast_kwh": 0.0,
+        "previous_week_kwh": 0.0
+      },
+      {
+        "day": 6,
+        "forecast_kwh": 0.0,
+        "previous_week_kwh": 7.544657647927703
+      },
+      {
+        "day": 7,
+        "forecast_kwh": 0.19676028133328205,
+        "previous_week_kwh": 6.167999999999999
+      }
+    ]
+  },
+  "database": {
+    "forecast_tables": [],
+    "stations": 717,
+    "charging_points": 1399,
+    "session_count": 318163,
+    "first_session_start": "2025-08-30 00:00:00.000000",
+    "latest_session_start": "2026-01-10 23:45:00.000000"
+  },
+  "roundtrip": {
+    "passed": true,
+    "complete_local_days": [
+      {
+        "date": "2021-09-14",
+        "hours": 24,
+        "sessions": 1,
+        "energy_kwh": 0.2919304988466904
+      },
+      {
+        "date": "2021-09-15",
+        "hours": 24,
+        "sessions": 1,
+        "energy_kwh": 0.14585174610038745
+      },
+      {
+        "date": "2021-09-16",
+        "hours": 24,
+        "sessions": 1,
+        "energy_kwh": 0.12865649674152557
+      },
+      {
+        "date": "2021-09-17",
+        "hours": 24,
+        "sessions": 0,
+        "energy_kwh": 0.0
+      },
+      {
+        "date": "2021-09-18",
+        "hours": 24,
+        "sessions": 0,
+        "energy_kwh": 0.0
+      },
+      {
+        "date": "2021-09-19",
+        "hours": 24,
+        "sessions": 0,
+        "energy_kwh": 0.0
+      }
+    ],
+    "row_counts_after_two_saves": {
+      "forecast_runs": 6,
+      "forecast_hourly": 144,
+      "forecast_sessions": 3
+    },
+    "note": "Temporary database; audit-only point ID; first forecast hour used as audit issue metadata, not a verified issue time."
+  },
+  "tests": {
+    "tests": 43,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

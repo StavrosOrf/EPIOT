@@ -1,0 +1,37 @@
+{
+  "checked_at_utc": "2026-10-13T20:24:27.233686+00:00",
+  "probe": "GET run/info/{zero UUID}; no run submitted",
+  "end_to_end_verified": false,
+  "endpoints": [
+    {
+      "base_url": "https://drive2x-reflex.hesi.energy/services",
+      "tls_verification": true,
+      "dns_addresses": [
+        "194.171.117.75"
+      ],
+      "outcome": "connection_failed",
+      "error_type": "ConnectTimeout",
+      "elapsed_seconds": 5.031
+    },
+    {
+      "base_url": "https://drive2x-reflex.hesi.energy/api/v1",
+      "tls_verification": true,
+      "dns_addresses": [
+        "194.171.117.75"
+      ],
+      "outcome": "connection_failed",
+      "error_type": "ConnectTimeout",
+      "elapsed_seconds": 5.031
+    },
+    {
+      "base_url": "https://drive2x.hesi.energy/services",
+      "tls_verification": true,
+      "dns_addresses": [
+        "194.171.117.75"
+      ],
+      "outcome": "connection_failed",
+      "error_type": "ConnectTimeout",
+      "elapsed_seconds": 5.031
+    }
+  ]
+}
