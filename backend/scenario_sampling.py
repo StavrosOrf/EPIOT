@@ -1,22 +1,17 @@
-"""Reproducible simple/spatial session scenarios using the existing CSV priors."""
+"""Session records, priors and arrival curves shared by the synthetic scenarios."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from functools import lru_cache
-import hashlib
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
-from scipy.special import ndtr
-
-from backend.spatial_profiles import ARCHETYPES
 
 ROOT = Path(__file__).resolve().parents[1]
 UTC = timezone.utc
+PRIORS = ROOT / "seed_data"
 ASSUMPTION_MULTIPLIERS = {"low": .5, "base": 1., "high": 1.5}
-SAMPLER_VERSION = "spatial-priors-v1"
 
 
 @dataclass(frozen=True)
@@ -41,13 +36,8 @@ def point_power(charger):
     return power if np.isfinite(power) and power > 0 else 11.
 
 
-def point_rng(cp_id, source, start_date, seed):
-    encoded = f"{SAMPLER_VERSION}|{int(cp_id)}|{source}|{start_date}|{int(seed)}".encode()
-    return np.random.default_rng(int.from_bytes(hashlib.sha256(encoded).digest()[:8], "little"))
-
-
 @lru_cache(maxsize=4)
-def load_priors(directory=str(ROOT / "data")):
+def load_priors(directory=str(PRIORS)):
     directory = Path(directory)
     tables = {name: pd.read_csv(directory / filename) for name, filename in [
         ("weekday", "distribution-of-arrival.csv"), ("weekend", "distribution-of-arrival-weekend.csv"),
@@ -84,72 +74,13 @@ def arrival_curve(priors, archetype, weekend):
 
 def generate_sessions(charger, start, end, *, spatial_profile=None, seed=42, assumption="base",
                       timezone_name="Europe/Amsterdam", daily_arrivals=2., priors=None, source="simple"):
-    """Attempt arrivals on UTC quarter-hours; occupancy blocks overlapping arrivals.
+    """One point's sessions connected during [start, end), from its synthetic world.
 
-    Volume is an assumed attempted-arrival rate, not a guaranteed session count.
-    Geographic coefficients, duration scales and copula correlation are priors.
-    Three warm-up days carry overnight connections consistently into the window.
+    A convenience view of backend.scenario_world.sample_world, which samples
+    many points at once. Volume is an assumed attempted-arrival rate, not a
+    guaranteed session count. Geographic coefficients, duration scales and
+    copula correlation are priors.
     """
-    if assumption not in ASSUMPTION_MULTIPLIERS:
-        raise ValueError("Unknown demand assumption")
-    start, end = start.astimezone(UTC), end.astimezone(UTC)
-    if end <= start:
-        raise ValueError("Scenario window must be increasing")
-    priors = priors if priors is not None else load_priors()
-    profile = spatial_profile or {"weights": {"mixed": 1.}, "arrival_multiplier": 1.}
-    weights = np.array([profile["weights"].get(name, 0.) for name in ARCHETYPES], float)
-    if not (np.isfinite(weights).all() and (weights >= 0).all() and weights.sum() > 0):
-        raise ValueError("Invalid spatial mixture weights")
-    weights /= weights.sum()
-    rng = point_rng(charger["id"], source, start.isoformat(), seed)
-    power = point_power(charger)
-    volume = daily_arrivals*profile.get("arrival_multiplier", 1.)*ASSUMPTION_MULTIPLIERS[assumption]
-    if not np.isfinite(volume) or volume < 0:
-        raise ValueError("Invalid assumed arrival volume")
-    timeline = pd.date_range(start-timedelta(days=3), end, inclusive="left", freq="15min", tz="UTC")
-    local = timeline.tz_convert(timezone_name)
-    sessions, free_at = [], start-timedelta(days=3)
-    curves = {(kind, weekend): arrival_curve(priors, kind, weekend) for kind in ARCHETYPES for weekend in (False, True)}
-    for day in sorted(set(local.date)):
-        positions = np.flatnonzero(local.date == day)
-        slots = local[positions].hour*4+local[positions].minute//15
-        component = np.stack([curves[(kind, day.weekday() >= 5)][slots] for kind in ARCHETYPES])
-        # Normalize against the full known calendar day, even when generation
-        # ends at an 18:00 issue time. Ending earlier must not boost past demand.
-        midnight = datetime.combine(day, datetime.min.time(), ZoneInfo(timezone_name)).astimezone(UTC)
-        tomorrow = datetime.combine(day+timedelta(days=1), datetime.min.time(), ZoneInfo(timezone_name)).astimezone(UTC)
-        full_day = pd.date_range(midnight, tomorrow, inclusive="left", freq="15min").tz_convert(timezone_name)
-        full_slots = full_day.hour*4+full_day.minute//15
-        normalizers = np.array([curves[(kind, day.weekday() >= 5)][full_slots].sum() for kind in ARCHETYPES])
-        component /= normalizers[:, None]
-        mixture = weights @ component
-        for offset, pos in enumerate(positions):
-            timestamp = timeline[pos].to_pydatetime()
-            if timestamp < free_at or rng.random() >= -np.expm1(-volume*mixture[offset]):
-                continue
-            posterior = weights*component[:, offset]
-            kind = ARCHETYPES[int(rng.choice(len(ARCHETYPES), p=posterior/posterior.sum()))]
-            base_column = "workplace" if kind == "workplace" else "public"
-            z1, z2 = rng.standard_normal(2)
-            # Positive duration/energy dependence is assumed, not estimated.
-            duration = quantile(priors["duration"], base_column, float(ndtr(z1)))
-            energy = quantile(priors["energy"], base_column, float(ndtr(.4*z1+np.sqrt(1-.4**2)*z2)))
-            duration *= {"residential": 1.4, "workplace": 1., "retail": .4, "mixed": 1.}[kind]
-            if str(charger.get("type", "")).lower() == "fast":
-                duration *= .6
-            duration = float(np.clip(duration, .25, 72.))
-            energy *= .75 if kind == "retail" else 1.
-            energy = float(np.clip(energy, 0., power*duration))
-            departure = timestamp+timedelta(hours=duration)
-            free_at = departure
-            if departure > start:
-                sessions.append(ScenarioSession(int(charger["id"]), timestamp, departure, energy))
-    return sessions
-
-
-def session_to_dict(session):
-    return dict(cp_id=session.cp_id, start=session.start.isoformat(), end=session.end.isoformat(), energy_kwh=session.energy_kwh)
-
-
-def session_from_dict(value):
-    return ScenarioSession(int(value["cp_id"]), datetime.fromisoformat(value["start"]), datetime.fromisoformat(value["end"]), float(value["energy_kwh"]))
+    from backend.scenario_world import sample_world
+    return sample_world([charger], start, end, profiles=[spatial_profile], source=source, seed=seed, assumption=assumption,
+                        timezone_name=timezone_name, daily_arrivals=daily_arrivals, priors=priors).records()

@@ -10,8 +10,11 @@ point, an arrival time, a departure time and the energy charged.
 | `end` | datetime | Departure / plug-out time |
 | `consumption` | float | Energy charged in kWh |
 
-Sessions are stored in the `sessions` table and are **generated ahead of time** by a batch job
-(`update_database.py`), not at request time. The web app only reads them.
+The interactive app generates its sessions **on request** from the selected session source
+(simple, spatial or CPFT); see {doc}`on-request-scenarios`. This page describes the older
+**stored sessions** in the `sessions` table, which API calls without a `session_source` still
+read. They were produced ahead of time by a daily batch job that has been removed, since EPIOT
+receives no live data.
 
 ```{mermaid}
 flowchart LR
@@ -50,7 +53,7 @@ For one day and each charging point:
 1. **Time grid.** The day is split into 15-minute steps (96 per day).
 2. **Arrival probability.** The arrival curve for the day type (weekday or weekend) is normalised to a
    probability mass $m_k$ over the steps and scaled by the target number of sessions per charger,
-   $p_k = N \cdot m_k$ (the daily job uses $N = 2$).
+   $p_k = N \cdot m_k$ (the former daily job used $N = 2$).
 3. **Existing sessions.** Sessions already in the database that overlap the day are loaded; a charger
    that is still occupied at midnight only becomes eligible once it is free. (Later existing sessions
    on the same day are not checked, so each day should be generated only once.)
@@ -77,7 +80,7 @@ flowchart TD
     N --> A
 ```
 
-The empirical curves are read from four CSV files in `./data` (or `./backend/data`):
+The empirical curves are read from four CSV files in `./seed_data` (or `./backend/data`):
 
 | File | Columns | Shape |
 |---|---|---|
@@ -114,28 +117,25 @@ Distributions of the sessions stored in the local database for 8 September – 1
 The parameters in `backend/config.yaml`, derived from ElaadNL historical data: the number of sessions per charger per day (left), and the gamma-distributed energy demand per arrival hour with its inter-quartile band (right).
 ```
 
-This sampler is kept as a reference implementation and is not called by the daily job.
+This sampler is kept as a reference implementation and is not called by the application.
 
 ## Machine-learning prediction (in development)
 
 `method="ML"` is reserved for learned session prediction. The current implementation is a
 **placeholder**: `predict_charging_sessions` generates random occupancy sequences of 25–70 steps per
 charger with energies drawn uniformly between 5 and 50 kWh. The LSTM scaffolding in `backend/ml`
-(`DataScaler`, `PredictiveModel`, `Processing`) shows the intended interface. The
-{doc}`../related-tools/cpft` provides trained LSTM models for availability and charge load that are
-being integrated.
+(`DataScaler`, `PredictiveModel`, `Processing`) shows the intended interface. The trained
+{doc}`../related-tools/cpft` models are integrated separately, as the CPFT session source
+({doc}`on-request-scenarios`).
 
 :::{warning}
 Do not use sessions generated with `method="ML"` for analysis. Use the Monte Carlo generator until
 the learned predictor is integrated.
 :::
 
-## Regenerating sessions
+## Regenerating stored sessions
 
-```bash
-# Generate 100 days of Monte Carlo sessions starting 20 days ago, then refresh the power mix
-uv run python update_database.py
-```
-
-`update_database.py` calls `load_daily_charging_sessions(app, db, date, method="MC", scope="NL")`
-for each day. See {doc}`../operations/scheduled-updates` for scheduling.
+Stored sessions are no longer regenerated on a schedule ({doc}`../operations/scheduled-updates`).
+To add days for testing the legacy path, call
+`load_daily_charging_sessions(app, db, date, method="MC", scope="NL")` from
+`backend/charge_sessions.py` once per day; generating a day twice adds a second set of sessions.

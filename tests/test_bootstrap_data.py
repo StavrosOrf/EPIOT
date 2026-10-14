@@ -34,13 +34,14 @@ def snapshots(tmp_path):
                            "VALUES (3,'NL','2026-10-10 09:00:00',45,200)")
     data = tmp_path/"source-data"
     data.mkdir()
-    for name in PRIORS:
-        (data/name).write_text("retained,prior\n1,2\n", encoding="utf-8")
-    gpd.GeoDataFrame([dict(buurtcode="test", buurtnaam="Neighbourhood", water="NEE", oppervlakte_land_in_ha=20,
-        woningvoorraad=100, aantal_bedrijfsvestigingen=10, aantal_bedrijven_handel_en_horeca=2,
-        bevolkingsdichtheid_inwoners_per_km2=4000, geometry=box(4.8, 52.3, 5., 52.4))], crs=4326).to_file(data/ATLAS_NAME)
     directory = tmp_path/"seed"
     manifest = export_snapshots(database, directory, data)
+    # Small runtime inputs are plain files in seed_data/, not part of the snapshots.
+    for name in PRIORS:
+        (directory/name).write_text("retained,prior\n1,2\n", encoding="utf-8")
+    gpd.GeoDataFrame([dict(buurtcode="test", buurtnaam="Neighbourhood", water="NEE", oppervlakte_land_in_ha=20,
+        woningvoorraad=100, aantal_bedrijfsvestigingen=10, aantal_bedrijven_handel_en_horeca=2,
+        bevolkingsdichtheid_inwoners_per_km2=4000, geometry=box(4.8, 52.3, 5., 52.4))], crs=4326).to_file(directory/ATLAS_NAME)
     return directory, manifest, database, data
 
 
@@ -62,7 +63,8 @@ def test_country_export_contains_only_its_chargers_and_referenced_data(snapshots
     assert manifest["countries"]["NL"]["tables"]["sessions"] == 1
     payload = json.loads(gzip.decompress((directory/"NL.json.gz").read_bytes()))
     assert "geom" not in payload["tables"]["locations"]["columns"]
-    assert payload["atlas"]["features"][0]["properties"]["woningvoorraad"] == 100
+    assert "atlas" not in payload
+    assert "priors" not in json.loads(gzip.decompress((directory/"shared.json.gz").read_bytes()))
     assert len(payload["tables"]["grid_connections"]["rows"]) == 1
 
 
@@ -92,10 +94,7 @@ def test_offline_bootstrap_preserves_ids_sessions_grid_and_geometry(snapshots, t
             assert connection.exec_driver_sql("SELECT ST_X(geom), ST_Y(geom) FROM locations WHERE id=1").one() == (4.89, 52.37)
     finally:
         engine.dispose()
-    for name in PRIORS:
-        assert (runtime/name).read_text(encoding="utf-8") == (data/name).read_text(encoding="utf-8")
-    atlas = gpd.read_file(runtime/ATLAS_NAME)
-    assert atlas.iloc[0].geometry.equals(gpd.read_file(data/ATLAS_NAME).iloc[0].geometry)
+    assert not any((runtime/name).exists() for name in (*PRIORS, ATLAS_NAME))
     assert (runtime/"chargers/manifest.json").exists()
 
 
@@ -114,6 +113,15 @@ def test_corrupt_snapshot_is_rejected_before_writing_runtime_files(snapshots, tm
     path.write_bytes(path.read_bytes()+b"corrupted")
     target, runtime = tmp_path/"new.sqlite", tmp_path/"runtime"
     with pytest.raises(ValueError, match="checksum mismatch"):
+        bootstrap(target, seed_dir=directory, data_dir=runtime)
+    assert not target.exists() and not runtime.exists()
+
+
+def test_missing_seed_input_is_rejected_before_writing_runtime_files(snapshots, tmp_path):
+    directory, _, _, _ = snapshots
+    (directory/ATLAS_NAME).unlink()
+    target, runtime = tmp_path/"new.sqlite", tmp_path/"runtime"
+    with pytest.raises(ValueError, match=ATLAS_NAME):
         bootstrap(target, seed_dir=directory, data_dir=runtime)
     assert not target.exists() and not runtime.exists()
 

@@ -1,4 +1,10 @@
-"""Prepare hourly Dutch grid data from free/local files and stale references."""
+"""Import free/local Dutch grid observations once, and report how a range resolves.
+
+Run it when a new hourly dataset becomes available, not on a schedule: the app
+resolves every requested window from the imported observations on the fly and
+fills other dates from a labelled historical reference. No API is contacted
+and the application database is opened read-only.
+"""
 
 import argparse
 from datetime import date, datetime, timedelta
@@ -20,17 +26,15 @@ def main(argv=None):
     parser.add_argument("--database", type=Path, default=ROOT/"instance/default.sqlite")
     parser.add_argument("--cache", type=Path, default=Path(os.environ.get("FLASK_GRID_DATA_CACHE", str(ROOT/"instance/grid_data.sqlite"))))
     parser.add_argument("--csv", type=Path, default=os.environ.get("EPIOT_GRID_CSV"))
-    parser.add_argument("--start", type=date.fromisoformat)
-    parser.add_argument("--end", type=date.fromisoformat)
-    parser.add_argument("--backfill", action="store_true")
-    parser.add_argument("--no-stale", action="store_true")
+    parser.add_argument("--start", type=date.fromisoformat, help="Report coverage from this date (default: 7 days ago)")
+    parser.add_argument("--end", type=date.fromisoformat, help="Report coverage until this date (default: tomorrow)")
+    parser.add_argument("--no-stale", action="store_true", help="Report coverage without historical references")
     parser.add_argument("--timezone", default="Europe/Amsterdam")
     args = parser.parse_args(argv)
     today = datetime.now(ZoneInfo(args.timezone)).date()
     with sqlite3.connect(args.database.resolve().as_uri()+"?mode=ro", uri=True) as connection:
         connection.execute("PRAGMA query_only=ON")
         rows = connection.execute("SELECT datetime,renewable_percentage,co2_intensity FROM power_mixes WHERE country_zone='NL' ORDER BY datetime").fetchall()
-        first = connection.execute("SELECT date(MIN(start)) FROM sessions").fetchone()[0]
     originals = {hour.timestamp: hour for hour in map(lambda row: legacy_hour(*row), rows)}
     store = GridStore(args.cache)
     for hour in store.read(observations=True):
@@ -39,14 +43,14 @@ def main(argv=None):
         for hour in read_csv(args.csv):
             originals[hour.timestamp] = hour
     store.save(originals.values(), observations=True)
-    start_date = args.start or (date.fromisoformat(first) if args.backfill and first else today-timedelta(days=7))
+    start_date = args.start or today-timedelta(days=7)
     end_date = args.end or today+timedelta(days=1)
     if start_date > end_date:
         parser.error("Start date must be on or before end date")
     start, _ = day_window(start_date, args.timezone)
     _, end = day_window(end_date, args.timezone)
+    # The same resolution the app performs per request; nothing is stored for it
     hours = resolve_hours(originals.values(), start, end, allow_stale=not args.no_stale, timezone_name=args.timezone)
-    store.save(hours)
     report = dict(start=str(start_date), end=str(end_date), hours=len(hours), original_hours=len(originals),
         carbon_reference_hours=sum(hour.carbon_is_stale for hour in hours),
         renewable_reference_hours=sum(hour.renewable_is_stale for hour in hours),

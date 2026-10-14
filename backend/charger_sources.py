@@ -4,8 +4,8 @@ Each source is parsed into the same `Site`/`Point` records, which
 `backend.charger_import` writes into the existing locations/columns/
 charging_points tables. Nothing here touches the database.
 
-Raw files live under data/chargers/raw/<source>/ and are described in
-data/chargers/manifest.json; see docs/charger_sources.md.
+Raw files live under instance/chargers/raw/<source>/ and are described in
+instance/chargers/manifest.json; see docs/charger_sources.md.
 """
 
 from dataclasses import dataclass, field
@@ -21,7 +21,7 @@ import re
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT / "data/chargers"
+DATA_DIR = ROOT / "instance/chargers"
 RAW_DIR = DATA_DIR / "raw"
 MANIFEST = DATA_DIR / "manifest.json"
 USER_AGENT = "EPIOT-Drive2X/1.0 (charger-location research)"
@@ -55,7 +55,7 @@ SOURCES = {
     "digitraffic": Source("digitraffic", "Digitraffic AFIR", "Fintraffic (Finnish national access point)", "CC BY 4.0",
                           "https://www.digitraffic.fi/en/road-traffic/afir/", ("FI",)),
 }
-# Chargers loaded by backend.loaders.load_ams_data before sources were tagged.
+# Chargers loaded by the original Amsterdam importer before sources were tagged.
 LEGACY_SOURCE = "pilot"
 
 

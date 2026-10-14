@@ -1,14 +1,14 @@
-"""Inclusive local-day KPIs from stored sessions or cached daily scenarios."""
+"""Inclusive local-day KPIs from stored sessions or on-the-fly scenarios."""
 
 from collections import defaultdict
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 
 import numpy as np
+import pandas as pd
 
 from backend.cpft import day_window
-from backend.scenario_profiles import grid
-from backend.scenario_sampling import point_power
+from backend.scenario_profiles import STEP, point_powers, point_table
+from backend.session_frame import as_frame, bin_integrals
 from backend.kpi.environment import EnvironmentalComparison
 
 
@@ -26,15 +26,25 @@ def histogram(values, bins, upper, probability=False):
     return counts.tolist()
 
 
-def union_seconds(intervals, left, right):
-    """Count overlapping stored records once when measuring point occupancy."""
-    total, last = 0., left
-    for start, end in sorted(intervals):
-        start, end = max(left, start, last), min(right, end)
-        if end > start:
-            total += end-start
-            last = end
-    return total
+def local_hours(timestamps, zone, half_hours=False):
+    local = pd.to_datetime(np.asarray(timestamps, float), unit="s", utc=True).tz_convert(zone)
+    hours = local.hour.to_numpy()
+    return hours*2+local.minute.to_numpy()//30 if half_hours else hours
+
+
+def union_intervals(points, start, end, span):
+    """Merge each point's overlapping records in [0, span], so occupancy counts them once."""
+    if not len(points):
+        return points, start, end
+    order = np.lexsort((start, points))
+    points, start, end = points[order], start[order], end[order]
+    # Offsetting each point beyond the window keeps the running maximum per point
+    offset = points*(span+1.)
+    reach = np.maximum.accumulate(end+offset)-offset
+    opens = np.ones(len(points), bool)
+    opens[1:] = (points[1:] != points[:-1]) | (start[1:] > reach[:-1])
+    first = np.flatnonzero(opens)
+    return points[first], start[first], np.maximum.reduceat(end, first)
 
 
 def environment_fields(environment):
@@ -48,6 +58,7 @@ def environment_fields(environment):
 
 def calculate_environment_kpis(chargers, daily_sessions, timezone_name, power_mix):
     """Environmental-only request: do not repeat behavioural/occupancy aggregation."""
+    chargers = point_table(chargers)
     comparison = EnvironmentalComparison(power_mix, timezone_name)
     for day, records in daily_sessions:
         left, right = day_window(day, timezone_name)
@@ -56,16 +67,15 @@ def calculate_environment_kpis(chargers, daily_sessions, timezone_name, power_mi
 
 
 def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name, power_mix=(), *, include_environment=True):
-    """Each daily input is the same target-day scenario used by load profiles.
+    """Each daily input holds that local day's sessions; extra sessions are ignored.
 
-    Daily windows are disjoint: never count a scenario's previous-day history as
-    another forecast. Full connection durations are retained; occupancy and
+    Daily windows are disjoint: a scenario's previous-day history is never
+    counted again. Full connection durations are retained; occupancy and
     scheduled energy are restricted to the inclusive selected date range.
     """
-    zone = ZoneInfo(timezone_name)
-    ids = [int(charger["id"]) for charger in chargers]
+    chargers = point_table(chargers)
+    ids = chargers.ids
     points = len(ids)
-    power = {int(charger["id"]): point_power(charger) for charger in chargers}
     distributions = {kind: {field: [] for field in ("arrival", "departure", "duration", "consumption", "daily")}
                      for kind in ("wd", "we")}
     arrival_energy = {kind: np.zeros(24) for kind in distributions}
@@ -73,7 +83,7 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
     sessions_by_weekday = defaultdict(list)
     available = {kind: np.zeros(48) for kind in distributions}
     exposure = {kind: np.zeros(48) for kind in distributions}
-    occupied_by_point = defaultdict(float)
+    occupied_by_point = np.zeros(points)
     profiles_energy = dict(afap=0., alap=0., avg=0.)
     environmental = EnvironmentalComparison(power_mix, timezone_name) if include_environment else None
     basic_energy = 0.
@@ -81,55 +91,52 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
     range_seconds = 0.
     daily_totals = []
     for day, records in daily_sessions:
-        left, right = day_window(day, timezone_name)
+        left_time, right_time = day_window(day, timezone_name)
+        left, right = left_time.timestamp(), right_time.timestamp()
         kind = "we" if day.weekday() >= 5 else "wd"
-        timeline, _ = grid(left, right, left)
-        offsets = np.arange(len(timeline))*600.
-        local_slots = np.array([timestamp.astimezone(zone).hour*2+timestamp.astimezone(zone).minute//30 for timestamp in timeline])
-        intervals = defaultdict(list)
-        day_counts = dict.fromkeys(ids, 0)
-        daily_energy = dict.fromkeys(ids, 0.)
-        for record in records:
-            if record.cp_id not in power or record.start >= right or record.end <= left:
-                continue
-            relative_start = (record.start-left).total_seconds()
-            relative_end = (record.end-left).total_seconds()
-            intervals[record.cp_id].append((relative_start, relative_end))
-            seconds = (record.end-record.start).total_seconds()
-            energy = min(record.energy_kwh, power[record.cp_id]*seconds/3600)
-            daily_energy[record.cp_id] += energy*max(0., min(relative_end, len(timeline)*600)-max(relative_start, 0.))/seconds
-            if left <= record.start < right:
-                arrival = record.start.astimezone(zone).hour
-                distributions[kind]["arrival"].append(arrival)
-                distributions[kind]["duration"].append(seconds/3600)
-                distributions[kind]["consumption"].append(energy)
-                arrival_energy[kind][arrival] += energy
-                arrival_count[kind][arrival] += 1
-                day_counts[record.cp_id] += 1
-                session_count += 1
-                duration_total += seconds/3600
-                session_energy_total += energy
-                # Same arrival-cohort average-energy total, without scheduling strategies.
-                basic_energy += energy*max(0., min(relative_end, len(timeline)*600)-relative_start)/seconds
-            if left <= record.end < right:
-                distributions[kind]["departure"].append(record.end.astimezone(zone).hour)
+        count = int((right-left)/STEP)
+        span = count*STEP
+        frame = as_frame(records)
+        power = point_powers(chargers, frame.cp_id)
+        keep = ~np.isnan(power) & (frame.start < right) & (frame.end > left)
+        frame, power = frame.select(keep), power[keep]
+        point = np.searchsorted(ids, frame.cp_id)
+        relative_start, relative_end = frame.start-left, frame.end-left
+        seconds = frame.end-frame.start
+        energy = np.minimum(frame.energy_kwh, power*seconds/3600)
+        inside = np.maximum(0., np.minimum(relative_end, span)-np.maximum(relative_start, 0.))
+        daily_energy = np.bincount(point, energy*inside/seconds, points)
+        arrived = (frame.start >= left) & (frame.start < right)
+        hours = local_hours(frame.start[arrived], timezone_name)
+        distributions[kind]["arrival"].extend(hours.tolist())
+        distributions[kind]["duration"].extend((seconds[arrived]/3600).tolist())
+        distributions[kind]["consumption"].extend(energy[arrived].tolist())
+        arrival_energy[kind] += np.bincount(hours, energy[arrived], 24)
+        arrival_count[kind] += np.bincount(hours, minlength=24)
+        day_counts = np.bincount(point[arrived], minlength=points)
+        session_count += int(arrived.sum())
+        duration_total += float(seconds[arrived].sum()/3600)
+        session_energy_total += float(energy[arrived].sum())
+        # Same arrival-cohort average-energy total, without scheduling strategies.
+        basic_energy += float((energy*np.maximum(0., np.minimum(relative_end, span)-relative_start)/seconds)[arrived].sum())
+        departed = (frame.end >= left) & (frame.end < right)
+        distributions[kind]["departure"].extend(local_hours(frame.end[departed], timezone_name).tolist())
         # Local half-hour bins average actual elapsed time, including repeated
         # or absent DST hours, and include selected points with no sessions.
-        busy = np.zeros(len(timeline))
-        for cp_id, spans in intervals.items():
-            occupied = np.array([union_seconds(spans, offset, offset+600) for offset in offsets])
-            busy += occupied
-            occupied_by_point[cp_id] += occupied.sum()
-        for slot, occupied in zip(local_slots, busy):
-            available[kind][slot] += points*600-occupied
-            exposure[kind][slot] += points*600
-        distributions[kind]["daily"].extend(daily_energy.values())
-        sessions_by_weekday[day.weekday()].extend(day_counts.values())
-        daily_totals.append(dict(date=str(day), session_count=sum(day_counts.values()), energy_kwh=sum(daily_energy.values())))
-        range_seconds += (right-left).total_seconds()
+        merged_point, merged_start, merged_end = union_intervals(
+            point, np.clip(relative_start, 0, span), np.clip(relative_end, 0, span), span)
+        busy = bin_integrals(merged_start, merged_end, float(STEP), count, STEP)
+        occupied_by_point += np.bincount(merged_point, merged_end-merged_start, points)
+        slots = local_hours(left+np.arange(count)*STEP, timezone_name, half_hours=True)
+        available[kind] += np.bincount(slots, points*STEP-busy, 48)
+        exposure[kind] += np.bincount(slots, np.full(count, float(points*STEP)), 48)
+        distributions[kind]["daily"].extend(daily_energy.tolist())
+        sessions_by_weekday[day.weekday()].extend(day_counts.tolist())
+        daily_totals.append(dict(date=str(day), session_count=int(day_counts.sum()), energy_kwh=float(daily_energy.sum())))
+        range_seconds += right-left
         # Each day's arrivals up to midnight, so a range equals the sum of its days
         if environmental is not None:
-            day_scheduled_energy = environmental.add_day(chargers, records, left, right)
+            day_scheduled_energy = environmental.add_day(chargers, frame, left_time, right_time)
             for strategy in profiles_energy:
                 profiles_energy[strategy] += day_scheduled_energy[strategy]
     output = {}
@@ -144,7 +151,7 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
             float(free/observed) if observed else None for free, observed in zip(available[kind], exposure[kind])]
     for weekday in range(7):
         output[f"sessions_per_day_{weekday}"] = histogram(sessions_by_weekday[weekday], 6, 6, True)
-    ratios = [occupied_by_point[cp_id]/range_seconds if range_seconds else 0 for cp_id in ids]
+    ratios = (occupied_by_point/range_seconds if range_seconds else np.zeros(points)).tolist()
     output["occupation_ratio_dist"] = histogram(ratios, 20, 1, True)
     if environmental is not None:
         output.update(environment_fields(environmental.result()))

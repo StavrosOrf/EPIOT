@@ -29,12 +29,12 @@ def analysis_versions(app):
         infrastructure += [file_stamp(database), file_stamp(str(database)+"-wal")]
     grid_path = app.config.get("GRID_DATA_CACHE", Path(app.instance_path)/"grid_data.sqlite")
     paths = list((ROOT/"backend").glob("*.py")) + list((ROOT/"backend/kpi").glob("*.py"))
-    paths += list((ROOT/"data").glob("distribution-of-*.csv"))
-    paths += [ROOT/"backend/data/cpft_preprocessing.json",
+    paths += list((ROOT/"seed_data").glob("distribution-of-*.csv"))
+    paths += [ROOT/"backend/data/cpft_preprocessing.json", ROOT/"backend/data/cpft_library.npz", ROOT/"backend/data/calendar_effects.json",
               app.config.get("SESSION_SCENARIO_ATLAS", DEFAULT_ATLAS), grid_path, str(grid_path)+"-wal"]
     model_dir = ROOT/"others/CPFT-main/CPFT-tool/CPFT_VS_Code_Python/outputs"
     paths += [model_dir/name for name in ("best_availability.keras", "best_kwh.keras")]
     configuration = {key: app.config.get(key) for key in (
-        "SESSION_SCENARIO_TIMEZONE", "SESSION_DAILY_ARRIVALS", "GRID_ALLOW_STALE", "aggregator_config")}
+        "SESSION_SCENARIO_TIMEZONE", "SESSION_DAILY_ARRIVALS", "SESSION_CALENDAR_EFFECTS", "GRID_ALLOW_STALE", "aggregator_config")}
     return dict(infrastructure=digest(infrastructure),
                 analysis=digest([infrastructure, configuration, [file_stamp(path) for path in paths]]))

@@ -13,6 +13,7 @@ import {
 import { animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
 import { get_KPIs, get_LoadProfiles, get_EnvironmentKPIs } from "./data_fetch.js";
 import { pickerOptions } from "./date_selection.js";
+import { calendarNote } from "./calendar_note.js";
 import { renderEnvironmentSummary } from "./environment_summary.js";
 import { initLocationSearch } from "./location_search.js";
 
@@ -131,7 +132,8 @@ let kpi_data_list = [];
 var active_tab = "Load Profiles";
 // get today's date
 var today = new Date();
-const starting_date = new Date(2025, 8, 1);
+// No live data: any calendar date is a valid scenario context
+const starting_date = null;
 let pickerRangeMode = false;
 let selectedTargetDate = today;
 let selectedKpiRange = null;
@@ -773,7 +775,7 @@ async function calculateLoadProfiles() {
     });
     const metadata = groups[0]?.response.source;
     document.getElementById("session-source-note").textContent = metadata
-      ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.` +
+      ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}. ${calendarNote(metadata)}` +
         (metadata.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : "")
       : "No charging points in this selection.";
     if (active_tab === "Load Profiles") createGraph(load_profile_data, !gridView, selectedDate);
@@ -853,7 +855,7 @@ async function runActiveAnalysis() {
       transformer_ids_list = result.map(group => group.transformerIds);
       const metadata = result[0]?.source;
       document.getElementById("session-source-note").textContent = metadata
-        ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.`
+        ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}. ${calendarNote(metadata)}`
         : "No charging points in this selection.";
       renderActiveKpi();
     } catch (error) {

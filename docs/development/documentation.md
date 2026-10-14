@@ -52,7 +52,7 @@ simulator or the session data:
 uv run --with matplotlib python docs/_scripts/generate_figures.py
 ```
 
-Figures that need `instance/default.sqlite` or the CSVs in `./data` are skipped when those are absent.
+Figures that need `instance/default.sqlite` or the CSVs in `./seed_data` are skipped when those are absent.
 
 ## Regenerate screenshots
 

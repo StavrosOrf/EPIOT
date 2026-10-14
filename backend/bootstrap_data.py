@@ -13,17 +13,15 @@ import tempfile
 from backend.charger_sources import COUNTRY_NAMES, ROOT, SOURCES, plausible
 from backend.models import Model
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 SEED_DIR = ROOT / "seed_data"
 COUNTRY_TABLES = ("operators", "locations", "columns", "charging_points", "transformers",
                   "grid_connections", "power_mixes", "sessions", "forecast_hourly", "forecast_sessions")
 SHARED_TABLES = ("operators", "gamma_distributions", "forecast_runs")
+# Small runtime inputs kept as plain files in seed_data/ and read from there directly.
 PRIORS = ("distribution-of-arrival.csv", "distribution-of-arrival-weekend.csv",
           "distribution-of-connection-time.csv", "distribution-of-energy-demand.csv")
 ATLAS_NAME = "wijkenbuurten_2022_v2_amsterdam.gpkg"
-ATLAS_COLUMNS = ("buurtcode", "buurtnaam", "water", "oppervlakte_land_in_ha", "woningvoorraad",
-                 "aantal_bedrijfsvestigingen", "aantal_bedrijven_handel_en_horeca",
-                 "bevolkingsdichtheid_inwoners_per_km2")
 
 
 def fields(table):
@@ -51,7 +49,7 @@ def write_snapshot(directory, name, payload):
                 tables={table: len(data["rows"]) for table, data in payload["tables"].items()})
 
 
-def export_snapshots(database, output=SEED_DIR, data_dir=ROOT/"data", grid_cache=None):
+def export_snapshots(database, output=SEED_DIR, data_dir=ROOT/"instance", grid_cache=None):
     output, data_dir, database = Path(output), Path(data_dir), Path(database)
     output.mkdir(parents=True, exist_ok=True)
     with closing(read_only(database)) as connection:
@@ -81,7 +79,6 @@ def export_snapshots(database, output=SEED_DIR, data_dir=ROOT/"data", grid_cache
                       tables={table: snapshot_table(connection, table,
                           "id NOT IN (SELECT operator_id FROM columns)" if table == "operators" else "1")
                           for table in SHARED_TABLES},
-                      priors={name: (data_dir/name).read_text(encoding="utf-8") for name in PRIORS},
                       charger_manifest=provenance)
         manifest["shared"] = write_snapshot(output, "shared.json.gz", shared)
         locs = "SELECT id FROM location_country WHERE country=?"
@@ -96,10 +93,6 @@ def export_snapshots(database, output=SEED_DIR, data_dir=ROOT/"data", grid_cache
         for country in countries:
             payload = dict(format_version=FORMAT_VERSION, country=country,
                 tables={table: snapshot_table(connection, table, filters[table], (country,)) for table in COUNTRY_TABLES})
-            if country == "NL":
-                import geopandas as gpd
-                atlas = gpd.read_file(data_dir/ATLAS_NAME, columns=list(ATLAS_COLUMNS)).to_crs(4326)
-                payload["atlas"] = json.loads(atlas.to_json(drop_id=True))  # full unsimplified geometry
             if grid_cache.exists():
                 from backend.grid_data import GridStore
                 payload["grid_observations"] = [hour.to_dict() for hour in GridStore(grid_cache).read(zone=country, observations=True)]
@@ -179,7 +172,7 @@ def insert_tables(connection, tables):
                                    [tuple(row) for row in data["rows"]])
 
 
-def bootstrap(database, *, seed_dir=SEED_DIR, data_dir=ROOT/"data", countries=None):
+def bootstrap(database, *, seed_dir=SEED_DIR, data_dir=ROOT/"instance", countries=None):
     """Build a new database offline; refuse to overwrite an existing database."""
     database, seed_dir, data_dir = Path(database).resolve(), Path(seed_dir), Path(data_dir)
     if database.exists():
@@ -194,8 +187,9 @@ def bootstrap(database, *, seed_dir=SEED_DIR, data_dir=ROOT/"data", countries=No
     shared = read_snapshot(seed_dir, manifest["shared"], country=None)
     for code in selected:
         read_snapshot(seed_dir, manifest["countries"][code], country=code)
-    if set(shared.get("priors", {})) != set(PRIORS):
-        raise ValueError("Bootstrap bundle is missing session priors")
+    missing = [name for name in (*PRIORS, ATLAS_NAME) if not (seed_dir/name).is_file()]
+    if missing:
+        raise ValueError(f"Bootstrap bundle is missing runtime inputs: {', '.join(missing)}")
     database.parent.mkdir(parents=True, exist_ok=True)
     from scripts.update_charger_data import engine_for
     from backend.charger_import import region_counts
@@ -205,7 +199,7 @@ def bootstrap(database, *, seed_dir=SEED_DIR, data_dir=ROOT/"data", countries=No
         staged_db = staging/"default.sqlite"
         migrate_database(staged_db)
         engine = engine_for(staged_db)
-        observations, atlas = [], None
+        observations = []
         try:
             with engine.begin() as connection:
                 connection.exec_driver_sql("PRAGMA foreign_keys=ON")
@@ -214,8 +208,6 @@ def bootstrap(database, *, seed_dir=SEED_DIR, data_dir=ROOT/"data", countries=No
                     payload = read_snapshot(seed_dir, manifest["countries"][code], country=code)
                     insert_tables(connection, payload["tables"])
                     observations.append((code, payload.get("grid_observations", [])))
-                    if payload.get("atlas"):
-                        atlas = payload["atlas"]
                 connection.exec_driver_sql("UPDATE locations SET geom=MakePoint(longitude,latitude,4326) "
                                            "WHERE longitude IS NOT NULL AND latitude IS NOT NULL")
                 if connection.exec_driver_sql("PRAGMA foreign_key_check").all():
@@ -232,13 +224,8 @@ def bootstrap(database, *, seed_dir=SEED_DIR, data_dir=ROOT/"data", countries=No
                     imported_at=manifest["created_at"]) for source in SOURCES}
         finally:
             engine.dispose()
-        runtime = staging/"data"
+        runtime = staging/"runtime"
         runtime.mkdir()
-        for name, text in shared["priors"].items():
-            (runtime/name).write_text(text, encoding="utf-8", newline="")
-        if atlas:
-            import geopandas as gpd
-            gpd.GeoDataFrame.from_features(atlas["features"], crs=4326).to_file(runtime/ATLAS_NAME, driver="GPKG", layer="buurten")
         for code, rows in observations:
             if rows:
                 hours = [GridHour.from_dict(row) for row in rows]

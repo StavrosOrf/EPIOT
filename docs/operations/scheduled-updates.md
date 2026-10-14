@@ -1,78 +1,44 @@
 # Scheduled updates
 
-Two kinds of data age: **charging sessions** must exist for the dates users pick, and the
-**power mix** must be fetched daily because the Electricity Maps history endpoint only covers the last
-24 hours. `update_database.py` does both.
+**None are needed.** EPIOT receives no live charging or grid feed. Every
+session scenario, CPFT day-ahead scenario and grid-mix value is computed when a
+request asks for it, for any past or future date (see
+{doc}`../concepts/on-request-scenarios`). Do not install a cron entry or timer
+for scenarios, forecasts or grid data.
 
-```{mermaid}
-flowchart TB
-    CRON([cron · daily 12:00]) --> SH[scripts/fetch_env_data.sh]
-    SH --> PY[update_database.py]
-    PY --> S1[Generate MC sessions<br/>100 days from today − 20]
-    PY --> S2[Create tables if missing]
-    PY --> S3[Fetch NL power mix<br/>last 24 h]
-    S1 & S3 --> DB[(default.sqlite)]
-    SH --> LOG[[logs/fetch.log]]
-```
+The web process is the only service to keep running ({doc}`deployment`).
 
-## What `update_database.py` does
+## Occasional, manual tasks
 
-1. Starts a minimal Flask app bound to the same database, with SpatiaLite loaded on connect.
-2. Generates Monte Carlo sessions for **100 consecutive days starting 20 days ago**, using
-   `load_daily_charging_sessions(..., method="MC", scope="NL")`.
-3. Ensures all tables exist (`create_tables_if_not_exist`).
-4. Fetches and upserts the latest power mix for `NL`.
+These run when their inputs change, not on a calendar:
 
-:::{admonition} Re-running over days that already have sessions
-:class: warning
+| When | Command | Effect |
+|---|---|---|
+| CPFT checkpoints, preprocessing, session priors, sampler version or timezone change | `uv run --extra cpft python scripts/build_cpft_library.py` | Rebuilds `backend/data/cpft_library.npz` (about 100 minutes). Until then CPFT requests return an explicit 503. |
+| Better demand or weather data for the day effects | `uv run --with matplotlib python scripts/calibrate_calendar_effects.py --figures docs/_static/figures` | Re-estimates `backend/data/calendar_effects.json`; see {doc}`../concepts/calendar-effects`. |
+| A new free hourly grid dataset is available | `uv run python scripts/prepare_grid_data.py --csv FILE` | Imports observations; the next request uses them. |
+| Open-data charging-point sources publish (BNetzA monthly) | `uv run python scripts/update_charger_data.py` | Refreshes infrastructure, not demand. See {doc}`../charger_sources`. |
 
-The generator only checks whether a charger is still occupied **at midnight**; it does not check
-sessions later in the day. Generating a day that already has sessions therefore **adds** a second set
-on top of the first, and sessions on one charger can overlap. Because the job covers a 100-day window
-every time it runs, a daily schedule regenerates the same days repeatedly.
+## What was removed
 
-Before scheduling it, either narrow the loop in `update_database.py` to days that have no sessions
-yet (for example, start from the day after `max(sessions.start)`), or clear the affected days first.
-:::
+The previous design ran three recurring jobs, all removed:
 
-Run it by hand with:
+- `update_database.py` (cron, daily): generated 100 days of Monte Carlo sessions
+  into `sessions` and fetched the last 24 hours of the Electricity Maps power mix.
+- `epiot-session-scenarios` (systemd, 18:00): pre-generated tomorrow's simple,
+  spatial and CPFT scenarios into `instance/session_scenarios.sqlite`.
+- `epiot-grid-data` (systemd, 02:45): pre-resolved grid reference hours.
+
+Existing `sessions` and `power_mixes` rows are kept and still serve the legacy
+stored-session source and grid observations. An old
+`instance/session_scenarios.sqlite` is no longer read and can be deleted.
+
+## Checking an installation
 
 ```bash
-uv run python update_database.py
+# Imported grid observations
+sqlite3 instance/grid_data.sqlite "SELECT count(*), min(timestamp), max(timestamp) FROM grid_observations;"
+
+# The CPFT library matches the current inputs (prints its build time)
+uv run python -c "from backend.cpft_library import get_library; l = get_library(); l.check('Europe/Amsterdam'); print(l.meta['built_at'])"
 ```
-
-## Scheduling with cron
-
-`scripts/fetch_env_data.sh` activates the environment, sets `SPATIALITE_LIBRARY_PATH` and runs
-`update_database.py`. Adjust the paths in the script to your server, then add a crontab entry
-(`crontab -e`) to run it every day at noon:
-
-```text
-0 12 * * * /path/to/epiot/scripts/fetch_env_data.sh >> /path/to/epiot/logs/fetch.log 2>&1
-```
-
-:::{tip}
-The shipped script activates a conda environment. On a uv-based install, replace the activation lines
-with:
-
-```bash
-cd /path/to/epiot
-export SPATIALITE_LIBRARY_PATH=mod_spatialite.so
-uv run python update_database.py
-```
-:::
-
-## Checking that updates work
-
-```bash
-# Latest stored power-mix hour and session coverage
-sqlite3 instance/default.sqlite \
-  "SELECT max(datetime) FROM power_mixes;
-   SELECT min(start), max(start), count(*) FROM sessions;"
-
-# Recent log output
-tail -n 50 logs/fetch.log
-```
-
-If the power-mix timestamp stops advancing, environment KPIs for new dates will be empty; see
-{doc}`../reference/troubleshooting`.

@@ -1,4 +1,4 @@
-"""KPI source selection, inclusive ranges, timezone boundaries and cache reuse."""
+"""KPI source selection, inclusive ranges, timezone boundaries and on-request ranges."""
 
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
@@ -11,25 +11,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from backend.cpft import day_window
-from backend.cpft_runtime import CPFTUnavailable
 from backend.kpi.statistics import calculate_kpis
 from backend.kpi.user import kpi_data
 from backend.scenario_sampling import ScenarioSession, UTC
 from backend.session_sources import SessionSourceService
-
-
-class DailyRuntime:
-    def forecast(self, chargers, histories, issue, end):
-        output = {}
-        for charger in chargers:
-            rows, timestamp = [], issue
-            while timestamp < end:
-                occupied = timestamp.hour == 10
-                rows.append(dict(hour=timestamp, availability_forecast_prob=.9 if occupied else .1,
-                    availability_forecast_bin=int(occupied), kWh_forecast_next_whole_period=2*int(occupied)))
-                timestamp += timedelta(hours=1)
-            output[charger["id"]] = rows
-        return output
+from tests.cpft_helpers import write_test_library
 
 
 @pytest.fixture
@@ -37,12 +23,12 @@ def client(tmp_path):
     engine = create_engine(f"sqlite:///{(tmp_path/'app.sqlite').as_posix()}")
     with engine.begin() as connection:
         for sql in [
-            "CREATE TABLE locations (id INTEGER PRIMARY KEY, latitude REAL, longitude REAL)",
+            "CREATE TABLE locations (id INTEGER PRIMARY KEY, latitude REAL, longitude REAL, country TEXT)",
             "CREATE TABLE columns (id INTEGER PRIMARY KEY, operator_id INTEGER, location_id INTEGER)",
             "CREATE TABLE charging_points (id INTEGER PRIMARY KEY, column_id INTEGER, power REAL, type TEXT)",
             "CREATE TABLE sessions (id INTEGER PRIMARY KEY, cp_id INTEGER, start DATETIME, end DATETIME, consumption REAL)",
             "CREATE TABLE power_mixes (id INTEGER PRIMARY KEY, country_zone TEXT, datetime DATETIME, renewable_percentage REAL, co2_intensity REAL)",
-            "INSERT INTO locations VALUES (1,52.36,4.90)", "INSERT INTO columns VALUES (1,1,1)",
+            "INSERT INTO locations VALUES (1,52.36,4.90,'Netherlands')", "INSERT INTO columns VALUES (1,1,1)",
             "INSERT INTO charging_points VALUES (1,1,11,'regular'),(2,1,11,'regular'),(3,1,11,'regular')",
             "INSERT INTO sessions VALUES (1,1,'2025-10-12 23:30','2025-10-13 00:30',4)",
             "INSERT INTO sessions VALUES (2,1,'2025-10-13 00:30','2025-10-13 01:30',4.5)",
@@ -54,8 +40,8 @@ def client(tmp_path):
     with Session(engine) as session:
         app = Flask(__name__)
         app.config.update(TESTING=True, GRID_DATA_CACHE=str(tmp_path/'grid.sqlite'), **{"station_data.db": SimpleNamespace(session=session)})
-        app.extensions["session_source_service"] = SessionSourceService(tmp_path/'cache.sqlite',
-            atlas_path=tmp_path/'missing.gpkg', runtime_factory=DailyRuntime)
+        app.extensions["session_source_service"] = SessionSourceService(atlas_path=tmp_path/'missing.gpkg',
+            library_path=write_test_library(tmp_path/'library.npz'))
         app.register_blueprint(kpi_data, url_prefix='/kpi')
         yield app.test_client(), engine
     engine.dispose()
@@ -115,39 +101,47 @@ def test_legacy_utc_picker_midnight_is_converted_to_local_calendar_date(client):
 
 
 @pytest.mark.parametrize('source', ['simple', 'spatial', 'cpft'])
-def test_selected_source_range_equals_sum_of_cached_target_days(client, source):
+def test_selected_source_range_equals_sum_of_its_days(client, source):
     browser, engine = client
     data = request(browser, session_source=source).get_json()
     repeat = request(browser, session_source=source).get_json()
     assert data['source']['source'] == source
     assert data['source']['synthetic'] is True
-    assert repeat['source']['cache_hits'] == 6
+    assert data['source']['generated'] == 'on request'
     assert data['summary'] == repeat['summary']
     singles = [request(browser, session_source=source, start_date=day, end_date=day).get_json()
                for day in ['2025-10-13', '2025-10-14']]
     assert data['summary']['session_count'] == sum(item['summary']['session_count'] for item in singles)
     assert data['summary']['energy_kwh'] == pytest.approx(sum(item['summary']['energy_kwh'] for item in singles))
     if source == 'cpft':
-        assert data['summary']['session_count'] == 6  # no synthetic-history arrivals counted
-        assert data['summary']['energy_kwh'] == pytest.approx(12)
+        assert data['summary']['session_count'] == 6  # one forecast hour per point and day, no history arrivals
+        # 2 kWh per point and day, scaled by each day's temperature effect
+        factors = [day['energy_factor'] for day in data['source']['calendar']['days']['NL']]
+        assert data['summary']['energy_kwh'] == pytest.approx(sum(3*2*factor for factor in factors), rel=1e-3)
     with engine.connect() as db:
         assert db.exec_driver_sql('SELECT COUNT(*) FROM sessions').scalar() == 5
 
 
 @pytest.mark.parametrize('updates', [dict(start_date=''), dict(end_date='2025-10-12'),
     dict(session_source='unknown'), dict(demand_assumption='unknown'), dict(seed=-1),
-    dict(selected_markers=[999]), dict(selected_markers={}),
-    dict(end_date=str(datetime.now(ZoneInfo('Europe/Amsterdam')).date()+timedelta(days=1)))])
+    dict(selected_markers=[999]), dict(selected_markers={}), dict(start_date='2024-01-01', end_date='2025-10-14')])
 def test_invalid_ranges_and_source_options_are_rejected(client, updates):
     browser, _ = client
     assert request(browser, **updates).status_code == 400
 
 
-def test_empty_cpft_selection_does_not_load_models_and_returns_finite_data(client):
+@pytest.mark.parametrize('source', ['simple', 'spatial', 'cpft'])
+def test_future_dates_are_ordinary_scenario_dates(client, source):
     browser, _ = client
-    def unavailable():
-        raise CPFTUnavailable('missing checkpoint')
-    browser.application.extensions['session_source_service'].runtime_factory = unavailable
+    day = str(datetime.now(ZoneInfo('Europe/Amsterdam')).date()+timedelta(days=400))
+    response = request(browser, session_source=source, start_date=day, end_date=day)
+    assert response.status_code == 200
+    assert response.get_json()['range']['day_count'] == 1
+
+
+def test_empty_cpft_selection_does_not_load_the_library_and_returns_finite_data(client, tmp_path):
+    browser, _ = client
+    browser.application.extensions['session_source_service'].library_path = tmp_path/'absent.npz'
     response = request(browser, selected_markers=[], session_source='cpft')
     assert response.status_code == 200
     assert response.get_json()['summary']['point_count'] == 0
@@ -183,14 +177,14 @@ def test_environmental_values_use_matching_hours_and_energy_weighted_intensity()
 
 @pytest.mark.parametrize('source', ['simple','spatial','cpft'])
 def test_api_environment_reference_is_labelled_and_all_schedules_have_same_energy(client, source):
-    from backend.grid_data import GridHour, GridStore, resolve_hours
+    from backend.grid_data import GridHour, GridStore
     browser, _ = client
     origin = datetime(2024,10,22,tzinfo=UTC)
     observations = [GridHour(origin+timedelta(hours=i),100+10*i,50,False,False) for i in range(24)]
     left, _ = day_window(date(2025,10,13),'Europe/Amsterdam')
     _, right = day_window(date(2025,10,14),'Europe/Amsterdam')
     store = GridStore(browser.application.config['GRID_DATA_CACHE'])
-    store.save(resolve_hours(observations,left,right))
+    store.save(observations, observations=True)
     response = request(browser,session_source=source)
     assert response.status_code == 200
     environment = response.get_json()['environment']

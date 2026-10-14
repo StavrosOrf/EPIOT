@@ -11,13 +11,11 @@ flowchart LR
     end
     subgraph Backend
       AGG[aggregators.py<br/>ocost]
-      UPD[update_database.py]
     end
     M -->|tiles| OSM[(OpenStreetMap<br/>tile.openstreetmap.org)]
     S -->|geocode| NOM[(Nominatim<br/>nominatim.openstreetmap.org)]
     AGG -->|day-ahead prices| EC[(Energy-Charts<br/>api.energy-charts.info)]
     AGG -->|optimise schedules| RF[(ReFlex<br/>drive2x-reflex.hesi.energy)]
-    UPD -->|power mix, CO₂| EM[(Electricity Maps<br/>api.electricitymaps.com)]
 ```
 
 | Service | Used for | Called by | When | Auth |
@@ -26,7 +24,7 @@ flowchart LR
 | **Nominatim** | Location search | Browser | On search | None (usage policy: max 1 req/s) |
 | **Energy-Charts** (Fraunhofer ISE) | NL day-ahead prices for `ocost` | `backend/api_calls/prices.py` | `ocost` requests | None |
 | **ReFlex** (HESI) | Cost-optimal EV schedules | `backend/aggregators.py` | `ocost` requests | Project network |
-| **Electricity Maps** | Hourly power breakdown and carbon intensity | `backend/api_calls/env_data_api.py` | Batch update | API token |
+| **Electricity Maps** | Hourly power breakdown and carbon intensity | `backend/api_calls/env_data_api.py` | Not called: EPIOT uses no live data | API token |
 
 ## Energy-Charts — day-ahead prices
 
@@ -58,7 +56,8 @@ one charging point in joules per step. See {doc}`../concepts/charging-strategies
 For each hour of history it computes the renewable share as
 $(\text{wind} + \text{solar} + \text{hydro} + \text{biomass} + \text{geothermal}) / \text{total}$ and
 upserts one `PowerMix` row per country and timestamp, removing duplicates. The history endpoint returns
-the last 24 hours, so the job must run daily to build a continuous record (see
+the last 24 hours. No job calls it any more: EPIOT uses no live data, and
+existing `power_mixes` rows serve as grid observations (see
 {doc}`../operations/scheduled-updates`).
 
 The API token is read from the `ELECTRICITYMAPS_API_TOKEN` environment variable.

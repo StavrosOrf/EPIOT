@@ -16,20 +16,18 @@ flowchart TB
         BP --> AGG
     end
     DB[("SQLite + SpatiaLite<br/>instance/default.sqlite")]
-    subgraph Batch["Batch jobs"]
-        JOBS["database_init.py<br/>update_database.py"]
+    subgraph Batch["One-off setup"]
+        JOBS["database_init.py<br/>build_cpft_library.py"]
     end
     subgraph Ext["External services"]
         MAP["OSM tiles · Nominatim"]
         OPT["Energy-Charts · ReFlex"]
-        EM["Electricity Maps"]
     end
     UI -- "JSON over HTTP" --> BP
     UI -.-> MAP
     BP --> DB
     AGG -. "ocost only" .-> OPT
     JOBS --> DB
-    JOBS -.-> EM
 ```
 
 ## Technology stack

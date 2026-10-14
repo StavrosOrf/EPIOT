@@ -12,11 +12,11 @@ from backend.cpft_runtime import CPFTUnavailable
 from backend.kpi.statistics import calculate_kpis, calculate_environment_kpis, days_between
 from backend.models import ChargingPoint, Location, Session
 from backend.scenario_sampling import ScenarioSession, UTC
-from backend.session_sources import SessionSourceService, SOURCE_LABELS
-from backend.spatial_profiles import DEFAULT_ATLAS
+from backend.session_sources import SOURCE_LABELS, session_service
 from backend.grid_data import app_grid_hours
 
 kpi_data = Blueprint("kpi", "kpi")
+MAX_RANGE_DAYS = 366
 
 
 def calendar_date(value, zone):
@@ -45,8 +45,9 @@ def get_user_kpi():
         end_date = calendar_date(arguments.get("end_date"), zone)
         if end_date < start_date:
             raise ValueError("The end date must be on or after the start date")
-        if end_date > datetime.now(zone).date():
-            raise ValueError("KPI dates cannot be after today")
+        # Synthetic scenarios have no "today": any date is only a calendar context
+        if (end_date-start_date).days >= MAX_RANGE_DAYS:
+            raise ValueError(f"KPI ranges are limited to {MAX_RANGE_DAYS} days")
         source = str(arguments.get("session_source", "database")).strip()
         if source not in {"database", *SOURCE_LABELS}:
             raise ValueError("Unknown session source")
@@ -64,11 +65,11 @@ def get_user_kpi():
         ids = sorted({int(value) for value in markers})
         db = current_app.config["station_data.db"]
         rows = list(db.session.execute(select(ChargingPoint.id, ChargingPoint.power, ChargingPoint.type,
-            Location.latitude, Location.longitude).join(ChargingPoint.column).join(Location)
+            Location.latitude, Location.longitude, Location.country).join(ChargingPoint.column).join(Location)
             .where(ChargingPoint.id.in_(ids))))
         if len(rows) != len(ids):
             raise ValueError("One or more selected charging points are unavailable")
-        chargers = [dict(id=row[0], power=row[1], type=row[2], latitude=row[3], longitude=row[4]) for row in rows]
+        chargers = [dict(id=row[0], power=row[1], type=row[2], latitude=row[3], longitude=row[4], country=row[5]) for row in rows]
         left, _ = day_window(start_date, timezone_name)
         _, right = day_window(end_date, timezone_name)
         mix = app_grid_hours(left, right, db.session,
@@ -76,7 +77,7 @@ def get_user_kpi():
             allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name) if section != "basic" else ()
         metadata = dict(source=source, label=SOURCE_LABELS.get(source, "Stored sessions"),
             synthetic=source != "database", assumption=assumption if source != "database" else None,
-            seed=seed, point_count=len(chargers), cache_hits=0,
+            seed=seed, point_count=len(chargers),
             note="Synthetic scenarios with assumed demand, not verified local charging forecasts."
                  if source != "database" else "Stored session dataset; local charging observations are not verified.")
         if source == "database":
@@ -92,21 +93,10 @@ def get_user_kpi():
         elif not chargers:
             daily = ((day, []) for day in days_between(start_date, end_date))
         else:
-            service = current_app.extensions.get("session_source_service")
-            if service is None:
-                service = SessionSourceService(
-                    cache_path=current_app.config.get("SESSION_SCENARIO_CACHE", Path(current_app.instance_path)/"session_scenarios.sqlite"),
-                    atlas_path=current_app.config.get("SESSION_SCENARIO_ATLAS", DEFAULT_ATLAS),
-                    daily_arrivals=float(current_app.config.get("SESSION_DAILY_ARRIVALS", 2.)))
-                current_app.extensions["session_source_service"] = service
-            def scenarios():
-                for day in days_between(start_date, end_date):
-                    records, daily_metadata = service.get(chargers, day, source=source, assumption=assumption,
-                        seed=seed, timezone_name=timezone_name)
-                    metadata["cache_hits"] += daily_metadata["cache_hits"]
-                    metadata["label"], metadata["note"] = daily_metadata["label"], daily_metadata["note"]
-                    yield day, records
-            daily = scenarios()
+            # Generated on request for the whole range: one view of the same scenario
+            daily, generated = session_service(current_app).days(chargers, start_date, end_date, source=source,
+                assumption=assumption, seed=seed, timezone_name=timezone_name)
+            metadata.update(generated)
         if section == "environment":
             output = calculate_environment_kpis(chargers, daily, timezone_name, mix)
         else:

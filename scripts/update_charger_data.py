@@ -4,7 +4,7 @@
     uv run python scripts/update_charger_data.py --skip-fetch    # re-import local files
     uv run python scripts/update_charger_data.py --sources ndw osm
 
-Raw files go to data/chargers/raw/, provenance to data/chargers/manifest.json.
+Raw files go to instance/chargers/raw/, provenance to instance/chargers/manifest.json.
 Run `uv run flask --app app db upgrade` once first. See docs/charger_sources.md.
 """
 
@@ -36,7 +36,7 @@ def engine_for(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sources", nargs="+", choices=list(SOURCES), default=list(SOURCES))
-    parser.add_argument("--skip-fetch", action="store_true", help="import the files already in data/chargers/raw")
+    parser.add_argument("--skip-fetch", action="store_true", help="import the files already in instance/chargers/raw")
     parser.add_argument("--skip-import", action="store_true", help="only download")
     parser.add_argument("--database", default=ROOT / "instance/default.sqlite")
     parser.add_argument("--dedupe-metres", type=float, default=30.,

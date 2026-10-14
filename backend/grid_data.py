@@ -1,13 +1,16 @@
 """Free/local grid data with explicit missing values and historical references.
 
-No network calls or paid API credentials are used. The separate SQLite store
-keeps original observations apart from hourly reference values prepared for
-other dates. References never become observations in the application database.
+No network calls or paid API credentials are used, and nothing is refreshed on
+a schedule. The separate SQLite store holds imported original observations;
+any requested window is resolved from them on the fly, filling dates without
+observations from a labelled historical reference. References never become
+observations in the application database.
 """
 
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
+from functools import lru_cache
 import csv
 import json
 import math
@@ -211,20 +214,32 @@ def read_csv(path):
         return rows
 
 
+@lru_cache(maxsize=4)
+def _stored_observations(path, stamps):
+    return tuple(GridStore(path).read(observations=True))
+
+
+def stored_observations(path):
+    """Imported observations, read again only when the store files change."""
+    stamps = []
+    for suffix in ("", "-wal"):
+        try:
+            info = Path(str(path)+suffix).stat()
+        except FileNotFoundError:
+            continue
+        stamps.append((suffix, info.st_mtime_ns, info.st_size))
+    return _stored_observations(str(path), tuple(stamps)) if stamps else ()
+
+
 def app_grid_hours(start, end, db_session, *, cache_path, allow_stale=True, timezone_name="Europe/Amsterdam"):
+    """Hourly grid values for any window, resolved on request from all observations."""
     from sqlalchemy import select
     from backend.models import PowerMix
-    store = GridStore(cache_path)
-    cached = store.read(start, end)
-    if len(cached) == int((end-start).total_seconds()/3600):
-        return cached if allow_stale else [replace(hour,
-            co2_intensity=None if hour.carbon_is_stale else hour.co2_intensity,
-            renewable_percentage=None if hour.renewable_is_stale else hour.renewable_percentage) for hour in cached]
-    # Read-only fallback also works before the daily preparer has been run.
-    originals = {hour.timestamp: hour for hour in store.read(observations=True)}
-    legacy = db_session.execute(select(PowerMix.datetime, PowerMix.renewable_percentage, PowerMix.co2_intensity)
-        .where(PowerMix.country_zone == "NL").order_by(PowerMix.datetime)).all()
-    for row in legacy:
-        hour = legacy_hour(*row)
-        originals.setdefault(hour.timestamp, hour)
+    originals = {hour.timestamp: hour for hour in stored_observations(cache_path)}
+    if db_session is not None:
+        legacy = db_session.execute(select(PowerMix.datetime, PowerMix.renewable_percentage, PowerMix.co2_intensity)
+            .where(PowerMix.country_zone == "NL").order_by(PowerMix.datetime)).all()
+        for row in legacy:
+            hour = legacy_hour(*row)
+            originals.setdefault(hour.timestamp, hour)
     return resolve_hours(originals.values(), start, end, allow_stale=allow_stale, timezone_name=timezone_name)

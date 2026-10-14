@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ATLAS = ROOT / "data/wijkenbuurten_2022_v2_amsterdam.gpkg"
+DEFAULT_ATLAS = ROOT / "seed_data/wijkenbuurten_2022_v2_amsterdam.gpkg"
 ARCHETYPES = ("residential", "workplace", "retail", "mixed")
 
 

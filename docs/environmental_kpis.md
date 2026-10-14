@@ -33,18 +33,22 @@ covered by data on matching dates. The initial reference is 22–23 October 2025
 Missing values remain null whenever no valid reference exists or stale fallback
 is disabled. A real zero carbon intensity or renewable share is preserved.
 
-Original observations and resolved hourly reference values are stored separately
-in `instance/grid_data.sqlite`, with UTC interval-start timestamps, independent
-carbon/renewable quality flags, provider/source information and original source
-timestamps. Writes are atomic and use SQLite WAL; the main application database
-is opened read-only by the preparer.
+Imported original observations are stored in `instance/grid_data.sqlite`, with
+UTC interval-start timestamps, independent carbon/renewable quality flags,
+provider/source information and original source timestamps. Every request
+resolves its own window from them (and from legacy `power_mixes` rows) on the
+fly, so there is nothing to prepare or refresh on a schedule, and new
+observations are used by the next request. Writes are atomic and use SQLite WAL;
+the main application database is opened read-only by the importer.
 
 ```bash
-uv run python scripts/prepare_grid_data.py --backfill
-uv run python scripts/prepare_grid_data.py --start 2026-10-08 --end 2026-10-14
-uv run python scripts/prepare_grid_data.py --backfill --csv /path/to/free-NL-hourly.csv
-uv run python scripts/prepare_grid_data.py --backfill --no-stale
+uv run python scripts/prepare_grid_data.py --csv /path/to/free-NL-hourly.csv
+uv run python scripts/prepare_grid_data.py --start 2026-10-08 --end 2026-10-14 --no-stale
 ```
+
+Run the importer once when a new dataset is available. It copies the legacy
+`power_mixes` rows and the CSV into the observation store, then prints how the
+given range would resolve (matching-date, reference and missing hours).
 
 CSV required columns are `timestamp`, `co2_intensity` (gCO2e/kWh) and
 `renewable_percentage` (0–100). Timestamps must be aware hourly interval starts,
@@ -54,29 +58,11 @@ for example `2025-10-22T00:00:00Z`. Optional columns are `zone` (NL only),
 timestamps and ambiguous timezone-free timestamps are rejected. Supply
 consumption-based data when available; unspecified basis is recorded as unknown.
 
-Flask settings are `GRID_DATA_CACHE` and `GRID_ALLOW_STALE` (use `FLASK_` prefixes
-for environment configuration). For strict matching-date calculations set
-`FLASK_GRID_ALLOW_STALE=false`. The preparer accepts `--database`, `--cache`,
-`--csv` and `--timezone`. Set `EPIOT_GRID_CSV` to import a locally maintained free
-dataset during every daily run; no paid feed is called to update it.
-
-## Daily background preparation
-
-Example Linux units are `scripts/systemd/epiot-grid-data.service` and `.timer`.
-The timer runs at **02:45 Europe/Amsterdam**, independently of Flask/Gunicorn,
-and rechecks/backfills the range from the first stored session through tomorrow.
-It refreshes local inputs and reference projections; it does not manufacture new
-observations. `Persistent=true` catches missed runs. Adjust the user and `/opt/epiot`
-paths, then install the units on the production VM:
-
-```bash
-sudo cp scripts/systemd/epiot-grid-data.{service,timer} /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now epiot-grid-data.timer
-```
-
-Optional local settings are read from `/etc/epiot/grid-data.env`. The units have
-not been installed or enabled on this Windows checkout.
+Flask settings are `GRID_DATA_CACHE` (the observation store) and `GRID_ALLOW_STALE`
+(use `FLASK_` prefixes for environment configuration). For strict matching-date
+calculations set `FLASK_GRID_ALLOW_STALE=false`. The importer accepts
+`--database`, `--cache`, `--csv` and `--timezone`; `EPIOT_GRID_CSV` sets a
+default CSV. No paid or live feed is called.
 
 ## Accounting and coverage
 

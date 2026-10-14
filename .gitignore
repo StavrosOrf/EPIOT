@@ -10,6 +10,7 @@ __pycache__/
 
 # Data
 *.gpkg
+!seed_data/*.gpkg
 *.data
 
 # Individual
@@ -24,11 +25,16 @@ logs/
 # outside the synced tree - see README, "Environment setup".
 .venv/
 .tmp/
+# Downloaded calibration inputs (scripts/calibrate_calendar_effects.py)
+.cache/
 
 _build/
 
-# Ship the verified CPFT preprocessing bundle; keep other input data ignored.
+# Ship the verified CPFT preprocessing bundle and its prebuilt scenario
+# library; keep other input data ignored.
 !backend/data/
 backend/data/*
 !backend/data/cpft_preprocessing.json
+!backend/data/cpft_library.npz
+!backend/data/calendar_effects.json
 !backend/data/charger_position_overrides.json

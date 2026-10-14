@@ -1,0 +1,194 @@
+{
+  "baseline": "9ef972c",
+  "executed_at": "2026-10-14T21:57:33+00:00",
+  "machine": "Windows-10-10.0.19045-SP0",
+  "python": "3.12.12",
+  "results": {
+    "before": [
+      {
+        "name": "Load profile, simple, 1000 points",
+        "kind": "profile",
+        "source": "simple",
+        "points": 1000,
+        "cold_ms": [
+          8272.690100013278,
+          8239.007099997252,
+          8331.886200001463
+        ],
+        "warm_ms": [
+          87.3896999983117,
+          85.45170002616942,
+          86.36830002069473
+        ],
+        "sessions": 2772
+      },
+      {
+        "name": "Load profile, spatial, 1000 points",
+        "kind": "profile",
+        "source": "spatial",
+        "points": 1000,
+        "cold_ms": [
+          8373.200600035489,
+          8354.444099939428,
+          8354.159499984235
+        ],
+        "warm_ms": [
+          101.07140010222793,
+          101.95699997711927,
+          101.6480999533087
+        ],
+        "sessions": 3075
+      },
+      {
+        "name": "Load profile, CPFT, 64 points",
+        "kind": "profile",
+        "source": "cpft",
+        "points": 64,
+        "cold_ms": [
+          6156.867200043052,
+          6012.489199987613,
+          6136.715600034222
+        ],
+        "warm_ms": [
+          11.015099938958883,
+          10.807699989527464,
+          11.04819995816797
+        ],
+        "sessions": 146
+      },
+      {
+        "name": "Basic KPIs, spatial, 500 points x 7 days",
+        "kind": "kpi",
+        "source": "spatial",
+        "points": 500,
+        "days": 7,
+        "cold_ms": [
+          29805.17940002028,
+          29655.800099950284,
+          29601.16590000689
+        ],
+        "warm_ms": [
+          507.4742999859154,
+          600.2395000541583,
+          509.6780000021681
+        ],
+        "sessions": 4623
+      },
+      {
+        "name": "Environment KPIs, simple, 500 points x 7 days",
+        "kind": "environment",
+        "source": "simple",
+        "points": 500,
+        "days": 7,
+        "cold_ms": [
+          29385.161999962293,
+          29377.767500001937,
+          29381.024499889463
+        ],
+        "warm_ms": [
+          589.5788000198081,
+          588.4220999432728,
+          586.9591000955552
+        ],
+        "sessions": null
+      },
+      {
+        "name": "Basic KPIs, CPFT, 64 points x 3 days",
+        "kind": "kpi",
+        "source": "cpft",
+        "points": 64,
+        "days": 3,
+        "repeats": 1,
+        "cold_ms": [
+          18191.374099929817
+        ],
+        "warm_ms": [
+          33.22510002180934
+        ],
+        "sessions": 47
+      }
+    ],
+    "after": [
+      {
+        "name": "Load profile, simple, 1000 points",
+        "kind": "profile",
+        "source": "simple",
+        "points": 1000,
+        "cold_ms": [
+          43.24040003120899,
+          42.603999958373606,
+          46.0185999982059
+        ],
+        "warm_ms": [],
+        "sessions": 2824
+      },
+      {
+        "name": "Load profile, spatial, 1000 points",
+        "kind": "profile",
+        "source": "spatial",
+        "points": 1000,
+        "cold_ms": [
+          53.37750003673136,
+          54.10399998072535,
+          54.88029995467514
+        ],
+        "warm_ms": [],
+        "sessions": 2994
+      },
+      {
+        "name": "Load profile, CPFT, 64 points",
+        "kind": "profile",
+        "source": "cpft",
+        "points": 64,
+        "cold_ms": [
+          3.5571999615058303,
+          3.4462999319657683,
+          3.4481999464333057
+        ],
+        "warm_ms": [],
+        "sessions": 135
+      },
+      {
+        "name": "Basic KPIs, spatial, 500 points x 7 days",
+        "kind": "kpi",
+        "source": "spatial",
+        "points": 500,
+        "days": 7,
+        "cold_ms": [
+          52.67520004417747,
+          52.609500009566545,
+          53.7180999526754
+        ],
+        "warm_ms": [],
+        "sessions": 4292
+      },
+      {
+        "name": "Environment KPIs, simple, 500 points x 7 days",
+        "kind": "environment",
+        "source": "simple",
+        "points": 500,
+        "days": 7,
+        "cold_ms": [
+          65.9567000111565,
+          65.5838999664411,
+          65.73710008524358
+        ],
+        "warm_ms": [],
+        "sessions": null
+      },
+      {
+        "name": "Basic KPIs, CPFT, 64 points x 3 days",
+        "kind": "kpi",
+        "source": "cpft",
+        "points": 64,
+        "days": 3,
+        "repeats": 1,
+        "cold_ms": [
+          10.502499993890524
+        ],
+        "warm_ms": [],
+        "sessions": 40
+      }
+    ]
+  }
+}

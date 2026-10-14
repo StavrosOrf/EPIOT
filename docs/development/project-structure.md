@@ -3,8 +3,7 @@
 ```text
 EPIOT_v2/
 ├── app.py                     Flask entry point: app setup, blueprints, index, icons
-├── database_init.py           One-off database population (loaders, sessions, power mix)
-├── update_database.py         Scheduled job: Monte Carlo sessions + power mix
+├── database_init.py           Offline database initialization from seed_data/
 ├── pyproject.toml / uv.lock   Dependencies (uv); optional extra `ml`
 ├── requirements.txt           Legacy pip/conda requirements
 ├── backend/
@@ -14,7 +13,7 @@ EPIOT_v2/
 │   ├── kpi/user.py            /kpi blueprint
 │   ├── aggregators.py         Charging-strategy simulators
 │   ├── charge_sessions.py     Session generators and diagnostics
-│   ├── loaders.py             Importers for stations, transformers, grid links
+│   ├── loaders.py             Grid-connection helper (nearest transformer per column)
 │   ├── utils.py               GeoJSON serialisers, availability helper
 │   ├── spatialite.py          SpatiaLite discovery
 │   ├── config.yaml            Session and energy-demand distributions
@@ -29,12 +28,12 @@ EPIOT_v2/
 │   ├── scripts/               script.js, loaders.js, data_fetch.js, plotter.js, utils.js, landing.js
 │   └── images/                Map icons, logos, favicon
 ├── migrations/                Alembic revisions
-├── scripts/                   install_spatialite.py, cron and run scripts
+├── scripts/                   install_spatialite.py, build_cpft_library.py, import and benchmark scripts
 ├── tests/                     pytest suite and exploratory notebooks
 ├── others/                    Related DRIVE2X tools: CPFT, ReFlex specification
 ├── docs/                      This documentation (Sphinx)
-├── data/                      Source datasets (git-ignored)
-└── instance/default.sqlite    The database (git-ignored)
+├── seed_data/                 Compact country snapshots that initialize a fresh database
+└── instance/                  Database, caches and restored runtime inputs (git-ignored)
 ```
 
 ## Where to change what
@@ -44,7 +43,7 @@ EPIOT_v2/
 | Add a charging strategy | `backend/aggregators.py` (new simulator) → `backend/views.py` (dispatch on `strategy`) → `templates/index.html` (`#strategy` option) |
 | Add a KPI | `backend/kpi/user.py` (compute and return the field) → `static/scripts/plotter.js` (render) → `static/scripts/utils.js` (export row) |
 | Add a map layer | `backend/features.py` or `backend/views.py` (endpoint) → `static/scripts/loaders.js` (markers) → app-bar toggle in `index.html` and `script.js` |
-| Support a new city | New loader in `backend/loaders.py`, new source data, and session generation over the new scope in `backend/charge_sessions.py` |
+| Support a new city | Add a region or supplier in `backend/charger_sources.py`, import with `scripts/update_charger_data.py`, then re-export `seed_data/` with `scripts/export_country_data.py` |
 | Change the session generator | `backend/charge_sessions.py`, then regenerate sessions |
 | Change the look | `static/css/styles.css`; chart styling in `renderPlot` in `plotter.js` |
 

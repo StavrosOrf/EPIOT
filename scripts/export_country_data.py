@@ -13,7 +13,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, default=ROOT/"instance/default.sqlite")
     parser.add_argument("--output", type=Path, default=SEED_DIR)
-    parser.add_argument("--data-dir", type=Path, default=ROOT/"data")
+    parser.add_argument("--data-dir", type=Path, default=ROOT/"instance")
     args = parser.parse_args()
     manifest = export_snapshots(args.database, args.output, args.data_dir)
     print(json.dumps({code: dict(bytes=item["bytes"], **item["tables"]) for code, item in manifest["countries"].items()}, indent=2))

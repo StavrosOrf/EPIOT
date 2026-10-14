@@ -55,7 +55,7 @@ class EnvironmentalComparison:
         costs = [hour.co2_intensity if hour is not None else None for hour in matches]
         # Sessions arriving this day, charged from their true arrival
         cohort = arrival_cohort(chargers, records, left, right, horizon)
-        self.required_energy += sum(record.energy_kwh for record in cohort)
+        self.required_energy += float(cohort.energy_kwh.sum())
         self.connection_windows += len(cohort)
         day_energy = {}
         for strategy, values in self.data.items():

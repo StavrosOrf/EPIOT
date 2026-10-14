@@ -7,9 +7,7 @@ extension, the database, and the web server.
 flowchart TB
     A[Clone repository] --> B[uv sync]
     B --> C[Install SpatiaLite]
-    C --> D[Place source data<br/>in ./data]
-    D --> E[flask db upgrade]
-    E --> F[python database_init.py]
+    C --> F[python database_init.py]
     F --> G[python app.py]
     G --> H((http://127.0.0.1:5000))
 ```
@@ -97,38 +95,22 @@ conda install libspatialite -c conda-forge
 :::
 ::::
 
-## 3. Provide the source data
+## 3. Build the database
 
-Place the following files in the `./data` folder (it is git-ignored):
-
-| File | Content | Used by |
-|---|---|---|
-| `chargers_data_ams.json` | Amsterdam charging stations (OpenChargeMap-style JSON) | `load_ams_data` |
-| `liander_elektriciteitsnetten.gpkg` | Liander grid assets: LV cabinets, MV installations, substations ([PDOK](https://service.pdok.nl/liander/elektriciteitsnetten/atom/liander_elektriciteitsnetten.xml)) | `load_transformer_data` |
-| `wijkenbuurten_2022_v2_amsterdam.gpkg` | CBS neighbourhood polygons for Amsterdam | `match_buurten` |
-| `distribution-of-arrival.csv`, `distribution-of-arrival-weekend.csv`, `distribution-of-connection-time.csv`, `distribution-of-energy-demand.csv` | Empirical charging-behaviour curves | Monte Carlo session generator |
-
-See {doc}`../operations/database` for what each loader does with these files.
-
-## 4. Build the database
-
-Apply the schema migrations, then populate the database:
+Initialize the database offline from the committed country snapshots in `seed_data/`:
 
 ```bash
-uv run flask --app app db upgrade
 uv run python database_init.py
 ```
 
-`database_init.py` contains commented-out steps for the first full load (charging stations,
-transformers, grid connections and synthetic sessions). Uncomment the ones you need on first run.
-The database file is `instance/default.sqlite`.
+The initializer applies all migrations itself, so do not run `flask db upgrade` first; it refuses
+to overwrite an existing database. It writes `instance/default.sqlite` and the charger manifest in
+`instance/chargers/`. The session-prior CSVs and the Amsterdam neighbourhood atlas are read directly
+from `seed_data/`. No source downloads are needed. See
+[seed_data/README.md](../../seed_data/README.md) for
+country selection and refreshing the snapshots.
 
-:::{tip}
-The first `db upgrade` on a fresh checkout may print an error and still succeed on a second run.
-If it does, run it again before continuing.
-:::
-
-## 5. Run the app
+## 4. Run the app
 
 ```bash
 uv run python app.py

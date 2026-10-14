@@ -8,7 +8,7 @@ the code. Run from the repository root:
     uv run --with matplotlib python docs/_scripts/generate_figures.py
 
 Outputs are written to ``docs/_static/figures``. Figures that need the
-database (``instance/default.sqlite``) or the distribution CSVs in ``./data``
+database (``instance/default.sqlite``) or the distribution CSVs in ``./seed_data``
 are skipped with a message when those files are missing.
 """
 
@@ -39,7 +39,7 @@ from backend.aggregators import (  # noqa: E402
 
 OUT = ROOT / "docs" / "_static" / "figures"
 DB = ROOT / "instance" / "default.sqlite"
-DATA = ROOT / "data"
+DATA = ROOT / "seed_data"
 
 # Reference categorical palette, first three slots (validated all-pairs).
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
@@ -261,7 +261,7 @@ def ev2gym_inputs():
         "distribution-of-energy-demand.csv",
     ]
     if not all((DATA / n).exists() for n in needed):
-        print("skip EV2Gym inputs: distribution CSVs missing from ./data")
+        print("skip EV2Gym inputs: distribution CSVs missing from ./seed_data")
         return
     wd = pd.read_csv(DATA / needed[0], encoding="utf-8-sig")
     we = pd.read_csv(DATA / needed[1], encoding="utf-8-sig")

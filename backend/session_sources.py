@@ -1,151 +1,164 @@
-"""Selectable session sources and a separate SQLite cache of synthetic scenarios."""
+"""Selectable synthetic session sources, computed on the fly for any date.
 
-from datetime import datetime, timedelta
-from contextlib import contextmanager
-import hashlib
-import json
+There is no live charging feed, so nothing is forecast or generated on a
+schedule and nothing is cached. Simple and spatial scenarios are views of one
+fixed synthetic world (backend/scenario_world.py). CPFT scenarios sample real
+checkpoint trajectories from the prebuilt library (backend/cpft_library.py).
+A request's sessions depend only on its inputs, so repeating a request, or
+asking for a day inside a longer range, returns identical sessions.
+
+Day-level calendar effects (season, day of week, holidays, a common demand
+shock and temperature; backend/scenario_calendar.py) apply to all three
+sources and are reported per day in the response metadata.
+"""
+
+from datetime import datetime, time, timedelta
 from pathlib import Path
-import sqlite3
 from zoneinfo import ZoneInfo
 
-from backend.scenario_sampling import (
-    ROOT, UTC, ASSUMPTION_MULTIPLIERS, generate_sessions, session_to_dict, session_from_dict, ScenarioSession,
-)
+import numpy as np
+
+from backend.cpft_library import LIBRARY, get_library, sample_cpft
+from backend.scenario_calendar import PARAMETERS, country_code, get_calendar
+from backend.scenario_sampling import ASSUMPTION_MULTIPLIERS
+from backend.scenario_world import MAX_HOURS, WORLD_VERSION, sample_world
+from backend.session_frame import SessionFrame
 from backend.spatial_profiles import DEFAULT_ATLAS, get_atlas
 
 SOURCE_LABELS = {"simple": "Simple session sampler", "spatial": "Spatial session sampler", "cpft": "CPFT on synthetic histories"}
+NOTES = {
+    "simple": "Synthetic scenario from public arrival, duration and energy priors; demand levels are assumed, not calibrated to local charging observations.",
+    "spatial": "Synthetic scenario; spatial effects and demand levels are assumed, not calibrated to local charging observations.",
+    "cpft": "Existing CPFT checkpoints on spatial synthetic histories, sampled from a prebuilt trajectory library; occupied hours become approximate sessions. This is not a verified local forecast.",
+}
 
 
-class ScenarioCache:
-    """No observed Session rows are read or written by this cache."""
-    def __init__(self, path):
-        self.path = Path(path) if path else None
-        if self.path:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.connect() as connection:
-                connection.execute("PRAGMA journal_mode=WAL")
-                connection.execute("CREATE TABLE IF NOT EXISTS scenario_cache (cache_key TEXT PRIMARY KEY, source TEXT NOT NULL, target_date TEXT NOT NULL, cp_id INTEGER NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL)")
-
-    @contextmanager
-    def connect(self):
-        connection = sqlite3.connect(str(self.path), timeout=30)
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
-
-    def get(self, key):
-        return self.get_many([key]).get(key)
-
-    def get_many(self, keys):
-        """Read a day's selection with one connection, below SQLite's bind limit."""
-        keys = list(dict.fromkeys(keys))
-        if not self.path or not keys:
-            return {}
-        values = {}
-        with self.connect() as connection:
-            for offset in range(0, len(keys), 900):
-                batch = keys[offset:offset+900]
-                rows = connection.execute(
-                    f"SELECT cache_key,payload FROM scenario_cache WHERE cache_key IN ({','.join('?' for _ in batch)})", batch)
-                values.update((key, json.loads(payload)) for key, payload in rows)
-        return values
-
-    def save(self, entries):
-        if self.path and entries:
-            with self.connect() as connection:
-                connection.executemany("INSERT INTO scenario_cache VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(cache_key) DO NOTHING", entries)
+def local_midnight(day, zone):
+    return datetime.combine(day, time.min, zone)
 
 
 class SessionSourceService:
-    def __init__(self, cache_path=None, atlas_path=DEFAULT_ATLAS, runtime_factory=None, daily_arrivals=2.):
-        self.cache = ScenarioCache(cache_path)
+    def __init__(self, atlas_path=DEFAULT_ATLAS, daily_arrivals=2., library_path=LIBRARY,
+                 calendar_effects=True, calendar_path=PARAMETERS):
         self.atlas_path = Path(atlas_path)
-        self.runtime_factory = runtime_factory
         self.daily_arrivals = daily_arrivals
-        files = [ROOT / "backend" / name for name in ["scenario_sampling.py", "spatial_profiles.py", "cpft_runtime.py", "session_sources.py"]]
-        files += [ROOT / "backend/data/cpft_preprocessing.json"]
-        files += sorted((ROOT / "data").glob("distribution-of-*.csv"))
-        self.version = hashlib.sha256(b"".join(path.read_bytes() for path in files)).hexdigest()[:16]
+        self.library_path = Path(library_path)
+        self.calendar_effects, self.calendar_path = calendar_effects, Path(calendar_path)
 
-    def get(self, chargers, target_date, *, source="simple", assumption="base", seed=42, timezone_name="Europe/Amsterdam"):
+    def calendar(self):
+        return get_calendar(self.calendar_path) if self.calendar_effects else None
+
+    def countries(self, chargers, calendar):
+        """ISO code per point; points without a known country use the calendar's default."""
+        default = calendar.default if calendar else "NL"
+        resolved = [country_code(charger.get("country"), default) for charger in chargers]
+        return [code for code, _ in resolved], sum(not known for _, known in resolved)
+
+    def calendar_metadata(self, calendar, countries, unknown, first, last, seed):
+        if not calendar:
+            return dict(calendar=dict(applied=False, note="Calendar, weather and demand effects are disabled."))
+        days = {country: [summary for effects in [calendar.effects(country, first, last, seed)]
+                          for summary in map(effects.summary, range(len(effects.days)))]
+                for country in sorted(set(countries))}
+        return dict(calendar=dict(applied=True, version=calendar.version, days=days, points_with_default_country=unknown,
+                                  note="Synthetic day effects (season, day of week, holidays, common demand shock and weather) "
+                                       "calibrated on ElaadNL 2019 open data and KNMI/ERA5 temperatures; not forecasts of real days."))
+
+    def validate(self, source, assumption, seed):
         if source not in SOURCE_LABELS or assumption not in ASSUMPTION_MULTIPLIERS:
             raise ValueError("Unknown session source or demand assumption")
-        if not isinstance(seed, int) or not 0 <= seed <= 2**32-1:
+        if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed <= 2**32-1:
             raise ValueError("Seed must be an integer between 0 and 4294967295")
-        zone = ZoneInfo(timezone_name)
-        start = datetime.combine(target_date-timedelta(days=1), datetime.min.time(), zone).astimezone(UTC)
-        end = datetime.combine(target_date+timedelta(days=1), datetime.min.time(), zone).astimezone(UTC)
-        issue = datetime.combine(target_date-timedelta(days=1), datetime.min.time().replace(hour=18), zone).astimezone(UTC)
+
+    def profiles(self, chargers, source):
+        if source == "simple" or not chargers:
+            return None
+        atlas = get_atlas(self.atlas_path)
+        return [atlas.resolve(charger) for charger in chargers]
+
+    def metadata(self, chargers, profiles, source, assumption, seed, timezone_name, frame, **extra):
+        matched = sum(bool(profile and profile.get("matched")) for profile in profiles or ())
+        values = dict(source=source, label=SOURCE_LABELS[source], synthetic=True, verified_observations=False,
+                      generated="on request", assumption=assumption, seed=seed, scenario_version=WORLD_VERSION,
+                      timezone=timezone_name, point_count=len(chargers), spatial_matched_points=matched,
+                      spatial_fallback_points=len(chargers)-matched if source != "simple" else 0,
+                      history_source="spatial synthetic sessions" if source == "cpft" else None,
+                      session_count=len(frame), note=NOTES[source])
+        values.update(extra)
+        return values
+
+    def prepare(self, chargers, source, assumption, seed):
+        self.validate(source, assumption, seed)
         chargers = sorted(chargers, key=lambda charger: int(charger["id"]))
         if len({int(charger["id"]) for charger in chargers}) != len(chargers):
             raise ValueError("Duplicate charging-point IDs")
-        point_values, missing, profiles, keys = {}, [], {}, {}
-        atlas = get_atlas(self.atlas_path) if source != "simple" and chargers else None
-        model_files = None
-        if source == "cpft" and chargers:
-            from backend.cpft_runtime import MODEL_DIR
-            model_files = {}
-            for name in ["best_availability.keras", "best_kwh.keras"]:
-                info = (MODEL_DIR/name).stat()
-                model_files[name] = (info.st_mtime_ns, info.st_size)
-        for charger in chargers:
-            cp_id = int(charger["id"])
-            profile = atlas.resolve(charger) if atlas else None
-            profiles[cp_id] = profile
-            identity = dict(source=source, date=str(target_date), charger=charger, profile=profile, assumption=assumption,
-                            seed=seed, timezone=timezone_name, version=self.version, daily_arrivals=self.daily_arrivals)
-            # Model replacement invalidates even a previously populated cache.
-            if source == "cpft":
-                identity["model_files"] = model_files
-            key = hashlib.sha256(json.dumps(identity, sort_keys=True, allow_nan=False).encode()).hexdigest()
-            keys[cp_id] = key
-        cached = self.cache.get_many(keys.values())
-        for charger in chargers:
-            cp_id = int(charger["id"])
-            if keys[cp_id] in cached:
-                point_values[cp_id] = cached[keys[cp_id]]
-            else:
-                missing.append(charger)
-        if source == "cpft" and missing:
-            from backend.cpft_runtime import get_runtime, sessions_from_forecast
-            histories = {int(charger["id"]): generate_sessions(charger, issue-timedelta(days=14), issue,
-                spatial_profile=profiles[int(charger["id"])], seed=seed, assumption=assumption,
-                timezone_name=timezone_name, daily_arrivals=self.daily_arrivals, source="cpft-history") for charger in missing}
-            runtime = self.runtime_factory() if self.runtime_factory else get_runtime()
-            # Bound memory and model batches even when a region contains many points.
-            forecasts = {}
-            for offset in range(0, len(missing), 64):
-                forecasts.update(runtime.forecast(missing[offset:offset+64], histories, issue, end))
-            for charger in missing:
-                cp_id = int(charger["id"])
-                past = [ScenarioSession(cp_id, session.start, min(session.end, issue),
-                        session.energy_kwh if session.end <= issue else 0.)
-                        for session in histories[cp_id] if session.start < issue and session.end > start]
-                records = past+sessions_from_forecast(cp_id, forecasts[cp_id])
-                point_values[cp_id] = {"sessions": [session_to_dict(record) for record in records],
-                    "spatial_profile": profiles[cp_id], "forecast_hours": [dict(row, hour=row["hour"].isoformat()) for row in forecasts[cp_id]]}
-        elif missing:
-            for charger in missing:
-                cp_id = int(charger["id"])
-                records = generate_sessions(charger, start, end, spatial_profile=profiles[cp_id], seed=seed,
-                    assumption=assumption, timezone_name=timezone_name, daily_arrivals=self.daily_arrivals, source=source)
-                point_values[cp_id] = {"sessions": [session_to_dict(record) for record in records], "spatial_profile": profiles[cp_id]}
-        now = datetime.now(UTC).isoformat()
-        self.cache.save([(keys[int(charger["id"])], source, str(target_date), int(charger["id"]),
-                          json.dumps(point_values[int(charger["id"])], allow_nan=False), now) for charger in missing])
-        records = [session_from_dict(value) for cp_id in sorted(point_values) for value in point_values[cp_id]["sessions"]]
-        records.sort(key=lambda record: (record.cp_id, record.start))
-        matched = sum(bool(profile and profile.get("matched")) for profile in profiles.values())
-        metadata = dict(source=source, label=SOURCE_LABELS[source], synthetic=True, verified_observations=False,
-                        assumption=assumption, seed=seed, scenario_version=self.version, timezone=timezone_name,
-                        target_date=str(target_date), issue_time=issue.isoformat() if source == "cpft" else None,
-                        point_count=len(chargers), spatial_matched_points=matched,
-                        spatial_fallback_points=len(chargers)-matched if source != "simple" else 0,
-                        history_source="spatial synthetic sessions" if source == "cpft" else None,
-                        session_count=len(records), cache_hits=len(chargers)-len(missing),
-                        note="Synthetic scenarios; spatial effects and demand levels are assumed, not calibrated to local charging observations.")
+        calendar = self.calendar()
+        countries, unknown = self.countries(chargers, calendar)
+        return chargers, self.profiles(chargers, source), calendar, countries, unknown
+
+    def cpft_day(self, chargers, profiles, day, assumption, seed, timezone_name, calendar, countries):
+        library = get_library(self.library_path) if chargers else None
+        return sample_cpft(chargers, day, profiles=profiles, seed=seed, assumption=assumption, daily_arrivals=self.daily_arrivals,
+                           timezone_name=timezone_name, library=library, calendar=calendar, countries=countries)
+
+    def get(self, chargers, target_date, *, source="simple", assumption="base", seed=42, timezone_name="Europe/Amsterdam"):
+        """Sessions for the previous day and the target day, the load-profile window."""
+        chargers, profiles, calendar, countries, unknown = self.prepare(chargers, source, assumption, seed)
+        zone = ZoneInfo(timezone_name)
+        start, end = local_midnight(target_date-timedelta(days=1), zone), local_midnight(target_date+timedelta(days=1), zone)
+        extra = dict(target_date=str(target_date))
         if source == "cpft":
-            metadata["note"] = "Existing CPFT checkpoints on spatial synthetic histories; occupied hours become approximate sessions. This is not a verified local forecast."
-        return records, metadata
+            frame, info = self.cpft_day(chargers, profiles, target_date, assumption, seed, timezone_name, calendar, countries)
+            info.pop("calendar", None)
+            extra.update(info)
+        else:
+            frame = sample_world(chargers, start, end, profiles=profiles, source=source, seed=seed, assumption=assumption,
+                                 timezone_name=timezone_name, daily_arrivals=self.daily_arrivals, calendar=calendar, countries=countries)
+        if chargers:
+            extra.update(self.calendar_metadata(calendar, countries, unknown, target_date-timedelta(days=1), target_date, seed))
+        return frame, self.metadata(chargers, profiles, source, assumption, seed, timezone_name, frame, **extra)
+
+    def days(self, chargers, start_date, end_date, *, source="simple", assumption="base", seed=42, timezone_name="Europe/Amsterdam"):
+        """(day, sessions) for each local day of an inclusive range, and the range's provenance.
+
+        Simple and spatial ranges are one continuous window of the same world
+        the single-day view shows. CPFT forecasts every day from its own
+        18:00 issue the evening before, as the day-ahead model does.
+        """
+        chargers, profiles, calendar, countries, unknown = self.prepare(chargers, source, assumption, seed)
+        zone = ZoneInfo(timezone_name)
+        days = [start_date+timedelta(days=offset) for offset in range((end_date-start_date).days+1)]
+        extra = dict(start_date=str(start_date), end_date=str(end_date))
+        if chargers:
+            extra.update(self.calendar_metadata(calendar, countries, unknown, start_date, end_date, seed))
+        if source == "cpft":
+            daily = []
+            for day in days:
+                frame, info = self.cpft_day(chargers, profiles, day, assumption, seed, timezone_name, calendar, countries)
+                daily.append((day, frame))
+            extra.update({key: info[key] for key in ("library_version", "built_at") if key in info})
+            extra["issue_hour_local"] = 18
+            frame = SessionFrame.concat([frame for _, frame in daily])
+        else:
+            frame = sample_world(chargers, local_midnight(start_date, zone), local_midnight(end_date+timedelta(days=1), zone),
+                                 profiles=profiles, source=source, seed=seed, assumption=assumption, timezone_name=timezone_name,
+                                 daily_arrivals=self.daily_arrivals, calendar=calendar, countries=countries)
+            # Each day gets only the sessions that can touch it (none lasts over 72 hours)
+            ordered = frame.select(np.argsort(frame.start, kind="stable"))
+            daily = []
+            for day in days:
+                left, right = local_midnight(day, zone).timestamp(), local_midnight(day+timedelta(days=1), zone).timestamp()
+                low, high = np.searchsorted(ordered.start, [left-MAX_HOURS*3600, right])
+                daily.append((day, ordered.select(slice(low, high)).overlapping(left, right)))
+        return daily, self.metadata(chargers, profiles, source, assumption, seed, timezone_name, frame, **extra)
+
+
+def session_service(app):
+    """The application's service, configured from Flask settings on first use."""
+    service = app.extensions.get("session_source_service")
+    if service is None:
+        service = SessionSourceService(atlas_path=app.config.get("SESSION_SCENARIO_ATLAS", DEFAULT_ATLAS),
+                                       daily_arrivals=float(app.config.get("SESSION_DAILY_ARRIVALS", 2.)),
+                                       calendar_effects=str(app.config.get("SESSION_CALENDAR_EFFECTS", True)).lower() not in ("0", "false", "no"))
+        app.extensions["session_source_service"] = service
+    return service

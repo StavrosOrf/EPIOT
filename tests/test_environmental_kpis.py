@@ -33,6 +33,17 @@ def compare(records, hours, chargers=CHARGERS):
     return result.result()
 
 
+def test_new_observations_are_used_on_the_next_request_without_preparation(tmp_path):
+    from backend.grid_data import app_grid_hours
+    store = GridStore(tmp_path/'grid.sqlite')
+    store.save(original_profile(), observations=True)
+    assert all(hour.carbon_is_stale for hour in app_grid_hours(LEFT, RIGHT, None, cache_path=store.path))
+    store.save([GridHour(LEFT, 42, 60, False, False)], observations=True)
+    hours = app_grid_hours(LEFT, RIGHT, None, cache_path=store.path)
+    assert hours[0].co2_intensity == 42 and hours[0].carbon_is_stale is False
+    assert hours[1].carbon_is_stale is True
+
+
 def test_reference_preserves_origins_and_never_turns_missing_values_into_zero():
     profile = original_profile()
     exact = GridHour(LEFT, 0, None, False)
@@ -86,7 +97,7 @@ def test_csv_validates_timezones_quality_flags_and_explicit_missing_values(tmp_p
         read_csv(path)
 
 
-def test_daily_preparation_is_offline_and_does_not_change_the_application_db(tmp_path, monkeypatch):
+def test_grid_import_is_offline_and_does_not_change_the_application_db(tmp_path, monkeypatch):
     import requests
     def prohibit_network(*args, **kwargs):
         pytest.fail('Grid preparation must not call an API')
@@ -140,7 +151,7 @@ def test_arrival_cohort_gives_all_strategies_identical_energy_from_the_true_arri
     earlier = ScenarioSession(1,LEFT-timedelta(hours=1),LEFT+timedelta(hours=3),2)
     late = ScenarioSession(1,RIGHT-timedelta(hours=1),RIGHT+timedelta(hours=3),2)
     # The connection that arrived before the window belongs to the previous one
-    [cohort] = arrival_cohort(CHARGERS,[earlier,late],LEFT,RIGHT)
+    [cohort] = arrival_cohort(CHARGERS,[earlier,late],LEFT,RIGHT).records()
     assert (cohort.start, cohort.end, cohort.energy_kwh) == (late.start, RIGHT, pytest.approx(.5))
     costs = np.full(144,500.)
     costs[-3:] = 100
@@ -152,7 +163,7 @@ def test_arrival_cohort_gives_all_strategies_identical_energy_from_the_true_arri
         assert np.all(profile[:-6] == 0)  # nothing before the 23:00 arrival
     assert values['mincarbon']@costs <= values['afap']@costs+1e-10
     # Followed past midnight when the horizon allows, so it keeps its full energy
-    [followed] = arrival_cohort(CHARGERS,[late],LEFT,RIGHT,RIGHT+timedelta(days=1))
+    [followed] = arrival_cohort(CHARGERS,[late],LEFT,RIGHT,RIGHT+timedelta(days=1)).records()
     assert (followed.end, followed.energy_kwh) == (late.end, 2)
 
 
@@ -212,10 +223,10 @@ def test_stale_reference_coverage_is_distinct_from_matching_date_coverage():
 
 def test_strict_mode_suppresses_reference_values_and_does_not_claim_reference_coverage(tmp_path):
     from backend.grid_data import app_grid_hours
-    from types import SimpleNamespace
     store = GridStore(tmp_path/'grid.sqlite')
-    store.save(resolve_hours(original_profile(),LEFT,RIGHT))
-    hours = app_grid_hours(LEFT,RIGHT,SimpleNamespace(),cache_path=store.path,allow_stale=False)
+    store.save(original_profile(), observations=True)
+    assert all(hour.carbon_is_stale for hour in app_grid_hours(LEFT,RIGHT,None,cache_path=store.path))
+    hours = app_grid_hours(LEFT,RIGHT,None,cache_path=store.path,allow_stale=False)
     assert all(hour.co2_intensity is None and hour.renewable_percentage is None for hour in hours)
     result = compare([ScenarioSession(1,LEFT,LEFT+timedelta(hours=1),1)],hours)
     assert result['covered_steps'] == 0

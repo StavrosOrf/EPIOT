@@ -1,12 +1,34 @@
-# CPFT prediction, persistence, and retrieval tests
+# Tests
 
 Run from the repository root using the locked project environment:
 
 ```bash
 uv sync --locked
-uv run pytest tests/test_cpft.py tests/test_forecast_store.py -q
 uv run pytest -q
+uv run --extra cpft pytest -q  # also runs the TensorFlow checkpoint tests
 ```
+
+## On-request scenarios
+
+| File | Coverage |
+| --- | --- |
+| `test_on_the_fly.py` | Window independence of the synthetic world across DST, session constraints, seed/source/demand behaviour, vectorized profiles and minimum-carbon schedule against the per-session versions, CPFT library sampling (issue cut, DST horizons, volume-bin mixing, day/range equality) |
+| `test_calendar_effects.py` | Calibrated day effects: long-run means preserved, weather generator against the climatology, demand-shock size and persistence, window independence, Dutch and German day types, holidays on the weekend curve, larger day-to-day variation, disabled effects, CPFT holidays as Sundays and temperature-scaled energy |
+| `test_calendar_note.mjs` | The page's one-line summary of the day effects |
+| `test_cpft_runtime.py` | Batched CPFT observations, features and recursive forecasts against the row-by-row reference |
+| `test_session_sources.py`, `test_kpi_sources.py` | Sources and KPIs through the HTTP endpoints, generated per request for any date; explicit errors for a missing or stale CPFT library |
+
+CPFT library tests use `cpft_helpers.write_test_library`, a small library in the
+real format that needs no TensorFlow.
+
+## CPFT prediction, persistence, and retrieval
+
+```bash
+uv run pytest tests/test_cpft.py tests/test_forecast_store.py -q
+```
+
+The application does not persist forecasts (scenarios are generated per
+request); the forecast tables remain for the CPFT audit scripts.
 
 The tests use temporary SQLite files, apply the new forecast migration there,
 and verify writes through a fresh connection. They do not import `app.py`, access
@@ -19,7 +41,7 @@ to check that forecast writes leave observations intact.
 | --- | --- |
 | `test_cpft.py` | Predictor calls for every point, exact local-day horizon, UTC normalization, 23/25-hour DST days, occupancy-to-session conversion, energy conservation, invalid inputs, model failure |
 | `test_forecast_store.py` | Prediction/save/fetch round trip, zero-session forecasts, point/run filtering, idempotent retries, run identity, invalid writes, transactional rollback, concurrent readers, migration downgrade |
-| `cpft_helpers.py` | Deterministic CPFT output fixtures and a model stub |
+| `cpft_helpers.py` | Deterministic CPFT output fixtures, a model stub and a test CPFT library |
 
 The supporting functions are:
 
@@ -55,7 +77,8 @@ These tests **stub model inference**. They verify the integration contract and
 real database behavior, not trained CPFT accuracy. The adapter deliberately has
 no random fallback and does not import the research script, which retrains on
 execution. Connecting saved CPFT models/scalers, observed-history selection,
-session-level forecasting, web routes, and daily scheduling remain separate work.
+session-level forecasting and web routes are handled by the CPFT library
+(`backend/cpft_library.py`); daily scheduling is not needed.
 
 The forecast migration is included but not applied to the application database
 by this test suite. When integrating with the app, use the existing Alembic

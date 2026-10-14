@@ -9,6 +9,11 @@ All five KPI categories appear as a button bar in the panel header, right of the
 The logo, About and close controls retain fixed positions when categories are
 shown, and the analysis logo links to the EPIOT home page.
 
+Every scenario is **generated when it is requested**, for any past or future date.
+There is no live charging feed, so there is nothing to forecast or prepare daily:
+no scheduled job, no scenario cache and no TensorFlow in the web process. See
+{doc}`concepts/on-request-scenarios` for the design and its guarantees.
+
 ## Sources
 
 - Simple: the bundled public arrival, connection-duration and energy priors used
@@ -16,20 +21,25 @@ shown, and the analysis logo links to the EPIOT home page.
 - Spatial: the same sampling approach, with geographic mixtures of residential,
   workplace, retail and generic public profiles and a density-based arrival-rate
   multiplier. Charger access/electrical type is kept separate from land use.
-- CPFT: the original `best_availability.keras` and `best_kwh.keras` weights run
-  on 14 days of spatially generated history. Issue is 18:00 Europe/Amsterdam on
-  the preceding day. Inputs stop at issue, including exclusion of final energy
-  totals for ongoing sessions. The six-hour gap and the entire target local day
-  are predicted. Occupied hours become approximate sessions. The earlier
-  checkpoint evaluation found poor next-day performance; this integration does
-  not establish local forecasting accuracy.
+- CPFT: real outputs of the original `best_availability.keras` and `best_kwh.keras`
+  weights on 14 days of spatially generated history, issued at 18:00 local on the
+  preceding day. Inputs stop at issue, including exclusion of final energy totals
+  for ongoing sessions; the six-hour gap and the entire target local day are
+  predicted, and occupied hours become approximate sessions. The trajectories are
+  computed once per model version into a library (see below) and sampled per
+  request. The earlier checkpoint evaluation found poor next-day performance; this
+  integration does not establish local forecasting accuracy.
 
-All three sources are synthetic scenarios. A fixed seed, target date, point ID
-and source configuration make selections repeatable. Changing strategy does not
-resample sessions. CPFT imports TensorFlow lazily, keeps its 72-hour input shape,
-uses the verified frozen scalers/feature ordering, and recomputes lags, rolling
-features and UTC calendar fields. It never runs the original training script.
-The runtime shares feature construction with the executed checkpoint audit.
+All three sources are synthetic scenarios. A fixed seed, date, point ID and source
+configuration always give the same sessions. Days differ through calibrated
+**calendar, weather and demand effects** shared by all points of a country:
+season, day of week, public holidays and bridge days, a persistent common
+demand shock, and synthetic daily temperature that changes energy per session
+({doc}`concepts/calendar-effects`). Each response's `source.calendar` lists
+them per day; the page shows a one-line summary below the chart. Changing strategy does not resample
+sessions. Simple and spatial sessions belong to one continuous synthetic world per
+point, seed and source: a day looks the same in the load profile and inside any KPI
+range, and sessions cross midnight without restarting.
 
 ## Spatial assumptions
 
@@ -51,38 +61,43 @@ Base attempted arrivals default to 2/day, multiplied by spatial exposure and
 0.5/1/1.5 for low/base/high demand. Occupancy can block arrivals, so this is not a
 guaranteed realized session count. A Gaussian copula with assumed correlation
 0.4 relates duration and energy. Sessions do not overlap per point, may cross
-midnight, and obey `energy <= charger_power * connected_hours`. Unknown power
-uses the application's existing 11 kW fallback. The temporal sampler uses actual
-UTC quarter-hours with local-day normalization, including 23/25-hour days.
+midnight, last 15 minutes to 72 hours, and obey `energy <= charger_power * connected_hours`.
+Unknown power uses the application's existing 11 kW fallback. The sampler uses actual
+UTC quarter-hours with local-day normalization, including 23/25-hour days. Low,
+base and high demand share their random numbers, so they differ only by demand.
 
-## Run and prepare
+## Run
+
+```bash
+uv sync --locked
+uv run python app.py
+```
+
+Nothing else needs to run. The web process needs neither TensorFlow nor a
+prepared cache; the CPFT source reads `backend/data/cpft_library.npz`.
+
+App settings: `SESSION_SCENARIO_TIMEZONE`, `SESSION_SCENARIO_ATLAS`,
+`SESSION_DAILY_ARRIVALS` and `SESSION_CALENDAR_EFFECTS` (default true; false
+disables all day effects) (Flask's `FLASK_` prefixed environment settings).
+Points take their holidays and climate from their stored country; points
+without one use the Netherlands.
+
+### Rebuilding the CPFT library
+
+The library is versioned with its inputs. Rebuild it only when the checkpoints,
+`backend/data/cpft_preprocessing.json`, the session priors in `seed_data/` or the
+world sampler version change, or to use another timezone:
 
 ```bash
 uv sync --locked --extra cpft
-uv run --extra cpft python app.py
-uv run --extra cpft python scripts/prepare_session_scenarios.py --date 2026-10-15
+uv run --extra cpft python scripts/build_cpft_library.py
 ```
 
-The preparation command defaults to tomorrow in Europe/Amsterdam and all points
-in the application database. `--source`, `--assumption`, `--seed`, `--point-ids`,
-`--database` and `--cache` provide explicit overrides. Its application database
-connection is read-only. It can run beside Flask/Gunicorn as an independent
-process; model batches are limited to 64 points.
-
-Scenarios are saved in a **separate** SQLite cache at
-`instance/session_scenarios.sqlite`, using WAL and short atomic writes. Original
-`sessions` rows are never changed. Cache identity includes source, date, point
-attributes, geographic profile, seed, demand assumption and input/code versions.
-The app reads prepared results or computes a cache miss. Cached CPFT results can
-be read without TensorFlow; uncached CPFT requests require the optional extra and
-fail explicitly if inference is unavailable. They never fall back to random data.
-
-App settings: `SESSION_SCENARIO_CACHE`, `SESSION_SCENARIO_TIMEZONE`, `SESSION_SCENARIO_ATLAS` and
-`SESSION_DAILY_ARRIVALS` (Flask's `FLASK_` prefixed environment settings).
-Use a local VM disk for the database/cache in production. Example systemd service
-and timer files are in `scripts/systemd/`; adjust paths/user before installation.
-They run at 18:00 Europe/Amsterdam and have not been enabled on this Windows
-workspace. For replay of a missed target, run the command with its explicit date.
+The build runs the checkpoints over synthetic histories for each calendar context
+(target weekday, month and UTC offset at issue) and profile cell (land-use mixture,
+attempted-arrival volume, regular or fast point). It takes about 100 minutes on a
+16-core machine and produces a 15 MB file. If the inputs no longer match, CPFT requests fail with an explicit
+503 asking for a rebuild; they never fall back to random data.
 
 ## API and plots
 
@@ -101,33 +116,36 @@ its external service contract is fixed to 288 steps. Other strategies cover DST.
 
 The UI uses `POST /stations/aggregate_load` with the same named fields in JSON,
 and `selected_markers` as an ID array, to support regions with long point lists
-without exceeding server URL limits. The target date defaults to today, and all
-date pickers allow only today or earlier. The separate daily preparation job can
-still generate tomorrow's forecasts.
+without exceeding server URL limits. The target date defaults to today, and the
+date pickers accept any date, past or future.
 
 API calls omitting `session_source` retain the existing database-backed path for
 backward compatibility. The web selector explicitly chooses one of the three
-new sources, so it does not silently use the unverified stored sessions.
+synthetic sources, so it does not silently use the unverified stored sessions.
 
 `POST /kpi/user` accepts `selected_markers`, `start_date`, `end_date`,
 `session_source`, `demand_assumption` and `seed`. Dates are `YYYY-MM-DD`; both
-endpoints are included, including a same-day range, and future KPI dates are
-rejected. Range selections persist when switching tabs. First opening KPIs
+endpoints are included, including a same-day range, and ranges are limited to
+366 days. Range selections persist when switching tabs. First opening KPIs
 defaults to the last seven calendar days, including today.
-Each day reuses that source's cached target-day data; its previous-day history
-is not counted again. Overnight occupancy/energy is restricted to each actual
-local day, and full session durations are retained for arrival statistics.
-Zero-use selected points are included in availability and daily distributions.
+Simple and spatial ranges are generated as one continuous window, so a range
+equals the sum of its single days. CPFT forecasts each day from its own issue
+time; its synthetic history before issue is never counted. Overnight
+occupancy/energy is restricted to each actual local day, and full session
+durations are retained for arrival statistics. Zero-use selected points are
+included in availability and daily distributions.
 
 ### Fast retrieval
 
-Load Profiles and Flexibility share the same cached response for identical
-charger IDs, date, strategy, source, demand assumption and seed. Area membership
-is cached independently of date and strategy. Analysis requests use compact
-IDs-only spatial responses; transformer membership is resolved only for the
-grid view. A lightweight `GET /stations/analysis-version` checks freshness on
-each analysis action, so database/configuration/input-file changes invalidate
-affected results. Browser caches are page-local and bounded to 64 entries each;
+Generation is vectorized over all selected points, so the server needs no cache.
+The browser still avoids repeated requests: Load Profiles and Flexibility share
+the same response for identical charger IDs, date, strategy, source, demand
+assumption and seed. Area membership is cached independently of date and
+strategy. Analysis requests use compact IDs-only spatial responses; transformer
+membership is resolved only for the grid view. A lightweight
+`GET /stations/analysis-version` checks freshness on each analysis action, so
+database, configuration, input-file and CPFT-library changes invalidate affected
+results. Browser caches are page-local and bounded to 64 entries each;
 simultaneous identical requests share a promise, and failures are not retained.
 
 The UI requests `section=basic` from `POST /kpi/user` first. This returns User,
@@ -139,18 +157,17 @@ opened. The default `section=all` retains the combined API response for existing
 clients. Basic summaries omit `scheduled_energy_kwh`; their average-energy
 total is calculated analytically with the same arrival-cohort/window convention.
 
-Scenario-cache reads use one SQLite connection per selected day, with queries
-of at most 900 keys. Geographic profiles are memoized by atlas instance and
-coordinates (at most 32,768 entries); changing the atlas file or coordinates
-causes a fresh spatial lookup. Existing session-cache identity and source
-isolation are preserved. Non-file database deployments should update the
-`ANALYSIS_DATA_REVISION` Flask setting when underlying data changes.
+Geographic profiles are memoized by atlas instance and coordinates (at most
+32,768 entries); changing the atlas file or coordinates causes a fresh spatial
+lookup. Non-file database deployments should update the
+`ANALYSIS_DATA_REVISION` Flask setting when underlying data change.
 
 Environmental KPIs use matching-date grid hours where available and a clearly
-labelled historical hourly reference otherwise. Missing values stay null when
-no valid reference exists. They report energy coverage, fixed-energy strategy
-comparisons and a minimum-carbon schedule. See [environmental KPI details](environmental_kpis.md)
-for provenance, the free/local data pipeline and the daily background job.
+labelled historical hourly reference otherwise, resolved per request from the
+imported observations. Missing values stay null when no valid reference exists.
+They report energy coverage, fixed-energy strategy comparisons and a
+minimum-carbon schedule. See [environmental KPI details](environmental_kpis.md)
+for provenance and importing grid data.
 
 ## Verification
 
@@ -163,43 +180,24 @@ On restricted Windows/OneDrive checkouts where Node cannot resolve parent-folder
 symlinks, use `node --preserve-symlinks --preserve-symlinks-main --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs`.
 
 Tests cover geographic assignment, missing-data fallback, source isolation,
-save/fetch across repeated selections, model failure, session constraints,
-energy conservation, overnight connections, both DST transitions, chart/export
-timestamps and actual checkpoint reproduction against its original saved output.
+window independence (a day alone equals the same day in longer windows, across
+both DST transitions), session constraints, energy conservation, overnight
+connections, chart/export timestamps, equivalence of the vectorized profile and
+minimum-carbon schedules with the per-session versions they replaced, batched
+CPFT features and recursive forecasts against the row-by-row reference, CPFT
+library sampling and rejection of a stale library, and actual checkpoint
+reproduction against its original saved output. Library tests use a small
+generated library and need no TensorFlow.
 
 ### Reproducible speed comparison
 
-Run the before/after benchmark from the repository root:
-
 ```bash
-uv run python scripts/benchmark_analysis.py --repeats 5
+uv run --extra cpft python scripts/benchmark_on_the_fly.py --baseline 9ef972c
 ```
 
-It compares the exact pre-optimization code at Git revision `4ba8f16` with the
-working tree, using disposable synthetic data, SQLite, real SpatiaLite and
-localhost HTTP. It does not open application databases or contact external
-services. The default cases use 100 chargers over 7 days for the HTTP workflow,
-1,000 cached points, and a larger 500-charger/30-day KPI calculation.
-Node.js, the bundled session priors, the Amsterdam atlas and SpatiaLite are
-required. Startup/import/fixture preparation are outside the measured window.
-
-Each comparison alternates execution order, discards a warmup and records every
-timing sample. Profile values, basic statistics and environmental results are
-checked for equivalence. The script refuses to compare different numerical
-dependencies. Reports are written to `reports/analysis_speed_comparison.json`
-and `.md`. Timings exclude chart rendering and real-world network latency;
-CPFT inference and the external optimizer are not measured. Cold-cache timings
-include real scenario generation, while cached timings measure retrieval.
-
-For the smaller executable regression test in PowerShell:
-
-```powershell
-$env:EPIOT_BENCHMARK = "1"
-uv run pytest tests/test_analysis_benchmark.py -q
-Remove-Item Env:EPIOT_BENCHMARK
-```
-
-The test checks results and avoided requests, without asserting a machine-dependent
-speedup. If the default uv cache is inaccessible, add
-`--cache-dir .cache/uv --no-sync` to `uv run` when the project environment is
-already installed.
+It runs the previous cached design (revision `9ef972c`) and the working tree in
+separate processes on identical synthetic points, and writes
+`reports/on_the_fly_speed.json` and `.md`. For the baseline it reports both a day
+the daily job had prepared (warm) and one it had not (cold: a new date, seed or
+demand level). Imports, model/library/atlas loading, HTTP and the database are
+outside the measured window.

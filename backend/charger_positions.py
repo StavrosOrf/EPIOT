@@ -13,7 +13,7 @@ Three faults occur in the feeds (see docs/charger_sources.md):
 A swap is tried next, then the address
 is geocoded with the country's official geocoder where one exists (PDOK, Swiss
 geo.admin.ch, French Géoplateforme) and Nominatim otherwise. Results are cached
-in data/chargers/geocode_cache.json so re-imports make no repeat requests.
+in instance/chargers/geocode_cache.json so re-imports make no repeat requests.
 What cannot be resolved is left for the importer's plausibility check to drop.
 """
 

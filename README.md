@@ -94,8 +94,8 @@ uv run python app.py
 
 The initializer applies all migrations, restores stable charger IDs, powers,
 Amsterdam sessions, transformers/grid links and historical electricity data,
-rebuilds SpatiaLite geometry/indexes, and restores the spatial atlas and session
-priors. Runtime caches are regenerated on demand. It refuses to overwrite an
+and rebuilds SpatiaLite geometry/indexes. The spatial atlas and session priors
+are plain files in `seed_data/` and are read from there directly. Runtime caches are regenerated on demand. It refuses to overwrite an
 existing database. To install only selected countries:
 
 ```
@@ -111,7 +111,7 @@ uv run python scripts/repair_charger_positions.py
 ```
 
 To refresh chargers from their original suppliers, download the open data into
-`./data/chargers` and import it (optional; initialization needs no downloads):
+`./instance/chargers` and import it (optional; initialization needs no downloads):
 
 ```
 uv run python scripts/update_charger_data.py

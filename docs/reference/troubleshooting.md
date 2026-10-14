@@ -50,11 +50,14 @@ The virtualenv was created on another machine (for example, synced through OneDr
 ```{dropdown} The load profile is flat zero
 :icon: question
 
-The selected day has no sessions for the chargers in the area. Check the session coverage:
+The selection has no sessions on that day. With a synthetic session source this can happen for very
+small selections or low demand, since every day is generated: choose another seed, the high demand
+assumption or a larger area. Stored sessions (API calls without `session_source`) exist only for the
+days in
 
 `sqlite3 instance/default.sqlite "SELECT min(start), max(start) FROM sessions;"`
 
-and pick a date in that range, or generate sessions for the missing days ({doc}`../operations/scheduled-updates`).
+and are no longer extended ({doc}`../operations/scheduled-updates`).
 ```
 
 ```{dropdown} "Load profiles are not available for this selection"

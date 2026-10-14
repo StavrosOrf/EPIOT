@@ -121,6 +121,8 @@ concepts/time-model
 concepts/charging-strategies
 concepts/flexibility
 concepts/session-data
+concepts/on-request-scenarios
+concepts/calendar-effects
 concepts/kpi-methodology
 ```
 

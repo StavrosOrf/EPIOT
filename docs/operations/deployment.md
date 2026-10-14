@@ -8,7 +8,6 @@ flowchart TB
     RP -->|HTTP 127.0.0.1:5000| GU[gunicorn<br/>4 workers]
     GU --> APP[Flask app<br/>app:app]
     APP --> DB[(instance/default.sqlite)]
-    CRON([cron]) --> UPD[update_database.py] --> DB
 ```
 
 ## 1. Switch off debug mode
@@ -98,7 +97,6 @@ WantedBy=multi-user.target
 - [ ] gunicorn with `--limit-request-line` and enough workers
 - [ ] Reverse proxy with TLS, forwarded headers and a generous read timeout
 - [ ] `SPATIALITE_LIBRARY_PATH` set for the service user
-- [ ] `ELECTRICITYMAPS_API_TOKEN` set for the update job
-- [ ] Daily `update_database.py` scheduled and logging to `logs/`
+- [ ] `backend/data/cpft_library.npz` present and matching the checkpoints (no cron or timer is needed; see {doc}`scheduled-updates`)
 - [ ] Database file backed up (it is a single file: `instance/default.sqlite`)
 - [ ] Outbound HTTPS allowed to the services in {doc}`../architecture/external-services`

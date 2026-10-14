@@ -24,12 +24,11 @@ from backend.aggregators import (
 )
 
 from flask import current_app, Blueprint
-from backend.session_sources import SessionSourceService, SOURCE_LABELS
+from backend.session_sources import SOURCE_LABELS, session_service
 from backend.cpft_runtime import CPFTUnavailable
 from backend.scenario_profiles import grid
 from backend.scenario_sampling import point_power
 from backend.cpft import day_window
-from backend.spatial_profiles import DEFAULT_ATLAS
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from backend.grid_data import app_grid_hours
@@ -231,6 +230,7 @@ def get_aggregate_load():
                 Location.latitude,
                 Location.longitude,
                 Location.street,
+                Location.country,
             )
             .join(ChargingPoint.column)
             .join(Location)
@@ -246,17 +246,12 @@ def get_aggregate_load():
                 target = datetime.date.fromisoformat(arguments.get("date", ""))
                 seed = int(arguments.get("seed", "42"))
                 timezone_name = current_app.config.get("SESSION_SCENARIO_TIMEZONE", "Europe/Amsterdam")
-                charger_data = [dict(id=row[0], power=row[1], type=row[2], latitude=row[4], longitude=row[5]) for row in point_rows]
+                charger_data = [dict(id=row[0], power=row[1], type=row[2], latitude=row[4], longitude=row[5], country=row[7])
+                                for row in point_rows]
                 if len(charger_data) != len(set(selected_markers)):
                     return jsonify(error="One or more selected charging points are unavailable"), 400
-                service = current_app.extensions.get("session_source_service")
-                if service is None:
-                    service = SessionSourceService(
-                        cache_path=current_app.config.get("SESSION_SCENARIO_CACHE", Path(current_app.instance_path)/"session_scenarios.sqlite"),
-                        atlas_path=current_app.config.get("SESSION_SCENARIO_ATLAS", DEFAULT_ATLAS),
-                        daily_arrivals=float(current_app.config.get("SESSION_DAILY_ARRIVALS", 2.)))
-                    current_app.extensions["session_source_service"] = service
-                sessions, metadata = service.get(charger_data, target, source=source,
+                # Computed on request for any date: no live data, so nothing is prepared or cached
+                sessions, metadata = session_service(current_app).get(charger_data, target, source=source,
                     assumption=arguments.get("demand_assumption", "base"), seed=seed, timezone_name=timezone_name)
                 start, target_start = day_window(target-datetime.timedelta(days=1), timezone_name)
                 _, end = day_window(target, timezone_name)
@@ -266,7 +261,7 @@ def get_aggregate_load():
                         return jsonify(error="Cost optimisation currently supports two 24-hour days. Choose another strategy for a daylight-saving transition."), 422
                     zone = ZoneInfo(timezone_name)
                     rows = [(session.cp_id, session.start.astimezone(zone).replace(tzinfo=None),
-                             session.end.astimezone(zone).replace(tzinfo=None), session.energy_kwh) for session in sessions]
+                             session.end.astimezone(zone).replace(tzinfo=None), session.energy_kwh) for session in sessions.records()]
                     load_profile, up_flex, down_flex = simulate_cost_optimal_operation(
                         {int(charger["id"]): point_power(charger) for charger in charger_data}, rows,
                         start_date=str(target-datetime.timedelta(days=1)))

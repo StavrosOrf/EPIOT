@@ -1,6 +1,5 @@
 """Regression checks for avoided work and unchanged analysis results."""
 
-from contextlib import contextmanager
 from datetime import date, timedelta
 from types import SimpleNamespace
 
@@ -10,51 +9,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 from tests.test_kpi_sources import client, request
-from tests.test_session_sources import CHARGERS, FakeRuntime, TARGET
-from backend.session_sources import ScenarioCache, SessionSourceService
+from tests.test_session_sources import CHARGERS
 from backend.spatial_profiles import SpatialAtlas
-
-
-def test_cache_bulk_reads_use_one_connection_and_bounded_queries(tmp_path, monkeypatch):
-    cache = ScenarioCache(tmp_path/"bulk.sqlite")
-    cache.save([(str(i), "simple", str(TARGET), i, '{"sessions":[]}', "now") for i in range(1901)])
-    original, connections, queries = cache.connect, [], []
-
-    @contextmanager
-    def counted():
-        connections.append(1)
-        with original() as db:
-            db.set_trace_callback(queries.append)
-            yield db
-
-    monkeypatch.setattr(cache, "connect", counted)
-    result = cache.get_many([str(i) for i in range(1901)]+["missing", "1"])
-    assert len(result) == 1901
-    assert result["1"] == {"sessions": []}
-    assert len(connections) == 1
-    assert len([sql for sql in queries if sql.startswith("SELECT")]) == 3
-    assert cache.get_many([]) == {}
-    assert len(connections) == 1
-
-
-@pytest.mark.parametrize("source", ["simple", "spatial", "cpft"])
-def test_warm_selection_uses_one_bulk_read_and_preserves_results(tmp_path, monkeypatch, source):
-    service = SessionSourceService(tmp_path/"warm.sqlite", atlas_path=tmp_path/"missing.gpkg",
-                                  runtime_factory=FakeRuntime)
-    expected, _ = service.get(CHARGERS, TARGET, source=source)
-    original, connections = service.cache.connect, []
-
-    @contextmanager
-    def counted():
-        connections.append(1)
-        with original() as db:
-            yield db
-
-    monkeypatch.setattr(service.cache, "connect", counted)
-    actual, metadata = service.get(list(reversed(CHARGERS)), TARGET, source=source)
-    assert actual == expected
-    assert metadata["cache_hits"] == len(CHARGERS)
-    assert len(connections) == 1
 
 
 def test_spatial_resolution_reused_until_coordinates_or_atlas_change(tmp_path):

@@ -21,7 +21,7 @@ require.
 ## Folder layout
 
 ```
-data/chargers/
+instance/chargers/
   manifest.json           # downloads (URL, size, sha256, time), import counts, per-city counts
   raw/ndw/                # charging_point_locations_ocpi.json.gz, tariffs, GeoJSON
   raw/bnetza/             # ladesaeulenregister.csv
@@ -31,7 +31,7 @@ data/chargers/
   raw/digitraffic/        # locations.json, statuses.json (live availability)
 ```
 
-`data/` is not committed. The compact snapshots in `seed_data/` are GitHub-ready
+`instance/` is not committed. The compact snapshots in `seed_data/` are GitHub-ready
 and initialize a fresh server offline, including Amsterdam pilot/grid data and
 the inputs for simple/spatial sessions:
 
@@ -89,19 +89,19 @@ of being accepted by the generous coastal tolerance.
 | Swapped latitude/longitude | Sargans at (9.45, 47.05) | Swapped back when that lands in the country |
 | Station abroad, labelled with the feed's country | German, Austrian and Italian stations in the Swiss feed; Spanish ones in the French register | Address searched in all countries (Nominatim); within 1 km of the feed's position, only the country label changes |
 | Typo or placeholder | Wegberg at latitude 55 instead of 51; Swiss sites at (50, −15) | Same address search; the site moves to the address |
-| Far out at sea | An Alphen aan den Rijn charger 18 km off Petten | More than about 2 km from Natural Earth's 1:10m land (`data/chargers/ne_10m_land.zip`, public domain) counts as misplaced: the address is searched, otherwise the site is dropped. The 2 km margin keeps harbour and beach chargers, which the coarse coastline would otherwise put in the water. |
+| Far out at sea | An Alphen aan den Rijn charger 18 km off Petten | More than about 2 km from Natural Earth's 1:10m land (`instance/chargers/ne_10m_land.zip`, public domain) counts as misplaced: the address is searched, otherwise the site is dropped. The 2 km margin keeps harbour and beach chargers, which the coarse coastline would otherwise put in the water. |
 | Pile-up: three or more addresses on one point | 188 German devices from many towns on one North Sea point; 42 Düsseldorf sites on the town centre | Each address geocoded with the country's own service. A result within 1 km confirms the shared position. A point shared by sites from three or more towns is a placeholder, so unresolved sites there are dropped. A one-town pile keeps its town position. |
 
 Geocoders: PDOK for the Netherlands, geo.admin.ch for Switzerland and
 Liechtenstein, the IGN Géoplateforme for France, and Nominatim (at most one
 request per second) elsewhere. Results, including misses, are cached in
-`data/chargers/geocode_cache.json`, so a re-import makes no repeat requests.
+`instance/chargers/geocode_cache.json`, so a re-import makes no repeat requests.
 `--no-geocode` keeps only the offline repairs. Finally every site is checked
 against its country's bounding box (France includes its overseas territories,
 and other countries use a broad Europe box). Whatever still lies outside is
 skipped. The manifest records each repair count under `imports.<source>.positions`.
 After the repairs, each site's country is set from Natural Earth's 1:10m
-borders (`data/chargers/ne_10m_admin_0_countries.zip`). A site within about 1 km
+borders (`instance/chargers/ne_10m_admin_0_countries.zip`). A site within about 1 km
 of its labelled country keeps the label, because the borders are only accurate
 to a few hundred metres. One clearly inside another country takes that country.
 Åland counts as Finland, and French Polynesia, New Caledonia and the other
@@ -144,5 +144,5 @@ cells.
 2. **Local time and grid context.** Derive the time zone and the electricity-mix zone from the selected chargers' country, instead of the Amsterdam defaults in `views.py` and `kpi/user.py`. Show "No grid data here" on the transformer layer outside Amsterdam.
 3. **Spatial priors outside Amsterdam.** Use a pan-European population grid (Eurostat GEOSTAT 1 km or GHSL) in `SpatialAtlas`, so the spatial sampler is not generic outside Amsterdam. Keep CBS neighbourhoods for the Netherlands.
 4. **Better coverage where OSM is thin.** Switzerland, France and Finland are done. Next: Belgium's DATEX II feeds on transportdata.be, Spain's national access point (nap.dgt.es; the catalogue's CSV link is a web form), NOBIL for Norway and Sweden (free key), and Austria's E-Control API (key and usage terms). Add Open Charge Map with a free API key for the UK and Italy. Add the MOBI.E OCPI feed for Portugal once its endpoint is confirmed. Add the national access points (Mobilithek, PUN) when they publish open endpoints. Each new source only needs a parser in `backend/charger_sources.py`.
-5. **Live occupancy.** NDW publishes EVSE status. Snapshots taken every 15 minutes, like the `epiot-session-scenarios` timer, would give observed occupancy for calibrating arrival rates across the Netherlands.
+5. **Live occupancy.** NDW publishes EVSE status. Snapshots taken every 15 minutes would give observed occupancy for calibrating arrival rates across the Netherlands.
 6. **Scheduled refresh.** Run `update_charger_data.py` monthly with a systemd timer. BNetzA publishes monthly and the script finds the newest CSV link itself.

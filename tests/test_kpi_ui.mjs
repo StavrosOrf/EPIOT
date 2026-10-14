@@ -16,14 +16,22 @@ test("local calendar dates survive UTC offsets and range endpoints stay inclusiv
     assert.equal(start.toISOString().slice(0, 10), "2025-10-12");
     assert.equal(calendarDate(start), "2025-10-13");
     assert.equal(calendarDate(end), "2025-10-14");
-    const options = pickerOptions(true, new Date(2025, 8, 1), end, [start, end], () => {});
+    const options = pickerOptions(true, null, end, [start, end], () => {});
     assert.equal(options.mode, "range");
-    assert.equal(calendarDate(options.maxDate), "2025-10-14");
+    assert.equal(options.maxDate, null);
+    assert.equal(options.minDate, null);
     assert.deepEqual(options.defaultDate.map(calendarDate), ["2025-10-13", "2025-10-14"]);
     assert.equal(typeof options.onChange, "function");
   } finally {
     if (previousZone === undefined) delete process.env.TZ; else process.env.TZ = previousZone;
   }
+});
+
+test("future dates are valid scenario dates and stay selected", () => {
+  const today = new Date(2025, 9, 14), future = new Date(2026, 2, 29);
+  const options = pickerOptions(false, null, today, [future], () => {});
+  assert.equal(calendarDate(options.defaultDate), "2026-03-29");
+  assert.equal(options.maxDate, null);
 });
 
 test("switching tabs preserves the KPI range and the separate target date", () => {
@@ -111,7 +119,7 @@ test("changing source ignores a late result from the previous KPI request", asyn
     let active_tab = "KPIs", profileRequestVersion = 0, kpi_data_list = [], load_profile_data = [], charger_ids_list, transformer_ids_list;
     const datepicker = {selectedDates:[new Date(2025,9,13),new Date(2025,9,14)]};
     const selected_polygons = [], selected_area_names = [];
-    const clear_graph = () => {}, showGraphMessage = () => {}, calculateLoadProfiles = () => {};
+    const clear_graph = () => {}, showGraphMessage = () => {}, calculateLoadProfiles = () => {}, calendarNote = () => "";
     const renderActiveKpi = () => render(kpi_data_list);
     ${functionBody("async function runActiveAnalysis(", 'analysisButton.addEventListener("click"')}
     return runActiveAnalysis;

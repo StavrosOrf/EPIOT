@@ -333,13 +333,13 @@ def sample_charging_sessions_ev2gym(
 
     # Locate CSVs
     if csv_dir is None:
-        for cand in (Path("./backend/data"), Path("./data"), Path("/mnt/data")):
+        for cand in (Path("./seed_data"), Path("./backend/data"), Path("/mnt/data")):
             if (cand / "distribution-of-arrival.csv").exists():
                 csv_dir = cand
                 break
         else:
             raise FileNotFoundError(
-                "Distributions not found in ./backend/data, ./data, or /mnt/data")
+                "Distributions not found in ./seed_data, ./backend/data, or /mnt/data")
 
     df_arr_wd, df_arr_we, df_conn, df_energy = _load_distributions(csv_dir)
 

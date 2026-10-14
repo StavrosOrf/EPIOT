@@ -33,7 +33,8 @@ The database handle is shared with blueprints through `app.config["station_data.
 | `backend/aggregators.py` | Charging-strategy simulators (`afap`, `alap`, `avg`, `ocost`) and timestamp sampling helpers |
 | `backend/models.py` | SQLAlchemy models (see {doc}`data-model`) |
 | `backend/utils.py` | GeoJSON serialisers and the charger-availability helper used by KPIs |
-| `backend/loaders.py` | One-off importers: Amsterdam stations, Liander transformers, grid connections |
+| `backend/bootstrap_data.py` | Exports and restores the `seed_data/` country snapshots (`database_init.py`) |
+| `backend/loaders.py` | Grid-connection helper: nearest MV/LV transformer per column |
 | `backend/charge_sessions.py` | Session generators (Monte Carlo, gamma, ML placeholder) and plotting helpers |
 | `backend/api_calls/prices.py` | Day-ahead prices from Energy-Charts |
 | `backend/api_calls/reflex.py` | Builds the ReFlex optimisation query |
@@ -59,14 +60,13 @@ flowchart LR
     features --> utils
     agg --> prices[api_calls/prices.py]
     agg --> reflex[api_calls/reflex.py]
-    init[database_init.py] --> loaders[loaders.py]
-    init --> cs[charge_sessions.py]
-    init --> env[api_calls/env_data_api.py]
-    upd[update_database.py] --> cs
-    upd --> env
-    cs --> agg
-    cs --> mlu[ml/utils.py]
-    views & features & kpi & loaders & cs & env --> models
+    init[database_init.py] --> boot[bootstrap_data.py]
+    views --> src[session_sources.py]
+    kpi --> src
+    src --> world[scenario_world.py]
+    src --> lib[cpft_library.py]
+    world & lib --> frame[session_frame.py]
+    views & features & kpi & boot --> models
 ```
 
 ## Endpoint handlers
@@ -79,7 +79,7 @@ flowchart LR
 | `POST /stations/within` | `get_stations_within` | Body: GeoJSON geometry |
 | `GET /stations/all` | `get_all_stations` | Every charging point; optional `source` filter |
 | `GET /stations/density` | `get_density` | Grid aggregates for overview zooms, cached per zoom |
-| `GET /stations/coverage` | `get_coverage` | Search cities and open-data sources, from `data/chargers/manifest.json` |
+| `GET /stations/coverage` | `get_coverage` | Search cities and open-data sources, from `instance/chargers/manifest.json` |
 | `GET /stations/aggregate_load` | `get_aggregate_load` | Load and flexibility for one area |
 | `POST /stations/charging-points-by-transformers` | `charging_points_by_transformers` | Grid view expansion |
 | `POST /features/transformers/within` | `get_transformers_wtithin` | Optional `tr_type` filter |

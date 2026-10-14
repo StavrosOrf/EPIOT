@@ -1,11 +1,11 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "created_at": "2026-10-14T13:30:56+00:00",
   "countries": {
     "CH": {
       "file": "CH.json.gz",
-      "bytes": 669444,
-      "sha256": "fb79f4eb89d7daaa8c93d76fea8b2424b0863648dc7d3982a63968fc4c645323",
+      "bytes": 669447,
+      "sha256": "269daabb3f29f8cd2336a899c295811c6eff88473782ed7773794b24c0e30d23",
       "tables": {
         "operators": 41,
         "locations": 9063,
@@ -21,8 +21,8 @@
     },
     "DE": {
       "file": "DE.json.gz",
-      "bytes": 4545890,
-      "sha256": "e43a0032015f9a9f5a35b187d4472eff2b86fc964e96f0be8d560bbbc7f9b040",
+      "bytes": 4545889,
+      "sha256": "933ef31bcf5641847072ce48e2f4dc2914a226a75a7da85fe31b8303c1de4ea4",
       "tables": {
         "operators": 11739,
         "locations": 73955,
@@ -38,8 +38,8 @@
     },
     "FI": {
       "file": "FI.json.gz",
-      "bytes": 328539,
-      "sha256": "0a5b3dbbf2f0ae6898d4303289d9d5f555603a02b67878c3c2a89b7859b029bb",
+      "bytes": 328537,
+      "sha256": "fb01fb7784ab28d9442061e198da3b58db84bb3a5a7d684a853ee6ab4d2d6b89",
       "tables": {
         "operators": 25,
         "locations": 3774,
@@ -56,7 +56,7 @@
     "FR": {
       "file": "FR.json.gz",
       "bytes": 3043319,
-      "sha256": "7731ca9d88dc51e165f83fb417fd2d3683d01549edb8d6cf7d92bfe44d8cc639",
+      "sha256": "48ccc315696dbb49e809bbe8428040398fe4fcb8dbd63257c369b02e69233fbe",
       "tables": {
         "operators": 246,
         "locations": 44666,
@@ -73,7 +73,7 @@
     "GB": {
       "file": "GB.json.gz",
       "bytes": 74265,
-      "sha256": "6db0525a4e080380cfd4c348f552b701c38125ecee0583054a16602fdaec7667",
+      "sha256": "daebff2159ea9ccbc313857fa8bd33c2604550ceb6854a0044639c0c94cb22d1",
       "tables": {
         "operators": 99,
         "locations": 1423,
@@ -90,7 +90,7 @@
     "IT": {
       "file": "IT.json.gz",
       "bytes": 35070,
-      "sha256": "9fa4c4016b86ed535bf3b6c2f56349a4a111d5d55405bcdc0078d5763b7da631",
+      "sha256": "900d10d672228525875adacf5b4d4199b04d95910bba6a0a43df19882c358d63",
       "tables": {
         "operators": 67,
         "locations": 679,
@@ -106,8 +106,8 @@
     },
     "LI": {
       "file": "LI.json.gz",
-      "bytes": 869,
-      "sha256": "43ff0103353d5e82b0377ee22e4ff5fbbbcfd050e198c109480226476c29a8b4",
+      "bytes": 870,
+      "sha256": "d8f0d1d7878bb2cdc897439ff0a399f9045ccb0e4d33a179d4a4f7606b39428a",
       "tables": {
         "operators": 2,
         "locations": 3,
@@ -123,8 +123,8 @@
     },
     "NL": {
       "file": "NL.json.gz",
-      "bytes": 18361851,
-      "sha256": "45f0e5f1df9026ba17bf19c8756fef87d67fee6fae5c9e9c07dbcf7a2e431c08",
+      "bytes": 15421480,
+      "sha256": "45795582a0c44aa019cf84f85243dea0d26fc299869c9eb950a6e2c07d5c5335",
       "tables": {
         "operators": 141,
         "locations": 107140,
@@ -140,8 +140,8 @@
     },
     "PT": {
       "file": "PT.json.gz",
-      "bytes": 52395,
-      "sha256": "7e3bdb70b53c3dbc2153dda5d8b0f16b16093f8127a08b67866f826eeaf3926c",
+      "bytes": 52398,
+      "sha256": "42562e2068e453d87dbf888fb2f448a3105c4d778e284f05b9bf93f3f1d1d58c",
       "tables": {
         "operators": 71,
         "locations": 794,
@@ -242,8 +242,8 @@
   },
   "shared": {
     "file": "shared.json.gz",
-    "bytes": 9650,
-    "sha256": "1f75eccd5fc0bbefdd602fdc64aea960e3a07e7cdc77a672794813eabc21d4bd",
+    "bytes": 3117,
+    "sha256": "15617ed54e05d501b07999095af5b4c3482771e2639e00c8bc675f20113a5407",
     "tables": {
       "operators": 5,
       "gamma_distributions": 0,

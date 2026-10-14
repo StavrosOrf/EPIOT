@@ -1,66 +1,37 @@
 # Building the database
 
-The database is built once from open source datasets and then kept up to date by a scheduled job.
-This page describes the one-off build; {doc}`scheduled-updates` covers the recurring part.
+The database is initialized once, offline, from the compact country snapshots in `seed_data/`.
+It holds infrastructure, not demand: session scenarios are generated per request, so no recurring
+job writes to it ({doc}`scheduled-updates`).
 
-## Pipeline
+## Initialization
 
 ```{mermaid}
 flowchart TB
-    subgraph Sources["./data"]
+    subgraph Seed["./seed_data"]
         direction LR
-        J[Charging stations<br/>JSON]
-        B[CBS neighbourhoods<br/>GPKG]
-        G[Liander grid<br/>GPKG]
+        S[Country snapshots<br/>*.json.gz]
         D[Behaviour curves<br/>CSV]
+        B[CBS neighbourhoods<br/>GPKG]
     end
-    M[flask db upgrade · create schema] --> L1
-    J & B --> L1[load_ams_data<br/>locations · operators · columns · charging points]
-    G & B --> L2[load_transformer_data<br/>transformers inside Amsterdam bounds]
-    L1 & L2 --> L3[add_grid_connections<br/>nearest MV/LV transformer per column]
-    L3 --> L4[load_daily_charging_sessions<br/>× N days, Monte Carlo]
-    D --> L4
-    L4 --> L5[load_electricity_data_…<br/>power mix]
-    L5 --> DB[(instance/default.sqlite)]
+    S --> I[database_init.py<br/>migrations · tables · SpatiaLite geometry]
+    I --> DB[(instance/default.sqlite)]
+    D & B -. read directly at runtime .-> APP[Session samplers]
 ```
 
-All steps are functions in `backend/` and are called from `database_init.py`. On a fresh database,
-uncomment the steps you need in its `__main__` block and run:
-
 ```bash
-uv run flask --app app db upgrade
 uv run python database_init.py
 ```
 
-## Step 1 — Charging infrastructure
+The initializer applies all migrations itself and restores charging stations, operators, Amsterdam
+sessions, transformers, grid connections and power mixes with their original IDs. It refuses to
+overwrite an existing database. The behaviour-curve CSVs and the neighbourhood atlas are not copied:
+the app reads them from `seed_data/`. Coverage, the snapshot format and how to refresh it are in
+`seed_data/README.md`; supplier refreshes are described in `docs/charger_sources.md`.
 
-`load_ams_data(app, db)` reads `chargers_data_ams.json` (OpenChargeMap-style records) and, for each
-station, merges:
+The functions below regenerate derived tables on an existing database.
 
-| Source field | Target |
-|---|---|
-| `AddressInfo` | `Location` with street, town, postcode, coordinates and a `POINT` geometry |
-| `AddressInfo` lon/lat → CBS polygons | `Location.supplement` = `buurtcode` of the containing neighbourhood |
-| `OperatorInfo` | `Operator` (or ID 1, *(Unknown Operator)*) |
-| Station `ID`, `OperatorsReference` | `Column`, with `elaadnl_id` parsed from `EVnetNL …` references |
-| `Connections[]` | One `ChargingPoint` per connection: `power = PowerKW`, `type = fast` if `IsFastChargeCapable` |
-
-Records are **merged** by primary key, so re-running the loader updates rather than duplicates.
-
-## Step 2 — Grid assets
-
-`load_transformer_data(app, db)` reads three layers from the Liander GeoPackage, reprojects them to
-WGS 84 and keeps the features inside the bounding box of the Amsterdam neighbourhoods:
-
-| Layer | Stored `type` |
-|---|---|
-| `laagspanningsverdeelkasten` | `Low` |
-| `middenspanningsinstallaties` | `Middle` |
-| `onderstations` | `High` |
-
-Each transformer gets a `Location` with an ID from 30 000 upwards.
-
-## Step 3 — Grid connections
+## Grid connections
 
 `add_grid_connections(app, db, within_m=50_000, voltage_type="Middle")` links every column to its
 nearest MV/LV transformer:
@@ -79,7 +50,7 @@ By default the table is cleared first (`reset_table=True`). Use `reset_grid_conn
 separately. The nearest-transformer rule is an approximation of the real feeder topology, which is not
 public.
 
-## Step 4 — Charging sessions
+## Charging sessions
 
 `load_daily_charging_sessions(app, db, date, method="MC", scope="NL")` generates one day of sessions
 for every charging point inside the Netherlands bounding polygon and commits them. Loop over the
@@ -97,7 +68,7 @@ it does not check sessions later in the day: generate each day **once**. To star
 `reset_charging_session_db(app, db)`. The method is described in
 {doc}`../concepts/session-data`.
 
-## Step 5 — Power mix
+## Power mix
 
 `load_electricity_data_for_supported_countries(app, db)` fetches the last 24 hours of power mix for
 the supported zones (currently `NL`) and upserts them into `power_mixes`. It needs an Electricity Maps

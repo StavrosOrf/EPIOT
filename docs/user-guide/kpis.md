@@ -94,8 +94,8 @@ Environment KPIs: hourly carbon footprint and renewable share for three strategi
 | **Renewable Energy Share** | Strategy | % of charged energy from renewables | Which strategy uses the greenest electricity? |
 
 The environment KPIs combine the charging profile of each strategy with the hourly Dutch power mix
-(carbon intensity and renewable share from Electricity Maps). They are only available for dates for
-which power-mix data has been stored; see {doc}`../operations/scheduled-updates`.
+(carbon intensity and renewable share). Dates with imported observations use them; other dates use a
+clearly labelled historical reference day, resolved for each request; see {doc}`../environmental_kpis`.
 
 ## Mobility
 

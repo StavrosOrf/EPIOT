@@ -60,9 +60,12 @@ python others/CPFT-main/CPFT-tool/CPFT_pipeline_Python.py
 ## Relation to EPIOT
 
 CPFT predicts availability and hourly energy per charging point; EPIOT's simulators need individual
-sessions (arrival, departure, energy) at 10-minute resolution. The integration guide in the PDF
-describes how CPFT forecasts map onto EPIOT's session model. Until the integration lands, EPIOT uses
-its Monte Carlo generator.
+sessions (arrival, departure, energy) at 10-minute resolution. EPIOT's **CPFT session source** runs
+the bundled checkpoints on synthetic histories and turns occupied hours into approximate sessions.
+Without live charging data, those forecasts depend only on the calendar and the history's profile,
+so the trajectories are computed once per model version (`scripts/build_cpft_library.py`) and
+sampled per request; the web application never loads TensorFlow. See
+{doc}`../concepts/on-request-scenarios`.
 
 CPFT is released under the Apache License 2.0. Contributors: Peyman Afzali-Gorouh and Vahid
 Vahidinasab.

@@ -37,6 +37,7 @@ dependencies = [
     # Only used by scripts/install_spatialite.py to unpack the official
     # mod_spatialite bundle, which is distributed as a .7z archive.
     "py7zr; sys_platform == 'win32'",
+    "holidays>=0.106",
 ]
 
 [project.optional-dependencies]

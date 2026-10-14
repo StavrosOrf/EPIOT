@@ -1,4 +1,4 @@
-"""Spatial scenarios, source selection, cache isolation, and model-backed inference."""
+"""Spatial scenarios, source selection, on-request generation and the CPFT library."""
 
 from datetime import date, datetime, timedelta, timezone
 import importlib.util
@@ -18,6 +18,7 @@ from backend.scenario_profiles import grid, simulate_scenarios
 from backend.scenario_sampling import ScenarioSession, generate_sessions
 from backend.session_sources import SessionSourceService
 from backend.spatial_profiles import profile_from_attributes, SpatialAtlas
+from tests.cpft_helpers import write_test_library
 
 UTC = timezone.utc
 TARGET = date(2026, 10, 15)
@@ -103,49 +104,39 @@ def test_profiles_cover_complete_dst_target_days(target, expected):
     assert len(simulate_scenarios(CHARGERS[:1], sessions, start, end, "avg")[0]) == len(timestamps)
 
 
-class FakeRuntime:
-    def forecast(self, chargers, histories, issue, end):
-        assert all(session.start < issue for values in histories.values() for session in values)
-        result = {}
-        for charger in chargers:
-            rows, hour = [], issue
-            while hour < end:
-                occupied = int(hour.hour == 10)
-                rows.append(dict(hour=hour, availability_forecast_prob=.9 if occupied else .1,
-                    availability_forecast_bin=occupied, kWh_forecast_next_whole_period=2.*occupied))
-                hour += timedelta(hours=1)
-            result[charger["id"]] = rows
-        return result
+@pytest.fixture
+def library(tmp_path):
+    return write_test_library(tmp_path/"library.npz")
 
 
-def test_all_sources_persist_separately_and_point_selection_does_not_change_scenario(tmp_path):
-    calls = []
-    def factory():
-        calls.append(1)
-        return FakeRuntime()
-    service = SessionSourceService(tmp_path/"cache.sqlite", atlas_path=tmp_path/"missing.gpkg", runtime_factory=factory)
+def test_all_sources_are_generated_on_request_and_point_selection_does_not_change_scenario(tmp_path, library):
+    service = SessionSourceService(atlas_path=tmp_path/"missing.gpkg", library_path=library)
     by_source = {}
     for source in ["simple", "spatial", "cpft"]:
         records, meta = service.get(CHARGERS, TARGET, source=source)
         assert meta["synthetic"] and not meta["verified_observations"]
-        subset, again = service.get(CHARGERS[:1], TARGET, source=source)
-        assert subset == [session for session in records if session.cp_id == 1]
-        assert again["cache_hits"] == 1
+        assert meta["generated"] == "on request"
+        subset, _ = service.get(CHARGERS[:1], TARGET, source=source)
+        assert subset.equals(records.select(records.cp_id == 1))
+        assert service.get(list(reversed(CHARGERS)), TARGET, source=source)[0].equals(records)
         by_source[source] = records
-    assert len(calls) == 1
-    assert by_source["cpft"] != by_source["spatial"]
-    with service.cache.connect() as connection:
-        assert connection.execute("SELECT COUNT(*) FROM scenario_cache").fetchone()[0] == 6
+    assert not by_source["cpft"].equals(by_source["spatial"])
+    # Nothing is written anywhere: there is no scenario cache to prepare or invalidate
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["library.npz"]
 
 
-def test_cpft_failure_does_not_fall_back_to_random_or_publish_partial_cache(tmp_path):
-    def unavailable():
-        raise CPFTUnavailable("model missing")
-    service = SessionSourceService(tmp_path/"cache.sqlite", atlas_path=tmp_path/"missing.gpkg", runtime_factory=unavailable)
-    with pytest.raises(CPFTUnavailable):
+def test_missing_cpft_library_is_explicit_and_never_falls_back_to_random(tmp_path):
+    service = SessionSourceService(atlas_path=tmp_path/"missing.gpkg", library_path=tmp_path/"missing.npz")
+    with pytest.raises(CPFTUnavailable, match="library is missing"):
         service.get(CHARGERS, TARGET, source="cpft")
-    with service.cache.connect() as connection:
-        assert connection.execute("SELECT COUNT(*) FROM scenario_cache").fetchone()[0] == 0
+
+
+def test_cpft_library_built_from_other_inputs_is_rejected(tmp_path, monkeypatch):
+    path = write_test_library(tmp_path/"stale.npz")
+    monkeypatch.setattr("backend.cpft_library.current_inputs", lambda: "changed checkpoints")
+    service = SessionSourceService(atlas_path=tmp_path/"missing.gpkg", library_path=path)
+    with pytest.raises(CPFTUnavailable, match="Rebuild"):
+        service.get(CHARGERS, TARGET, source="cpft")
 
 
 def test_frozen_scalers_keep_original_in_place_float32_arithmetic():
@@ -165,19 +156,20 @@ def scenario_client(tmp_path):
     with engine.begin() as connection:
         for sql in [
             "CREATE TABLE operators (id INTEGER PRIMARY KEY, name TEXT)",
-            "CREATE TABLE locations (id INTEGER PRIMARY KEY, latitude REAL, longitude REAL, street TEXT)",
+            "CREATE TABLE locations (id INTEGER PRIMARY KEY, latitude REAL, longitude REAL, street TEXT, country TEXT)",
             "CREATE TABLE columns (id INTEGER PRIMARY KEY, operator_id INTEGER, location_id INTEGER)",
             "CREATE TABLE charging_points (id INTEGER PRIMARY KEY, column_id INTEGER, power REAL, type TEXT)",
             "CREATE TABLE sessions (id INTEGER PRIMARY KEY, cp_id INTEGER, start DATETIME, end DATETIME, consumption REAL)",
             "CREATE TABLE power_mixes (id INTEGER PRIMARY KEY, country_zone TEXT, datetime DATETIME, renewable_percentage REAL, co2_intensity REAL)",
-            "INSERT INTO operators VALUES (1,'test')", "INSERT INTO locations VALUES (1,52.36,4.90,'test')",
+            "INSERT INTO operators VALUES (1,'test')", "INSERT INTO locations VALUES (1,52.36,4.90,'test','Netherlands')",
             "INSERT INTO columns VALUES (1,1,1)", "INSERT INTO charging_points VALUES (1,1,11,'regular')",
             "INSERT INTO sessions VALUES (1,1,'2026-10-14 08:00','2026-10-14 10:00',7)"]:
             connection.exec_driver_sql(sql)
     with Session(engine) as session:
         app = Flask(__name__)
         app.config.update(TESTING=True, aggregator_config={}, GRID_DATA_CACHE=str(tmp_path/'grid.sqlite'), **{"station_data.db": SimpleNamespace(session=session)})
-        app.extensions["session_source_service"] = SessionSourceService(tmp_path/"cache.sqlite", atlas_path=tmp_path/"missing.gpkg", runtime_factory=FakeRuntime)
+        app.extensions["session_source_service"] = SessionSourceService(atlas_path=tmp_path/"missing.gpkg",
+            library_path=write_test_library(tmp_path/"library.npz"))
         app.register_blueprint(station_data, url_prefix="/stations")
         yield app.test_client(), engine
     engine.dispose()
@@ -227,11 +219,9 @@ def test_api_dst_day_lengths_and_optimizer_limit(scenario_client, target, expect
     assert client.post("/stations/aggregate_load", json=query).status_code == 422
 
 
-def test_api_model_failure_is_explicit(scenario_client):
+def test_api_model_failure_is_explicit(scenario_client, tmp_path):
     client, _ = scenario_client
-    def unavailable():
-        raise CPFTUnavailable("CPFT model unavailable")
-    client.application.extensions["session_source_service"].runtime_factory = unavailable
+    client.application.extensions["session_source_service"].library_path = tmp_path/"absent.npz"
     response = client.post("/stations/aggregate_load", json=dict(selected_markers=[1], strategy="avg", date="2026-10-15", session_source="cpft"))
     assert response.status_code == 503
     assert "CPFT" in response.get_json()["error"]
@@ -245,7 +235,8 @@ def test_minimum_carbon_api_matches_average_energy_and_fails_on_missing_grid(sce
     query = dict(selected_markers=[1],date=str(TARGET),strategy='mincarbon',session_source='simple')
     assert client.post('/stations/aggregate_load',json=query).status_code == 422
     store = GridStore(client.application.config['GRID_DATA_CACHE'])
-    store.save([GridHour(start+timedelta(hours=i),100+10*(i%24),50,False,False) for i in range(int((end-start).total_seconds()/3600))])
+    store.save([GridHour(start+timedelta(hours=i),100+10*(i%24),50,False,False) for i in range(int((end-start).total_seconds()/3600))],
+               observations=True)
     energies = []
     for strategy in ['afap','alap','avg','mincarbon']:
         response = client.post('/stations/aggregate_load',json=dict(query,strategy=strategy))
