@@ -296,6 +296,39 @@ def test_import_leaves_out_stations_outside_the_sources_countries(connection):
     assert (stats["sites"], stats["skipped_outside_coverage"]) == (1, 1)
 
 
+def test_anglet_station_is_repaired_offline_without_losing_its_eight_points():
+    from backend.charger_positions import repair_positions
+    rows = [dict(id_station_itinerance="FRALLPEVCARSANGLT", id_pdc_itinerance=f"FRALLEGO{i}",
+                 consolidated_latitude="50.636688", consolidated_longitude="-1.499184",
+                 consolidated_is_lon_lat_correct="False", adresse_station="Carrefour Anglet BAB2",
+                 consolidated_commune="Anglet", consolidated_code_postal="64600", puissance_nominale="150")
+            for i in range(8)]
+    [station], stats = repair_positions(parse_irve(rows), mask=False, shapes=False)
+    assert (station.lat, station.lon, station.country) == (43.486703, -1.501622, "FR")
+    assert len(station.points) == 8 and not station.position_suspect
+    assert stats["verified_overrides"] == 1
+
+
+def test_publisher_rejected_coordinates_are_not_kept_by_the_coastal_tolerance():
+    import math
+    from shapely.geometry import box
+    from backend.charger_positions import repair_positions
+    station = site("flagged", 50.636688, -1.499184, "FR", "Unknown road", "Unknown town")
+    station.position_suspect = True
+    [station], stats = repair_positions([station], mask=box(-1.55, 50.6, -1.50, 50.7), shapes=False)
+    assert math.isnan(station.lat) and stats["unresolved"] == 1
+
+
+def test_override_does_not_replace_a_future_feed_correction():
+    from backend.charger_positions import repair_positions
+    station = site("FRALLPEVCARSANGLT", 43.4868, -1.5015, "FR", "Carrefour BAB2", "Anglet")
+    station.source = "irve"
+    station.position_suspect = True
+    [station], _ = repair_positions([station], mask=False, shapes=False)
+    assert (station.lat, station.lon) == (43.4868, -1.5015)
+    assert not station.position_suspect
+
+
 
 def test_sites_clearly_inside_another_country_take_its_label():
     import geopandas as gpd

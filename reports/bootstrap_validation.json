@@ -1,0 +1,41 @@
+{
+  "equal_application_tables": [
+    "operators",
+    "locations",
+    "columns",
+    "charging_points",
+    "transformers",
+    "grid_connections",
+    "power_mixes",
+    "sessions",
+    "forecast_hourly",
+    "forecast_sessions",
+    "gamma_distributions",
+    "forecast_runs"
+  ],
+  "rows": {
+    "operators": 12385,
+    "locations": 239676,
+    "columns": 254422,
+    "charging_points": 586291,
+    "transformers": 28260,
+    "grid_connections": 717,
+    "power_mixes": 72,
+    "sessions": 318163,
+    "forecast_hourly": 0,
+    "forecast_sessions": 0,
+    "gamma_distributions": 0,
+    "forecast_runs": 0
+  },
+  "endpoint_checks": 19,
+  "spatial_matched": true,
+  "anglet_points": 8,
+  "raw_files_required": false,
+  "verified_at": "2026-10-14T12:08:55.047431+00:00",
+  "tests": {
+    "passed": 152,
+    "skipped": 1,
+    "skip": "opt-in external ReFlex integration"
+  },
+  "snapshot_manifest": "seed_data/manifest.json"
+}

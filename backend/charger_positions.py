@@ -28,6 +28,7 @@ import time
 from backend.charger_sources import COUNTRIES_FILE, DATA_DIR, LAND_FILE, USER_AGENT, plausible
 
 CACHE = DATA_DIR / "geocode_cache.json"
+OVERRIDES = Path(__file__).resolve().parent / "data/charger_position_overrides.json"
 PILE_UP_ADDRESSES = 3  # distinct addresses on one point before it counts as a pile-up
 CONFIRM_METRES = 1000  # a geocoded address this close confirms the feed's position
 # Natural Earth's 1:10m coast is off by a few hundred metres and misses
@@ -270,6 +271,24 @@ def move(site, lat, lon):
     site.lat, site.lon = lat, lon
 
 
+def position_overrides():
+    return json.loads(OVERRIDES.read_text(encoding="utf-8"))
+
+
+def apply_position_override(site, overrides):
+    correction = overrides.get(f"{site.source}:{site.key}")
+    if correction and metres((site.lat, site.lon), correction["position"]) <= CONFIRM_METRES:
+        site.position_suspect = False
+        return False
+    # Do not overwrite a future corrected feed position elsewhere.
+    if correction and metres((site.lat, site.lon), correction["bad_position"]) <= CONFIRM_METRES:
+        move(site, *correction["position"])
+        site.country = correction["country"]
+        site.position_suspect = False
+        return True
+    return False
+
+
 def repair_positions(sites, geocoder=None, mask=None, shapes=None):
     """Fix what can be fixed in place; returns the sites and counts of each repair.
 
@@ -278,6 +297,9 @@ def repair_positions(sites, geocoder=None, mask=None, shapes=None):
     """
     sites = list(sites)
     stats = Counter()
+    overrides = position_overrides()
+    for site in sites:
+        stats["verified_overrides"] += apply_position_override(site, overrides)
     if mask is None:
         mask, far_mask = land_masks() or (None, None)
     elif mask is False:
@@ -288,7 +310,7 @@ def repair_positions(sites, geocoder=None, mask=None, shapes=None):
     far_at_sea = lambda lat, lon: offshore(lat, lon, far_mask) if far_mask is not None else False
     outside = []
     for site in sites:
-        if plausible(site.country, site.lat, site.lon) and not at_sea(site.lat, site.lon):
+        if not site.position_suspect and plausible(site.country, site.lat, site.lon) and not at_sea(site.lat, site.lon):
             continue
         if at_sea(site.lat, site.lon):
             stats["at_sea"] += 1
@@ -315,7 +337,7 @@ def repair_positions(sites, geocoder=None, mask=None, shapes=None):
                 move(site, lat, lon)
                 stats["geocoded"] += 1
             site.country = country
-        elif sea_only and not far_at_sea(site.lat, site.lon):
+        elif sea_only and not site.position_suspect and not far_at_sea(site.lat, site.lon):
             stats["kept_near_coast"] += 1  # the coarse coastline cannot tell a quay from water
         else:
             # Nothing better known: drop it rather than show it at sea or abroad

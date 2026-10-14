@@ -23,6 +23,7 @@ logs/
 # Virtualenv. On OneDrive checkouts this is a junction to a directory
 # outside the synced tree - see README, "Environment setup".
 .venv/
+.tmp/
 
 _build/
 
@@ -30,3 +31,4 @@ _build/
 !backend/data/
 backend/data/*
 !backend/data/cpft_preprocessing.json
+!backend/data/charger_position_overrides.json

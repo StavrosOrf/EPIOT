@@ -1,0 +1,14 @@
+{
+  "irve:FRALLPEVCARSANGLT": {
+    "bad_position": [50.636688, -1.499184],
+    "position": [43.486703, -1.501622],
+    "country": "FR",
+    "address": "25 Avenue Jean Leon Laporte 64600 Anglet",
+    "accuracy": "address location; not a surveyed charging stall",
+    "reason": "Eight Carrefour BAB2 points placed near the Isle of Wight; IRVE marks their coordinates incorrect.",
+    "source_url": "https://www.carrefour.fr/magasin/anglet-bab2",
+    "geocoder_url": "https://data.geopf.fr/geocodage/search?q=25%20Avenue%20Jean%20Leon%20Laporte%2064600%20Anglet&limit=1",
+    "geocoder_address_id": "64024_1004_00025",
+    "verified_on": "2026-10-14"
+  }
+}

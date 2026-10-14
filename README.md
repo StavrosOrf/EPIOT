@@ -82,29 +82,48 @@ brew install libspatialite
 
 ### Data and migrations
 
-Make sure the database files are in the **./data** folder:
-
-- chargers_data_ams.json
-- liander_elektriciteitsnetten.gpkg
-- wijkenbuurten_2022_v2_amsterdam.gpkg
-
-Apply the migrations, then populate the database on first run:
+The GitHub-ready snapshots in **./seed_data** contain the required data in one
+compressed JSON file per country, plus a small shared file and a checksum manifest.
+No raw supplier downloads, large GeoPackages, existing SQLite database or API
+credentials are needed. After installing SpatiaLite, initialize a fresh checkout:
 
 ```
-uv run flask --app app db upgrade
 uv run python database_init.py
+uv run python app.py
 ```
 
-To add chargers for the whole of the Netherlands, Germany, Switzerland, France and
-Finland, and for cities in Portugal, Italy and the UK, download the open data into
-`./data/chargers` and import it:
+The initializer applies all migrations, restores stable charger IDs, powers,
+Amsterdam sessions, transformers/grid links and historical electricity data,
+rebuilds SpatiaLite geometry/indexes, and restores the spatial atlas and session
+priors. Runtime caches are regenerated on demand. It refuses to overwrite an
+existing database. To install only selected countries:
+
+```
+uv run python database_init.py --countries NL DE FR
+```
+
+Details, coverage and snapshot sizes are in [seed_data/README.md](seed_data/README.md).
+For an existing server, apply new migrations with `uv run flask --app app db upgrade`.
+To apply the verified Anglet location correction without changing any charger IDs:
+
+```
+uv run python scripts/repair_charger_positions.py
+```
+
+To refresh chargers from their original suppliers, download the open data into
+`./data/chargers` and import it (optional; initialization needs no downloads):
 
 ```
 uv run python scripts/update_charger_data.py
+uv run python scripts/export_country_data.py
 ```
 
 Sources, licences, the field mapping and next steps are in
 [docs/charger_sources.md](docs/charger_sources.md).
+
+The standard install supports stored, simple and spatial sessions. CPFT inference
+also requires `uv sync --extra cpft`; its checkpoints and preprocessing are already
+in the repository. The remote ReFlex service still requires project network access.
 
 ## Running the app
 

@@ -31,12 +31,23 @@ data/chargers/
   raw/digitraffic/        # locations.json, statuses.json (live availability)
 ```
 
-`data/` is not committed. Rebuild the folder at any time:
+`data/` is not committed. The compact snapshots in `seed_data/` are GitHub-ready
+and initialize a fresh server offline, including Amsterdam pilot/grid data and
+the inputs for simple/spatial sessions:
+
+```
+uv run python database_init.py
+```
+
+The initializer runs migrations itself. Do not create the database first with
+`flask db upgrade`; it deliberately refuses to overwrite an existing database.
+See [the snapshot guide](../seed_data/README.md). Supplier refreshes remain optional:
 
 ```
 uv run flask --app app db upgrade              # once: adds source columns and indexes
 uv run python scripts/update_charger_data.py   # download and import everything
 uv run python scripts/update_charger_data.py --skip-fetch --sources osm   # re-import one source
+uv run python scripts/export_country_data.py  # regenerate the GitHub-ready snapshots
 ```
 
 ## How the data is mapped
@@ -60,6 +71,18 @@ EVSE → charging point, with power from `maxElectricPower` in W.
 
 The feeds get some positions wrong, and `backend/charger_positions.py` repairs
 them before import:
+
+Verified station corrections are kept in `backend/data/charger_position_overrides.json`.
+In particular, IRVE station `FRALLPEVCARSANGLT` (eight points for Carrefour BAB2,
+Anglet) was incorrectly placed at `(50.636688, -1.499184)` near the Isle of Wight.
+Its address location is `(43.486703, -1.501622)`, checked against Carrefour's
+published address and the French national address geocoder. This is an address
+location, not a surveyed charging-stall position. The correction works offline,
+preserves every charger ID and does not overwrite future feed corrections.
+`scripts/repair_charger_positions.py` applies it to existing databases and takes
+a backup first. IRVE's explicit `consolidated_is_lon_lat_correct=False` flag now
+forces address verification; an unverified flagged position is skipped instead
+of being accepted by the generous coastal tolerance.
 
 | Fault | Example | Repair |
 |---|---|---|

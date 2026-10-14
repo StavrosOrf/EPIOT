@@ -135,6 +135,7 @@ class Site:
     postcode: str | None = None
     group: str | None = None  # sites sharing a group share one location row
     points: list = field(default_factory=list)
+    position_suspect: bool = False  # publisher explicitly marks coordinates incorrect
 
 
 # Where a site of each country can plausibly be (south, west, north, east).
@@ -460,6 +461,8 @@ def parse_irve(rows):
         site = Site("irve", station, lat, lon, "FR", clean(first.get("nom_operateur")) or clean(first.get("nom_enseigne")),
                     clean(first.get("nom_station")), clean(first.get("adresse_station")),
                     clean(first.get("consolidated_commune")), clean(first.get("consolidated_code_postal")))
+        site.position_suspect = any(str(row.get("consolidated_is_lon_lat_correct", "")).lower() == "false"
+                                    for row in points.values())
         for key, row in points.items():
             dc = any((row.get(column) or "").strip().lower() in TRUE_TEXT
                      for column in ("prise_type_combo_ccs", "prise_type_chademo"))

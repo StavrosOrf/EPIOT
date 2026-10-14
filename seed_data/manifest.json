@@ -1,0 +1,253 @@
+{
+  "format_version": 1,
+  "created_at": "2026-10-14T12:03:45+00:00",
+  "countries": {
+    "CH": {
+      "file": "CH.json.gz",
+      "bytes": 669444,
+      "sha256": "fb79f4eb89d7daaa8c93d76fea8b2424b0863648dc7d3982a63968fc4c645323",
+      "tables": {
+        "operators": 41,
+        "locations": 9063,
+        "columns": 9144,
+        "charging_points": 20277,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "DE": {
+      "file": "DE.json.gz",
+      "bytes": 4545890,
+      "sha256": "e43a0032015f9a9f5a35b187d4472eff2b86fc964e96f0be8d560bbbc7f9b040",
+      "tables": {
+        "operators": 11739,
+        "locations": 73955,
+        "columns": 116372,
+        "charging_points": 208992,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "FI": {
+      "file": "FI.json.gz",
+      "bytes": 328539,
+      "sha256": "0a5b3dbbf2f0ae6898d4303289d9d5f555603a02b67878c3c2a89b7859b029bb",
+      "tables": {
+        "operators": 25,
+        "locations": 3774,
+        "columns": 3774,
+        "charging_points": 19845,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "FR": {
+      "file": "FR.json.gz",
+      "bytes": 3043319,
+      "sha256": "7731ca9d88dc51e165f83fb417fd2d3683d01549edb8d6cf7d92bfe44d8cc639",
+      "tables": {
+        "operators": 246,
+        "locations": 44666,
+        "columns": 44666,
+        "charging_points": 144131,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "GB": {
+      "file": "GB.json.gz",
+      "bytes": 74265,
+      "sha256": "6db0525a4e080380cfd4c348f552b701c38125ecee0583054a16602fdaec7667",
+      "tables": {
+        "operators": 99,
+        "locations": 1423,
+        "columns": 1423,
+        "charging_points": 3426,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "IT": {
+      "file": "IT.json.gz",
+      "bytes": 35070,
+      "sha256": "9fa4c4016b86ed535bf3b6c2f56349a4a111d5d55405bcdc0078d5763b7da631",
+      "tables": {
+        "operators": 67,
+        "locations": 679,
+        "columns": 679,
+        "charging_points": 1408,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "LI": {
+      "file": "LI.json.gz",
+      "bytes": 869,
+      "sha256": "43ff0103353d5e82b0377ee22e4ff5fbbbcfd050e198c109480226476c29a8b4",
+      "tables": {
+        "operators": 2,
+        "locations": 3,
+        "columns": 3,
+        "charging_points": 11,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "NL": {
+      "file": "NL.json.gz",
+      "bytes": 18175428,
+      "sha256": "90e0fe3566cbc5f44b8f5b200b7531baef401f0a423fe2c461cae7f8dd8cb3a7",
+      "tables": {
+        "operators": 138,
+        "locations": 105319,
+        "columns": 77567,
+        "charging_points": 185163,
+        "transformers": 28260,
+        "grid_connections": 717,
+        "power_mixes": 72,
+        "sessions": 318163,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    },
+    "PT": {
+      "file": "PT.json.gz",
+      "bytes": 52395,
+      "sha256": "7e3bdb70b53c3dbc2153dda5d8b0f16b16093f8127a08b67866f826eeaf3926c",
+      "tables": {
+        "operators": 71,
+        "locations": 794,
+        "columns": 794,
+        "charging_points": 3038,
+        "transformers": 0,
+        "grid_connections": 0,
+        "power_mixes": 0,
+        "sessions": 0,
+        "forecast_hourly": 0,
+        "forecast_sessions": 0
+      }
+    }
+  },
+  "sources": {
+    "ndw": {
+      "id": "ndw",
+      "label": "NDW DOT-NL",
+      "publisher": "Nationaal Dataportaal Wegverkeer (NDW)",
+      "licence": "Open data, free of charge (NDW terms)",
+      "url": "https://docs.ndw.nu/en/faq/DOT-NL/",
+      "countries": [
+        "NL"
+      ]
+    },
+    "bnetza": {
+      "id": "bnetza",
+      "label": "Ladesäulenregister",
+      "publisher": "Bundesnetzagentur",
+      "licence": "Open data (Bundesnetzagentur terms)",
+      "url": "https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/E-Mobilitaet/start.html",
+      "countries": [
+        "DE"
+      ]
+    },
+    "osm": {
+      "id": "osm",
+      "label": "OpenStreetMap",
+      "publisher": "OpenStreetMap contributors",
+      "licence": "ODbL 1.0",
+      "url": "https://www.openstreetmap.org/copyright",
+      "countries": [
+        "PT",
+        "IT",
+        "GB"
+      ]
+    },
+    "bfe": {
+      "id": "bfe",
+      "label": "ich-tanke-strom.ch",
+      "publisher": "Swiss Federal Office of Energy (BFE)",
+      "licence": "Open use, source must be credited (opendata.swiss)",
+      "url": "https://opendata.swiss/en/dataset/ladestationen",
+      "countries": [
+        "CH",
+        "LI"
+      ]
+    },
+    "irve": {
+      "id": "irve",
+      "label": "Base nationale des IRVE",
+      "publisher": "data.gouv.fr (Etalab) consolidation of operator data",
+      "licence": "Licence Ouverte / Open Licence 2.0",
+      "url": "https://www.data.gouv.fr/datasets/base-nationale-des-irve-data-gouv-infrastructures-de-recharge-pour-vehicules-electriques-donnees-statiques",
+      "countries": [
+        "FR"
+      ]
+    },
+    "digitraffic": {
+      "id": "digitraffic",
+      "label": "Digitraffic AFIR",
+      "publisher": "Fintraffic (Finnish national access point)",
+      "licence": "CC BY 4.0",
+      "url": "https://www.digitraffic.fi/en/road-traffic/afir/",
+      "countries": [
+        "FI"
+      ]
+    }
+  },
+  "omissions": [
+    "raw supplier downloads",
+    "live occupancy snapshots",
+    "rebuildable scenario and hourly caches"
+  ],
+  "total_rows": {
+    "operators": 12385,
+    "locations": 239676,
+    "columns": 254422,
+    "charging_points": 586291,
+    "transformers": 28260,
+    "grid_connections": 717,
+    "power_mixes": 72,
+    "sessions": 318163,
+    "forecast_hourly": 0,
+    "forecast_sessions": 0,
+    "gamma_distributions": 0,
+    "forecast_runs": 0
+  },
+  "shared": {
+    "file": "shared.json.gz",
+    "bytes": 9678,
+    "sha256": "e848133d3ed6c776741a8e935de4fb57144e1b62e1653061a75b65d5bb9c4083",
+    "tables": {
+      "operators": 8,
+      "gamma_distributions": 0,
+      "forecast_runs": 0
+    }
+  }
+}

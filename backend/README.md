@@ -1,27 +1,22 @@
 # Operational notes
 
-## Setting up the database
-
-To set up the database for the first time you need to install the requirements and make spatialite available in your system. Conda is the fastest way to do this on windows.
-
-```
-conda install libspatialite -c conda-forge
-```
-
-Once this is achieved you can first run two times:
+Install dependencies with `uv sync` and install SpatiaLite as described in the
+[root README](../README.md). Initialize a fresh checkout offline with:
 
 ```
-flask db upgrade
+uv run python database_init.py
+uv run python app.py
 ```
 
-The first time might throw an error, don't worry about this
-Once this is done proceed to populate the database by running database_init once.
+The initializer applies migrations and restores the compact country snapshots
+in [seed_data](../seed_data/README.md). No large raw input files or API keys are
+required. It refuses to overwrite an existing database. For an existing server,
+run `uv run flask --app app db upgrade` to apply new migrations.
 
-Wit the database setup, you can feed it with data, the inital example uses the file "chargers_data_ams.json" with the amsterdam charging stations. The database can be fed with:
-
-```
-python database_init.py
-```
+Supplier refreshes use `scripts/update_charger_data.py`; regenerate snapshots
+with `scripts/export_country_data.py` afterwards. See
+[the data model](../docs/architecture/backend.md) and
+[charger-source documentation](../docs/charger_sources.md).
 
 ## Database Model ERD
 
