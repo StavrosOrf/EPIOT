@@ -77,7 +77,9 @@ flowchart LR
 | `GET /marker_icon` | `get_marker_icon` | Absolute URLs of map icons and logos |
 | `GET /favicon.ico` | `favicon` | |
 | `POST /stations/within` | `get_stations_within` | Body: GeoJSON geometry |
-| `GET /stations/all` | `get_all_stations` | Every charging point |
+| `GET /stations/all` | `get_all_stations` | Every charging point; optional `source` filter |
+| `GET /stations/density` | `get_density` | Grid aggregates for overview zooms, cached per zoom |
+| `GET /stations/coverage` | `get_coverage` | Search cities and open-data sources, from `data/chargers/manifest.json` |
 | `GET /stations/aggregate_load` | `get_aggregate_load` | Load and flexibility for one area |
 | `POST /stations/charging-points-by-transformers` | `charging_points_by_transformers` | Grid view expansion |
 | `POST /features/transformers/within` | `get_transformers_wtithin` | Optional `tr_type` filter |

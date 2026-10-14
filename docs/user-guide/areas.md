@@ -53,8 +53,8 @@ are drawn during the session:
 | 4th (after a deletion) | Green again | Area 4 |
 
 Colours cycle through the three values and labels keep counting up: if you delete *Area 2* and
-draw a new area, it becomes *Area 4*. Charts,
-the *Locate on map* list and report sheets always use these labels, so you can match results to
+draw a new area, it becomes *Area 4*. Charts
+and report sheets always use these labels, so you can match results to
 shapes on the map.
 
 ```{figure} ../_static/screenshots/areas-drawn.jpg

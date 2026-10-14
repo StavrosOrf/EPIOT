@@ -150,9 +150,8 @@ const clearCallouts = (page) => page.evaluate(() => document.querySelectorAll(".
     ["#toggle-div .segmented", 4, -12, 0],
     ["#strategy", 5, -12, 0],
     ["#datepicker", 6, -12, 0],
-    ["#cs-id-dropdown", 7, -12, 0],
-    ["#download-btn", 8, -12, 0],
-    ["#graph .modebar-container .modebar", 9, -14, 12],
+    ["#download-btn", 7, -12, 0],
+    ["#graph .modebar-container .modebar", 8, -14, 12],
   ]);
   await shot(page, "anatomy-panel.jpg");
   await clearCallouts(page);

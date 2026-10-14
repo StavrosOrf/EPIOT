@@ -1,0 +1,10 @@
+[Unit]
+Description=Update EPIOT grid cache daily
+
+[Timer]
+OnCalendar=*-*-* 02:45:00 Europe/Amsterdam
+Persistent=true
+Unit=epiot-grid-data.service
+
+[Install]
+WantedBy=timers.target

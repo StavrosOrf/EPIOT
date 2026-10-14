@@ -61,7 +61,6 @@ flowchart TB
         RUN -- Load / Flexibility --> L[calculateLoadProfiles<br/>createGraph / createFlexGraph]
         SUB[KPI sub-tab] --> RR[redraw from memory]
         DL[Download report] --> X[generateAndDownloadExcel]
-        LOC[Locate on map] --> CL[close panel, zoom,<br/>open pop-up, highlight]
     end
     Map ~~~ Panel
 ```

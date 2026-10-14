@@ -49,8 +49,6 @@ those transformers**. Use it to see what the EV fleet adds to specific grid asse
 Grid view of the same areas: the titles now count transformers ("34 tr.") rather than chargers.
 ```
 
-In Grid view, the *Locate on map* list switches to transformer IDs.
-
 ### Charging strategy
 
 The strategy decides *when* within each plug-in window the energy is delivered. The same sessions,
@@ -84,12 +82,6 @@ The algorithms are specified in {doc}`../concepts/charging-strategies`.
 Pick any day from **1 September 2025** up to today. The chart covers that day and the previous one.
 Days without stored sessions produce flat zero profiles.
 
-### Locate on map
-
-The drop-down lists the charging-point IDs (or transformer IDs in Grid view) grouped by area. Pick an
-ID to close the panel, zoom to that marker, open its pop-up and highlight it with a pin icon. The
-highlight is removed when the pop-up closes.
-
 ## What happens when you click Analyse
 
 ```{mermaid}
@@ -116,7 +108,6 @@ sequenceDiagram
         ST-->>FE: 288-step profiles
     end
     FE->>FE: draw Yesterday / Today subplots
-    FE->>FE: fill Locate-on-map list
 ```
 
 If the backend cannot compute an area, the chart is replaced by *"Load profiles are not available for

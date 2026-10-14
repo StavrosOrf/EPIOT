@@ -95,6 +95,17 @@ uv run flask --app app db upgrade
 uv run python database_init.py
 ```
 
+To add chargers for the whole of the Netherlands, Germany, Switzerland, France and
+Finland, and for cities in Portugal, Italy and the UK, download the open data into
+`./data/chargers` and import it:
+
+```
+uv run python scripts/update_charger_data.py
+```
+
+Sources, licences, the field mapping and next steps are in
+[docs/charger_sources.md](docs/charger_sources.md).
+
 ## Running the app
 
 ```

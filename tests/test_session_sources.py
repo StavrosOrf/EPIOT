@@ -169,13 +169,14 @@ def scenario_client(tmp_path):
             "CREATE TABLE columns (id INTEGER PRIMARY KEY, operator_id INTEGER, location_id INTEGER)",
             "CREATE TABLE charging_points (id INTEGER PRIMARY KEY, column_id INTEGER, power REAL, type TEXT)",
             "CREATE TABLE sessions (id INTEGER PRIMARY KEY, cp_id INTEGER, start DATETIME, end DATETIME, consumption REAL)",
+            "CREATE TABLE power_mixes (id INTEGER PRIMARY KEY, country_zone TEXT, datetime DATETIME, renewable_percentage REAL, co2_intensity REAL)",
             "INSERT INTO operators VALUES (1,'test')", "INSERT INTO locations VALUES (1,52.36,4.90,'test')",
             "INSERT INTO columns VALUES (1,1,1)", "INSERT INTO charging_points VALUES (1,1,11,'regular')",
             "INSERT INTO sessions VALUES (1,1,'2026-10-14 08:00','2026-10-14 10:00',7)"]:
             connection.exec_driver_sql(sql)
     with Session(engine) as session:
         app = Flask(__name__)
-        app.config.update(TESTING=True, aggregator_config={}, **{"station_data.db": SimpleNamespace(session=session)})
+        app.config.update(TESTING=True, aggregator_config={}, GRID_DATA_CACHE=str(tmp_path/'grid.sqlite'), **{"station_data.db": SimpleNamespace(session=session)})
         app.extensions["session_source_service"] = SessionSourceService(tmp_path/"cache.sqlite", atlas_path=tmp_path/"missing.gpkg", runtime_factory=FakeRuntime)
         app.register_blueprint(station_data, url_prefix="/stations")
         yield app.test_client(), engine
@@ -234,6 +235,28 @@ def test_api_model_failure_is_explicit(scenario_client):
     response = client.post("/stations/aggregate_load", json=dict(selected_markers=[1], strategy="avg", date="2026-10-15", session_source="cpft"))
     assert response.status_code == 503
     assert "CPFT" in response.get_json()["error"]
+
+
+def test_minimum_carbon_api_matches_average_energy_and_fails_on_missing_grid(scenario_client):
+    from backend.grid_data import GridHour, GridStore
+    client, _ = scenario_client
+    start, _ = day_window(TARGET-timedelta(days=1),'Europe/Amsterdam')
+    _, end = day_window(TARGET,'Europe/Amsterdam')
+    query = dict(selected_markers=[1],date=str(TARGET),strategy='mincarbon',session_source='simple')
+    assert client.post('/stations/aggregate_load',json=query).status_code == 422
+    store = GridStore(client.application.config['GRID_DATA_CACHE'])
+    store.save([GridHour(start+timedelta(hours=i),100+10*(i%24),50,False,False) for i in range(int((end-start).total_seconds()/3600))])
+    energies = []
+    for strategy in ['afap','alap','avg','mincarbon']:
+        response = client.post('/stations/aggregate_load',json=dict(query,strategy=strategy))
+        assert response.status_code == 200
+        data = response.get_json()
+        energies.append(sum(data['y'])/6)
+        assert max(data['y']) <= 11+1e-8
+    # AFAP/ALAP follow connections from their real arrival, so energy inside the
+    # window differs for connections crossing its edges; average power and
+    # minimum carbon both give such connections their uniform in-window share
+    assert energies[3] == pytest.approx(energies[2])
 
 
 def test_real_saved_checkpoints_reproduce_export_with_runtime_scalers():

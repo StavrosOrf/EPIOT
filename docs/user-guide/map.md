@@ -20,7 +20,7 @@ A charging-station pop-up.
 | Field | Source |
 |---|---|
 | **Name** | Street address of the location (`locations.street`) |
-| **Id** | Charging-point ID (`charging_points.id`); the same ID appears in reports and *Locate on map* |
+| **Id** | Charging-point ID (`charging_points.id`); the same ID appears in reports |
 | **Operator** | Operator name (`operators.name`) |
 | **Capacity** | Rated connector power in kW (`charging_points.power`) |
 

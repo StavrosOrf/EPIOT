@@ -53,7 +53,7 @@ def client(tmp_path):
             connection.exec_driver_sql(sql)
     with Session(engine) as session:
         app = Flask(__name__)
-        app.config.update(TESTING=True, **{"station_data.db": SimpleNamespace(session=session)})
+        app.config.update(TESTING=True, GRID_DATA_CACHE=str(tmp_path/'grid.sqlite'), **{"station_data.db": SimpleNamespace(session=session)})
         app.extensions["session_source_service"] = SessionSourceService(tmp_path/'cache.sqlite',
             atlas_path=tmp_path/'missing.gpkg', runtime_factory=DailyRuntime)
         app.register_blueprint(kpi_data, url_prefix='/kpi')
@@ -76,7 +76,10 @@ def test_full_inclusive_range_and_overlapping_overnight_sessions(client):
     assert data['summary']['session_count'] == 3
     assert sum(data['arrival_dist_wd']) == 3
     assert data['summary']['mean_duration_hours'] == pytest.approx((1+1+51)/3)
-    assert data['summary']['energy_kwh'] == pytest.approx(2+4.5+1.5+26*19/51)
+    # Energy follows the same sessions as session_count: arrivals in the range,
+    # charged from their true arrival and cut at the end of the range. Session 1
+    # arrived the evening before, so its 2 kWh share belongs to that day.
+    assert data['summary']['energy_kwh'] == pytest.approx(4.5+1.5+26*19/51)
     assert data['summary']['point_count'] == 3  # includes unused point 3
     assert data['occupation_ratio_dist'][0] > 0
     assert len(data['weekday_availability']) == 48
@@ -176,3 +179,23 @@ def test_environmental_values_use_matching_hours_and_energy_weighted_intensity()
     assert result['renewable_energy_shared_avg'] == pytest.approx(75)
     assert result['co2_intensities_avg'][:2] == pytest.approx([100, 200])
     assert result['co2_intensities_avg'][2:] == [None]*22
+
+
+@pytest.mark.parametrize('source', ['simple','spatial','cpft'])
+def test_api_environment_reference_is_labelled_and_all_schedules_have_same_energy(client, source):
+    from backend.grid_data import GridHour, GridStore, resolve_hours
+    browser, _ = client
+    origin = datetime(2024,10,22,tzinfo=UTC)
+    observations = [GridHour(origin+timedelta(hours=i),100+10*i,50,False,False) for i in range(24)]
+    left, _ = day_window(date(2025,10,13),'Europe/Amsterdam')
+    _, right = day_window(date(2025,10,14),'Europe/Amsterdam')
+    store = GridStore(browser.application.config['GRID_DATA_CACHE'])
+    store.save(resolve_hours(observations,left,right))
+    response = request(browser,session_source=source)
+    assert response.status_code == 200
+    environment = response.get_json()['environment']
+    assert environment['uses_historical_reference'] is True
+    strategies = environment['strategies']
+    assert all(row['same_energy'] and row['status']=='historical_reference' for row in strategies.values())
+    assert strategies['mincarbon']['emissions_kg'] <= strategies['afap']['emissions_kg']+1e-8
+    assert all(row['matching_date_carbon_coverage_pct']==0 for row in strategies.values())

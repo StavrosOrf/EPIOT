@@ -1,0 +1,11 @@
+[Unit]
+Description=Prepare EPIOT free/local hourly grid data and historical references
+
+[Service]
+Type=oneshot
+User=epiot
+WorkingDirectory=/opt/epiot
+EnvironmentFile=-/etc/epiot/grid-data.env
+ExecStart=/opt/epiot/.venv/bin/python /opt/epiot/scripts/prepare_grid_data.py --backfill
+TimeoutStartSec=10min
+Nice=10

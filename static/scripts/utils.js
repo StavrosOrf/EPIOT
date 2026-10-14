@@ -110,6 +110,22 @@ function generateKPIsSheet(kpi_data_list) {
   wsData.push(["Start date (inclusive)", kpi_data_list.range?.start_date || ""]);
   wsData.push(["End date (inclusive)", kpi_data_list.range?.end_date || ""]);
   wsData.push(["Timezone", kpi_data_list.range?.timezone || ""]);
+  const environment = kpi_data_list.environment;
+  if (environment?.strategies) {
+    wsData.push(["Environmental method", environment.note]);
+    wsData.push(["Historical grid reference", environment.uses_historical_reference]);
+    wsData.push(["Reference observations start", environment.reference_source_start || ""]);
+    wsData.push(["Reference observations end", environment.reference_source_end || ""]);
+    wsData.push(["Strategy", "Energy (kWh)", "Covered emissions (kgCO2e)", "Mean intensity (gCO2e/kWh)",
+      "Renewable share (%)", "Carbon energy coverage (%)", "Renewable energy coverage (%)",
+      "Matching-date carbon coverage (%)", "Estimated carbon energy (%)", "Status", "Footprint difference vs AFAP (kgCO2e)"]);
+    for (const value of Object.values(environment.strategies)) {
+      wsData.push([value.label, value.energy_kwh, value.emissions_kg, value.average_intensity_g_per_kwh,
+        value.renewable_share_pct, value.carbon_energy_coverage_pct, value.renewable_energy_coverage_pct,
+        value.matching_date_carbon_coverage_pct, value.estimated_carbon_energy_pct, value.status,
+        value.footprint_difference_vs_afap_kg]);
+    }
+  }
 
   // Push each distribution array as a separate row
   wsData.push(["arrival_dist_wd", ...kpi_data_list.arrival_dist_wd]);

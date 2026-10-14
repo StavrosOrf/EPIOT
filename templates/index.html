@@ -23,6 +23,7 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/css/bootstrap.min.css"
     />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
@@ -41,6 +42,7 @@
 
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
@@ -264,8 +266,8 @@
             type="text"
             id="location-input"
             class="search__input"
-            placeholder="Search a place in Amsterdam…"
-            aria-label="Search a place"
+            placeholder="Search a city, street or address…"
+            aria-label="Search a city, street or address"
             role="combobox"
             aria-autocomplete="list"
             aria-expanded="false"
@@ -447,12 +449,12 @@
       hidden
     >
       <header class="panel__header">
-        <div class="panel__brand">
+        <a href="{{ url_for('index') }}" id="panel-logo" class="panel__brand logo" aria-label="EPIOT home">
           <span class="logo__mark" aria-hidden="true"
             ><i class="fa fa-bolt"></i
           ></span>
           <span class="logo__text">EPIOT</span>
-        </div>
+        </a>
         <span class="panel__divider" aria-hidden="true"></span>
         <div class="panel__title">
           <h2 id="panel-title">Analysis</h2>
@@ -467,39 +469,69 @@
           >
         </div>
 
-        <nav class="tabs" role="tablist" aria-label="Analysis views">
-          <button
-            id="load-tab"
-            class="tab active"
-            role="tab"
-            data-toggle="tooltip"
-            data-placement="bottom"
-            title="Power consumption of EVs over time."
-          >
-            Load profiles
-          </button>
-          <button
-            id="flex-tab"
-            class="tab"
-            role="tab"
-            data-toggle="tooltip"
-            data-placement="bottom"
-            title="Ability to shift the power consumption of EVs over time."
-          >
-            Flexibility
-          </button>
-          <button
-            id="stats-tab"
-            class="tab"
-            role="tab"
-            data-toggle="tooltip"
-            data-placement="bottom"
-            title="Key performance indicators for the selected areas and date range."
-          >
-            KPIs
-          </button>
-        </nav>
+        <div class="panel__nav">
+          <nav class="tabs" role="tablist" aria-label="Analysis views">
+            <button
+              id="load-tab"
+              class="tab active"
+              role="tab"
+              data-toggle="tooltip"
+              data-placement="bottom"
+              title="Power consumption of EVs over time."
+            >
+              Load profiles
+            </button>
+            <button
+              id="flex-tab"
+              class="tab"
+              role="tab"
+              data-toggle="tooltip"
+              data-placement="bottom"
+              title="Ability to shift the power consumption of EVs over time."
+            >
+              Flexibility
+            </button>
+            <button
+              id="stats-tab"
+              class="tab"
+              role="tab"
+              data-toggle="tooltip"
+              data-placement="bottom"
+              title="Key performance indicators for the selected areas and date range."
+            >
+              KPIs
+            </button>
+          </nav>
 
+          <div id="kpi-subnav" class="kpi-options" role="group" aria-label="KPI category" hidden>
+            <button type="button" class="kpi-option active" data-kpi="user_kpi" aria-pressed="true">
+              <i class="fa fa-user-o" aria-hidden="true"></i><span>User</span>
+            </button>
+            <button type="button" class="kpi-option" data-kpi="grid_kpi" aria-pressed="false">
+              <i class="fa fa-bolt" aria-hidden="true"></i><span>Grid</span>
+            </button>
+            <button type="button" class="kpi-option" data-kpi="environment_kpi" aria-pressed="false">
+              <i class="fa fa-leaf" aria-hidden="true"></i><span>Environment</span>
+            </button>
+            <button type="button" class="kpi-option" data-kpi="mobility_kpi" aria-pressed="false">
+              <i class="fa fa-car" aria-hidden="true"></i><span>Mobility</span>
+            </button>
+            <button type="button" class="kpi-option" data-kpi="city_kpi" aria-pressed="false">
+              <i class="fa fa-building-o" aria-hidden="true"></i><span>City</span>
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          id="open-landing-panel"
+          class="help-btn panel__help"
+          title="About EPIOT and how to use it"
+          onclick="window.EPIOT.openLanding()"
+        >
+          <i class="fa fa-question-circle-o" aria-hidden="true"></i>
+          <span>About</span>
+        </button>
         <button
           id="minimize-btn"
           class="icon-btn"
@@ -509,14 +541,6 @@
           <i class="fa fa-times" aria-hidden="true"></i>
         </button>
       </header>
-
-      <div id="kpi-subnav" class="subtabs" role="tablist" aria-label="KPI category" hidden>
-        <button class="subtab active" data-kpi="user_kpi">User</button>
-        <button class="subtab" data-kpi="grid_kpi">Grid</button>
-        <button class="subtab" data-kpi="environment_kpi">Environment</button>
-        <button class="subtab" data-kpi="mobility_kpi">Mobility</button>
-        <button class="subtab" data-kpi="city_kpi">City</button>
-      </div>
 
       <div class="panel__controls">
         <div class="field" id="session-source-field">
@@ -550,6 +574,7 @@
             <option value="afap">As Fast As Possible</option>
             <option value="alap">As Late As Possible</option>
             <option value="avg">Average Power</option>
+            <option value="mincarbon">Min. Carbon Footprint</option>
             <option value="ocost">Min. Charging Cost</option>
           </select>
         </div>
@@ -565,11 +590,6 @@
           />
         </div>
 
-        <div class="field">
-          <label for="cs-id-dropdown" class="field__label">Locate on map</label>
-          <select id="cs-id-dropdown" class="control"></select>
-        </div>
-
         <div class="field field--action">
           <button id="download-btn" class="btn btn-outline-app">
             <i class="fa fa-download" aria-hidden="true"></i>
@@ -580,6 +600,7 @@
 
       <p id="session-source-note" class="session-source-note" role="status">Synthetic scenarios with assumed demand, not verified local charging forecasts.</p>
       <div class="panel__body">
+        <section id="environment-summary" class="environment-summary" aria-label="Environmental scenario summary" hidden></section>
         <div id="graph"></div>
       </div>
     </section>

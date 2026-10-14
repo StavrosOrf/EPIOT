@@ -7,8 +7,9 @@ from zoneinfo import ZoneInfo
 import numpy as np
 
 from backend.cpft import day_window
-from backend.scenario_profiles import grid, simulate_scenarios
-from backend.scenario_sampling import UTC, point_power
+from backend.scenario_profiles import grid
+from backend.scenario_sampling import point_power
+from backend.kpi.environment import EnvironmentalComparison
 
 
 def days_between(start, end):
@@ -56,15 +57,9 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
     exposure = {kind: np.zeros(48) for kind in distributions}
     occupied_by_point = defaultdict(float)
     profiles_energy = dict(afap=0., alap=0., avg=0.)
-    carbon = {strategy: np.zeros(24) for strategy in profiles_energy}
-    carbon_energy = {strategy: np.zeros(24) for strategy in profiles_energy}
-    renewable, covered_energy = dict.fromkeys(profiles_energy, 0.), dict.fromkeys(profiles_energy, 0.)
-    # PowerMix imports store UTC timestamps without timezone information.
-    mix = {timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC):
-           (float(renewable_share), float(intensity)) for timestamp, renewable_share, intensity in power_mix
-           if renewable_share is not None and intensity is not None}
+    environmental = EnvironmentalComparison(power_mix, timezone_name)
     session_count, duration_total, session_energy_total = 0, 0., 0.
-    range_seconds, mix_steps, total_steps = 0., 0, 0
+    range_seconds = 0.
     daily_totals = []
     for day, records in daily_sessions:
         left, right = day_window(day, timezone_name)
@@ -111,21 +106,10 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
         sessions_by_weekday[day.weekday()].extend(day_counts.values())
         daily_totals.append(dict(date=str(day), session_count=sum(day_counts.values()), energy_kwh=sum(daily_energy.values())))
         range_seconds += (right-left).total_seconds()
-        matches = [mix.get(timestamp.replace(minute=0, second=0, microsecond=0)) for timestamp in timeline]
-        mix_steps += sum(value is not None for value in matches)
-        total_steps += len(timeline)
+        # Each day's arrivals up to midnight, so a range equals the sum of its days
+        day_scheduled_energy = environmental.add_day(chargers, records, left, right)
         for strategy in profiles_energy:
-            profile = np.asarray(simulate_scenarios(chargers, records, left, right, strategy)[0])/6
-            profiles_energy[strategy] += float(profile.sum())
-            for timestamp, energy, environmental in zip(timeline, profile, matches):
-                if environmental is None:
-                    continue
-                share, intensity = environmental
-                hour = timestamp.astimezone(zone).hour
-                carbon[strategy][hour] += intensity*energy
-                carbon_energy[strategy][hour] += energy
-                renewable[strategy] += share/100*energy
-                covered_energy[strategy] += energy
+            profiles_energy[strategy] += day_scheduled_energy[strategy]
     output = {}
     for kind, fields in distributions.items():
         for field, bins, upper, name in [("arrival", 24, 24, "arrival"), ("departure", 24, 24, "departure"),
@@ -140,11 +124,11 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
         output[f"sessions_per_day_{weekday}"] = histogram(sessions_by_weekday[weekday], 6, 6, True)
     ratios = [occupied_by_point[cp_id]/range_seconds if range_seconds else 0 for cp_id in ids]
     output["occupation_ratio_dist"] = histogram(ratios, 20, 1, True)
-    for strategy, label in [("afap", "uncontrolled"), ("alap", "delayed"), ("avg", "avg")]:
-        output[f"co2_intensities_{label}"] = [float(total/energy) if energy else None
-            for total, energy in zip(carbon[strategy], carbon_energy[strategy])]
-        output[f"renewable_energy_shared_{label}"] = (
-            100*renewable[strategy]/covered_energy[strategy] if covered_energy[strategy] else None)
+    environment = environmental.result()
+    for strategy, label in [("afap", "uncontrolled"), ("alap", "delayed"), ("avg", "avg"), ("mincarbon", "mincarbon")]:
+        metrics = environment["strategies"][strategy]
+        output[f"co2_intensities_{label}"] = metrics["intensity_by_hour"]
+        output[f"renewable_energy_shared_{label}"] = metrics["renewable_share_pct"]
     output["range"] = dict(start_date=str(start_date), end_date=str(end_date), inclusive=True,
                           day_count=(end_date-start_date).days+1, timezone=timezone_name, elapsed_hours=range_seconds/3600)
     output["summary"] = dict(point_count=points, session_count=session_count,
@@ -152,7 +136,5 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
         mean_duration_hours=duration_total/session_count if session_count else 0.,
         mean_occupancy_ratio=float(np.mean(ratios)) if ratios else 0., daily=daily_totals,
         scheduled_energy_kwh=profiles_energy)
-    output["environment"] = dict(covered_steps=mix_steps, total_steps=total_steps,
-        coverage_fraction=mix_steps/total_steps if total_steps else 0.,
-        note="Environmental KPIs use only hours with stored grid-mix data; missing hours are not filled.")
+    output["environment"] = environment
     return output

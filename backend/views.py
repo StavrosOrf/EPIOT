@@ -3,7 +3,9 @@ from flask import abort, jsonify, request
 import geojson as gj
 from shapely.geometry import shape
 from shapely.errors import GeometryTypeError
-from backend.models import ChargingPoint, Location, Operator, Session, GridConnection
+from backend.models import ChargingPoint, Column, Location, Operator, Session, GridConnection
+from backend.charger_sources import COUNTRY_NAMES, LEGACY_SOURCE, MANIFEST, REGIONS, SOURCES, load_manifest
+from backend.charger_import import cell_degrees, density_cells
 from backend.utils import stations_to_geojson
 import datetime
 
@@ -21,12 +23,14 @@ from backend.aggregators import (
 from flask import current_app, Blueprint
 from backend.session_sources import SessionSourceService, SOURCE_LABELS
 from backend.cpft_runtime import CPFTUnavailable
-from backend.scenario_profiles import grid, simulate_scenarios
+from backend.scenario_profiles import grid
 from backend.scenario_sampling import point_power
 from backend.cpft import day_window
 from backend.spatial_profiles import DEFAULT_ATLAS
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from backend.grid_data import app_grid_hours
+from backend.carbon_charging import CarbonScheduleUnavailable, daily_profiles
 
 
 station_data = Blueprint("station_data", "station_data")
@@ -43,15 +47,8 @@ def record(state):
         )
 
 
-@station_data.route("/within", methods=["POST"])
-def get_stations_within():
-    db = current_app.config["station_data.db"]
-    try:
-        data = gj.loads(request.data)
-        polygon = str(shape(data))
-    except (JSONDecodeError, KeyError, GeometryTypeError, TypeError):
-        abort(400, "Could not handle request, expected GeoJSON")
-    statement = (
+def station_columns():
+    return (
         select(
             ChargingPoint.id,
             ChargingPoint.power,
@@ -61,11 +58,31 @@ def get_stations_within():
             Location.longitude,
             Location.street,
             Location.supplement,
+            Column.source,
+            Location.postal_name,
+            Location.country,
         )
         .join(ChargingPoint.column)
         .join(Location)
         .join(Operator)
-        .filter(func.ST_Within(Location.geom, func.ST_GeomFromEWKT(polygon)))
+    )
+
+
+@station_data.route("/within", methods=["POST"])
+def get_stations_within():
+    db = current_app.config["station_data.db"]
+    try:
+        data = gj.loads(request.data)
+        geometry = shape(data)
+        polygon = str(geometry)
+    except (JSONDecodeError, KeyError, GeometryTypeError, TypeError, AttributeError):
+        abort(400, "Could not handle request, expected GeoJSON")
+    west, south, east, north = geometry.bounds
+    # The indexed bounding-box test narrows the rows before the exact polygon test
+    statement = station_columns().filter(
+        Location.latitude.between(south, north),
+        Location.longitude.between(west, east),
+        func.ST_Within(Location.geom, func.ST_GeomFromEWKT(polygon)),
     )
 
     query_result = db.session.execute(statement)
@@ -75,26 +92,61 @@ def get_stations_within():
 
 @station_data.route("/all", methods=["GET"])
 def get_all_stations():
+    """Every charging point, or one source's with ?source=pilot|ndw|bnetza|osm."""
     db = current_app.config["station_data.db"]
-    statement = (
-        select(
-            ChargingPoint.id,
-            ChargingPoint.power,
-            ChargingPoint.type,
-            Operator.name,
-            Location.latitude,
-            Location.longitude,
-            Location.street,
-            Location.supplement,
-        )
-        .join(ChargingPoint.column)
-        .join(Location)
-        .join(Operator)
-    )
-
+    statement = station_columns()
+    source = request.args.get("source")
+    if source == LEGACY_SOURCE:
+        statement = statement.filter(Column.source.is_(None))
+    elif source:
+        statement = statement.filter(Column.source == source)
     query_result = db.session.execute(statement)
 
     return jsonify(stations_to_geojson(query_result))
+
+
+@station_data.route("/coverage", methods=["GET"])
+def get_coverage():
+    """Searchable cities with charger counts, and the open-data sources behind them."""
+    manifest = load_manifest()
+    counts = manifest.get("regions", {})
+    imported = manifest.get("imports", {})
+    regions = [dict(id=region.id, name=region.name, country=region.country,
+                    country_name=COUNTRY_NAMES[region.country], lat=region.lat, lon=region.lon,
+                    zoom=region.zoom, bbox=region.bbox, **counts.get(region.id, dict(sites=None, points=None)))
+               for region in REGIONS]
+    sources = [dict(id=source.id, label=source.label, publisher=source.publisher, licence=source.licence,
+                    url=source.url, countries=source.countries, imported_at=imported.get(source.id, {}).get("imported_at"))
+               for source in SOURCES.values()]
+    return jsonify(regions=regions, sources=sources)
+
+
+# Overview zooms (below city level) get aggregated bubbles, never single points
+DENSITY_ZOOMS = range(3, 12)
+_density_cache = {}
+
+
+@station_data.route("/density", methods=["GET"])
+def get_density():
+    """Charging points aggregated on a zoom-dependent grid, inside an optional bbox=west,south,east,north."""
+    try:
+        zoom = int(request.args.get("zoom", ""))
+        bbox = [float(value) for value in request.args.get("bbox", "-180,-90,180,90").split(",")]
+        if zoom not in DENSITY_ZOOMS or len(bbox) != 4:
+            raise ValueError
+    except ValueError:
+        return jsonify(error=f"zoom must be {DENSITY_ZOOMS.start}-{DENSITY_ZOOMS.stop-1}, "
+                             "bbox west,south,east,north"), 400
+    # Cells for the whole dataset, computed once per zoom and import
+    version = MANIFEST.stat().st_mtime_ns if MANIFEST.exists() else 0
+    if _density_cache.get(zoom, (None,))[0] != version:
+        with current_app.config["station_data.db"].engine.connect() as connection:
+            _density_cache[zoom] = (version, density_cells(connection, zoom))
+    west, south, east, north = bbox
+    pad = cell_degrees(zoom)
+    cells = [cell for cell in _density_cache[zoom][1]
+             if south-pad <= cell[0] <= north+pad and west-pad <= cell[1] <= east+pad]
+    return jsonify(zoom=zoom, cell_degrees=pad, cells=cells)
 
 
 @station_data.route("/aggregate_load", methods=["GET", "POST"])
@@ -133,8 +185,10 @@ def get_aggregate_load():
     source = str(arguments.get("session_source", "database")).strip()
     if source not in {"database", *SOURCE_LABELS}:
         return jsonify(error="Unknown session source"), 400
-    if method not in {"afap", "alap", "avg", "ocost"}:
+    if method not in {"afap", "alap", "avg", "ocost", "mincarbon"}:
         return jsonify(error="Unknown charging strategy"), 400
+    if method == "mincarbon" and source == "database":
+        return jsonify(error="Select a simple, spatial or CPFT session source for minimum-carbon charging."), 400
     if source != "database" and arguments.get("demand_assumption", "base") not in {"low", "base", "high"}:
         return jsonify(error="Unknown demand assumption"), 400
 
@@ -191,10 +245,19 @@ def get_aggregate_load():
                         {int(charger["id"]): point_power(charger) for charger in charger_data}, rows,
                         start_date=str(target-datetime.timedelta(days=1)))
                 else:
-                    load_profile, up_flex, down_flex = simulate_scenarios(charger_data, sessions, start, end, method)
+                    hours = app_grid_hours(start, end, db.session,
+                        cache_path=current_app.config.get("GRID_DATA_CACHE", Path(current_app.instance_path)/"grid_data.sqlite"),
+                        allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name) if method == "mincarbon" else []
+                    load_profile, up_flex, down_flex = daily_profiles(charger_data, sessions, start, end, method, timezone_name, hours)
+                    metadata["energy_budget_note"] = "Each connection charges from its real arrival to its real departure; the window only crops the profile. Connections crossing the window edge can therefore put different energy inside the window under different strategies."
+                    if method == "mincarbon":
+                        metadata["grid_uses_historical_reference"] = any(hour.carbon_is_stale for hour in hours)
+                        metadata["scheduling_note"] = "Minimum-carbon scenario using historical/reference grid information; not demonstrated avoided emissions."
                 metadata["flexibility_note"] = "Indicative differences between charging schedules; not a firm flexibility commitment."
                 return jsonify(x=list(range(len(timestamps))), timestamps=[timestamp.isoformat() for timestamp in timestamps],
                     past_steps=past_steps, y=list(load_profile), up_flex=list(up_flex), down_flex=list(down_flex), source=metadata)
+            except CarbonScheduleUnavailable as exc:
+                return jsonify(error=str(exc)), 422
             except (ValueError, KeyError, TypeError) as exc:
                 return jsonify(error=str(exc)), 400
             except CPFTUnavailable as exc:

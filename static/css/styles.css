@@ -126,6 +126,224 @@ body.analysis-open #map {
   line-height: 1.5;
 }
 
+/* Charger clusters: brand-coloured badges sized by count; amber ring when the
+   cluster is a fast-charging hub (half or more of its points >= 50 kW) */
+.charger-cluster {
+  background: none;
+}
+
+.charger-cluster span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: 700 12px/1 var(--font);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: var(--brand);
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(31, 138, 76, 0.22), var(--shadow);
+  transition: transform 0.15s ease;
+}
+
+.charger-cluster:hover span {
+  transform: scale(1.08);
+}
+
+.charger-cluster--md span {
+  font-size: 13px;
+  background: var(--brand-600);
+}
+
+.charger-cluster--lg span {
+  font-size: 14px;
+  background: #0f4f2c;
+}
+
+.charger-cluster--xl span {
+  font-size: 15px;
+  background: #0b3a20;
+}
+
+.charger-cluster--fast span {
+  box-shadow: 0 0 0 4px rgba(229, 154, 11, 0.45), var(--shadow);
+}
+
+/* A charging site: the charger icon, with a count when it has several points.
+   No `position` here: Leaflet places markers with position:absolute, and
+   overriding it stacks every pin in normal flow, far from its location */
+.charger-site {
+  background: none;
+}
+
+.charger-site img {
+  width: 25px;
+  height: 25px;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.charger-site:hover img,
+.charger-site--open img {
+  transform: scale(1.12);
+  filter: drop-shadow(0 2px 4px rgba(16, 24, 20, 0.35));
+}
+
+.charger-site__count {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font: 700 11px/14px var(--font);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: #fff;
+  background: var(--brand);
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.charger-site--fast .charger-site__count {
+  background: var(--attention);
+}
+
+/* Charging points fanned out around their site. Leaflet positions the marker
+   with an inline transform, so the visuals live on the inner dot */
+.charger-port {
+  background: none;
+  cursor: pointer;
+}
+
+.charger-port__dot {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  color: #fff;
+  background: var(--brand);
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(16, 24, 20, 0.12), var(--shadow);
+  animation: port-in 0.18s ease-out;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.charger-port--fast .charger-port__dot {
+  background: var(--attention);
+}
+
+.charger-port:hover .charger-port__dot,
+.charger-port--active .charger-port__dot {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(31, 138, 76, 0.35), var(--shadow);
+}
+
+.charger-port--fast:hover .charger-port__dot,
+.charger-port--fast.charger-port--active .charger-port__dot {
+  box-shadow: 0 0 0 3px rgba(229, 154, 11, 0.45), var(--shadow);
+}
+
+@keyframes port-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+.charger-port-leg {
+  stroke: var(--brand-600);
+  stroke-width: 1.5;
+  stroke-opacity: 0.7;
+  stroke-dasharray: 3 3;
+  fill: none;
+}
+
+/* Charger popup card */
+.cp-popup-wrap .leaflet-popup-content {
+  margin: 14px 16px;
+  min-width: 200px;
+}
+
+.cp-popup__tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cp-popup__tag {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border-radius: 999px;
+}
+
+.cp-popup__tag--fast {
+  color: #8a5a00;
+  background: var(--attention-50);
+}
+
+.cp-popup__port {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.cp-popup__power {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.cp-popup__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.cp-popup__place {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cp-popup__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 10px 0 0;
+  padding-top: 10px;
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.cp-popup__facts dt {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.cp-popup__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.cp-popup__source {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* Hide the built-in Leaflet.draw toolbar; the custom toolbar drives it */
 .leaflet-draw.leaflet-control,
 .leaflet-draw-toolbar,
@@ -450,6 +668,15 @@ body.analysis-open #map {
 .search__option[aria-selected="true"] .search__option-icon {
   color: var(--brand-600);
   background: var(--surface);
+}
+
+/* Country code in place of an icon for city suggestions */
+.search__option-icon--badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--brand-600);
+  background: var(--brand-50);
 }
 
 .search__option-text {
@@ -904,14 +1131,15 @@ body.analysis-open .action-bar {
 }
 
 .panel__header,
-.subtabs,
 .panel__controls {
   flex: none;
 }
 
 .panel__header {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto 1px auto minmax(0, 1fr) auto 36px;
+  grid-template-rows: minmax(42px, auto);
+  grid-template-areas: "brand divider title nav about close";
   align-items: center;
   gap: 8px 14px;
   padding: 10px 12px 10px 16px;
@@ -920,6 +1148,7 @@ body.analysis-open .action-bar {
 }
 
 .panel__brand {
+  grid-area: brand;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -927,6 +1156,7 @@ body.analysis-open .action-bar {
 }
 
 .panel__divider {
+  grid-area: divider;
   flex: none;
   width: 1px;
   height: 24px;
@@ -934,6 +1164,7 @@ body.analysis-open .action-bar {
 }
 
 .panel__title {
+  grid-area: title;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -944,6 +1175,14 @@ body.analysis-open .action-bar {
   font-size: 17px;
   font-weight: 600;
   color: var(--text);
+}
+
+.panel__help {
+  grid-area: about;
+}
+
+#minimize-btn {
+  grid-area: close;
 }
 
 .info-dot {
@@ -958,11 +1197,24 @@ body.analysis-open .action-bar {
   color: var(--brand);
 }
 
+/* Tabs and, on the KPI tab, the category bar right of them. The tabs stay
+   put when the categories appear; the bar wraps below them if space runs out. */
+.panel__nav {
+  grid-area: nav;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+  padding-left: 12px;
+}
+
 /* Main tabs (segmented) */
 .tabs {
   display: flex;
+  align-items: center;
   gap: 4px;
-  margin-left: auto;
+  max-width: 100%;
   padding: 4px;
   background: var(--surface-2);
   border-radius: 999px;
@@ -1000,39 +1252,52 @@ body.analysis-open .action-bar {
   box-shadow: var(--shadow-sm);
 }
 
-/* KPI sub-tabs */
-.subtabs {
+/* KPI categories: a brand-tinted bar so they read as the KPI tab's own choices */
+.kpi-options {
+  position: relative;
   display: flex;
-  gap: 8px;
-  padding: 10px 20px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  scrollbar-width: thin;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  background: var(--brand-50);
+  border: 1px solid var(--brand-100);
+  border-radius: 999px;
 }
 
-.subtab {
-  flex: none;
-  height: 32px;
+.kpi-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
   padding: 0 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--brand-600);
+  background: transparent;
+  border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.subtab:hover {
-  color: var(--text);
-  border-color: var(--brand-100);
+.kpi-option .fa {
+  width: 14px;
+  font-size: 14px;
 }
 
-.subtab.active {
+.kpi-option:hover {
+  background: var(--surface);
+}
+
+.kpi-option.active {
   color: #fff;
   background: var(--brand);
-  border-color: var(--brand);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Controls row */
@@ -1052,6 +1317,111 @@ body.analysis-open .action-bar {
   font-size: 12px;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
+}
+
+.environment-summary {
+  display: grid;
+  gap: 12px;
+  padding: 16px 12px 4px;
+}
+
+.environment-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.environment-card > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+}
+
+.environment-card h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.environment-badge {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand-600);
+  background: var(--brand-50);
+  border-radius: 999px;
+}
+
+.environment-badge--reference {
+  color: #80590c;
+  background: var(--attention-50);
+}
+
+.environment-table-scroll {
+  overflow-x: auto;
+}
+
+.environment-card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.environment-card th,
+.environment-card td {
+  padding: 10px 14px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.environment-card th:first-child {
+  text-align: left;
+}
+
+.environment-card thead th {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.environment-card td small {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.environment-baseline {
+  background: #f8fbf9;
+}
+
+.environment-baseline-label {
+  margin-left: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.environment-context,
+.environment-warning {
+  margin: 0;
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.environment-warning {
+  color: #80590c;
+  background: var(--attention-50);
 }
 
 .field {
@@ -1366,6 +1736,36 @@ select.control {
 }
 
 @media (max-width: 900px) {
+  .panel__header {
+    grid-template-columns: auto minmax(0, 1fr) auto 36px;
+    grid-template-rows: 42px auto;
+    grid-template-areas:
+      "brand title about close"
+      "nav nav nav nav";
+  }
+
+  .panel__nav {
+    padding-left: 0;
+  }
+
+  .panel__divider {
+    display: none;
+  }
+
+  .tabs,
+  .kpi-options {
+    flex: 1 1 100%;
+  }
+
+  .kpi-option {
+    flex: 1 1 auto;
+  }
+
+  .tabs > .tab {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .panel__controls {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
@@ -1478,6 +1878,7 @@ select.control {
   }
 
   .panel__header {
+    grid-template-rows: 36px auto;
     gap: 8px 10px;
     padding: 8px 8px 8px 12px;
   }
@@ -1496,23 +1897,25 @@ select.control {
     flex: 1;
   }
 
-  #minimize-btn {
-    order: 2;
-  }
-
-  .tabs {
-    order: 3;
-    flex-basis: 100%;
-    margin-left: 0;
-  }
-
   .tab {
-    flex: 1 0 auto;
-    padding: 0 12px;
+    padding: 0 8px;
+    font-size: 13px;
   }
 
-  .subtabs {
-    padding: 8px 16px;
+  .kpi-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-radius: 16px;
+  }
+
+  .kpi-option {
+    min-width: 0;
+    padding: 0 6px;
+    font-size: 13px;
+  }
+
+  .kpi-option .fa {
+    display: none;
   }
 
   .panel__controls {

@@ -55,9 +55,8 @@ The analysis panel on the **Load profiles** tab.
 | 4 | **View** | *Chargers* aggregates the charging points inside each area; *Grid* aggregates the chargers behind the MV/LV transformers in each area. Load profiles only. |
 | 5 | **Charging strategy** | *As Fast As Possible*, *As Late As Possible*, *Average Power*, *Min. Charging Cost*. Hidden on the KPI tab. |
 | 6 | **Date** / **Date range** | A single day for load and flexibility; a range for KPIs. Selectable from 1 September 2025 up to today. |
-| 7 | **Locate on map** | Lists the charger (or transformer) IDs per area. Picking one closes the panel, zooms to the marker, opens its pop-up and highlights it. |
-| 8 | **Download report** | Exports the current results to `DRIVE2X_EPIOT_report.xlsx`. |
-| 9 | **Chart toolbar** | Plotly controls: save the chart as PNG (`epiot_chart.png`, 2× resolution), zoom, pan and reset axes. |
+| 7 | **Download report** | Exports the current results to `DRIVE2X_EPIOT_report.xlsx`. |
+| 8 | **Chart toolbar** | Plotly controls: save the chart as PNG (`epiot_chart.png`, 2× resolution), zoom, pan and reset axes. |
 
 Which controls appear depends on the active tab:
 
@@ -68,7 +67,6 @@ Which controls appear depends on the active tab:
 | Date (single day) | ✓ | ✓ | |
 | Date range | | | ✓ |
 | KPI sub-tabs | | | ✓ |
-| Locate on map | ✓ | ✓ | ✓ |
 | Download report | ✓ | ✓ | ✓ |
 
 Every change to a control re-runs the analysis for the active tab. While the backend computes, the
@@ -91,7 +89,6 @@ stateDiagram-v2
         KPIs --> LoadProfiles
     }
     Analysis --> Map: Close / Esc / click map
-    Analysis --> Map: Locate on map (pick an ID)
     Map --> Welcome: About
 ```
 

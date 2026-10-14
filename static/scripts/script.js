@@ -1,5 +1,5 @@
 // import { h3ToPolygon, generateHexGrid } from "./hexUtils.js";
-import { fetch_markers, calculateFlexibility } from "./loaders.js";
+import { fetch_markers, calculateFlexibility, fetchDensity, bubbleIcon, chargerSites, DETAIL_ZOOM } from "./loaders.js";
 import {
   createGraph,
   createFlexGraph,
@@ -13,6 +13,7 @@ import {
 import { animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
 import { get_KPIs } from "./data_fetch.js";
 import { pickerOptions } from "./date_selection.js";
+import { renderEnvironmentSummary } from "./environment_summary.js";
 import { initLocationSearch } from "./location_search.js";
 
 // Initialize Map using Leaflet.js
@@ -22,6 +23,15 @@ L.control.zoom({ position: "topright" }).addTo(map);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors",
 }).addTo(map);
+// Open-data licences ask for the charger sources to be credited on the map
+map.attributionControl.addAttribution(
+  'Chargers: <a href="https://docs.ndw.nu/en/faq/DOT-NL/" target="_blank" rel="noopener">NDW</a>, ' +
+  '<a href="https://www.bundesnetzagentur.de/DE/Fachthemen/ElektrizitaetundGas/E-Mobilitaet/start.html" target="_blank" rel="noopener">Bundesnetzagentur</a>, ' +
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a> (ODbL), ' +
+  '<a href="https://opendata.swiss/en/dataset/ladestationen" target="_blank" rel="noopener">BFE</a>, ' +
+  '<a href="https://www.data.gouv.fr/datasets/base-nationale-des-irve-data-gouv-infrastructures-de-recharge-pour-vehicules-electriques-donnees-statiques" target="_blank" rel="noopener">data.gouv.fr</a>, ' +
+  '<a href="https://www.digitraffic.fi/en/road-traffic/afir/" target="_blank" rel="noopener">Fintraffic</a> (CC BY 4.0)'
+);
 
 // Keep --header-h in sync with the app bar, which wraps on small screens, so
 // the floating controls and the analysis panel are positioned below it.
@@ -37,9 +47,67 @@ syncHeaderHeight();
 
 // restrict maximum zoom level to prevent too many hexagons
 map.setMaxZoom(16);
-map.setMinZoom(14);
+// Zoom 4 fits Europe; below DETAIL_ZOOM the map shows aggregated bubbles
+map.setMinZoom(4);
 
-const chargerLayer = L.layerGroup();
+// Draw each cluster on one of its own chargers, not at their average: the
+// average of two river banks or of coastal towns lies in the water between them
+const recalculateBounds = L.MarkerCluster.prototype._recalculateBounds;
+L.MarkerCluster.prototype._recalculateBounds = function () {
+  recalculateBounds.call(this);
+  const mean = this._wLatLng;
+  if (!mean) return;
+  const scale = Math.cos((mean.lat * Math.PI) / 180);
+  let best = null;
+  let bestDistance = Infinity;
+  // Child clusters are already placed on one of their chargers
+  for (const child of [...this._markers, ...this._childClusters]) {
+    const at = child._latlng;
+    const distance = (at.lat - mean.lat) ** 2 + ((at.lng - mean.lng) * scale) ** 2;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = at;
+    }
+  }
+  if (best) this._latlng = best;
+};
+
+// Charging sites are clustered: a city view can hold thousands of points.
+// At street level (16) every site stands alone; its points fan out on click
+// (charger_sites.js), so the cluster library's own spiderfy stays off.
+const chargerLayer = L.markerClusterGroup({
+  chunkedLoading: false,
+  showCoverageOnHover: false,
+  spiderfyOnMaxZoom: false,
+  disableClusteringAtZoom: 16,
+  maxClusterRadius: (zoom) => (zoom >= 14 ? 48 : 64),
+  iconCreateFunction(cluster) {
+    let count = 0;
+    let fast = 0;
+    for (const site of cluster.getAllChildMarkers()) {
+      count += site.options.points.length;
+      fast += site.options.points.filter((p) => Number(p.power) >= 50).length;
+    }
+    return bubbleIcon(count, fast / count);
+  },
+});
+// Server-side aggregates shown instead of chargerLayer below DETAIL_ZOOM.
+// Clustered too, so neighbouring bubbles merge instead of overlapping; a
+// merged bubble shows the summed charging points
+const densityLayer = L.markerClusterGroup({
+  showCoverageOnHover: false,
+  spiderfyOnMaxZoom: false,
+  maxClusterRadius: 56,
+  iconCreateFunction(cluster) {
+    let points = 0;
+    let fast = 0;
+    for (const m of cluster.getAllChildMarkers()) {
+      points += m.options.points;
+      fast += m.options.fast;
+    }
+    return bubbleIcon(points, fast / points);
+  },
+});
 var vizualizeChargers = true;
 
 // three colors for the drawn areas
@@ -111,6 +179,12 @@ function setActive(btn) {
   btn && btn.classList.add('active');
 }
 function enable(handler, btn) {
+  // Areas are analysed per charger, so drawing starts at city level
+  if (handler !== deleteHandler && map.getZoom() < DETAIL_ZOOM) {
+    clearActive();
+    showHint("Zoom in to city level, or pick a city in the search, to draw an area.", { timeout: 4000 });
+    return false;
+  }
   // Clicking the active tool again switches it off
   if (activeHandler === handler) {
     clearActive();
@@ -586,7 +660,29 @@ fetch_markers(
   vizualizeTransformers
 );
 
+// Single markers (and drawing) at city level, aggregate bubbles above it
+function syncDetailLayers() {
+  const detail = map.getZoom() >= DETAIL_ZOOM;
+  const show = (layer, visible) => (visible ? map.addLayer(layer) : map.removeLayer(layer));
+  show(chargerLayer, vizualizeChargers && detail);
+  show(densityLayer, vizualizeChargers && !detail);
+  show(transformerLayer, vizualizeTransformers && detail);
+}
+
+let wasDetail = map.getZoom() >= DETAIL_ZOOM;
+map.on("zoomend", function () {
+  syncDetailLayers();
+  const detail = map.getZoom() >= DETAIL_ZOOM;
+  if (wasDetail && !detail) {
+    showHint("Overview: bubbles count charging points. Zoom in to city level to see single chargers and draw areas.", { timeout: 4500 });
+  }
+  wasDetail = detail;
+});
+
+fetchDensity(map, densityLayer);
+
 map.on("load moveend", function () {
+  fetchDensity(map, densityLayer);
   fetch_markers(
     map,
     chargerLayer,
@@ -609,20 +705,6 @@ initLocationSearch(map, { onError: animateSelectMessage });
 ///////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
-
-// Initialize CS-ID Dropdown with Random IDs
-var groupDropdown = document.getElementById("cs-id-dropdown");
-// var randomCsIds = Array.from(
-//   { length: 5 },
-//   () => `CS-${Math.floor(Math.random() * 1000)}`
-// );
-
-// randomCsIds.forEach((id) => {
-//   var option = document.createElement("option");
-//   option.textContent = id;
-//   option.value = id;
-//   csDropdown.appendChild(option);
-// });
 
 // Initialize graph with default "Grid" tab
 // createGraph("Grid");
@@ -656,128 +738,6 @@ toggle.addEventListener("change", function () {
 //////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
-
-// Initialize the dropdown menu
-function initializeDropdown(comp_ids_list, groupNames) {
-  // clear the dropdown
-  groupDropdown.innerHTML = "";
-
-  comp_ids_list.forEach((group, index) => {
-    var optgroup = document.createElement("optgroup");
-
-    // Use provided group names or default to "Group X"
-    var groupName =
-      groupNames && groupNames[index]
-        ? groupNames[index]
-        : "Group " + (index + 1);
-    optgroup.label = groupName;
-
-    group.forEach((chargerId) => {
-      var option = document.createElement("option");
-      option.textContent = chargerId;
-      option.value = chargerId;
-      optgroup.appendChild(option);
-    });
-
-    groupDropdown.appendChild(optgroup);
-  });
-
-  // Placeholder shown until a specific ID is picked
-  const placeholder = new Option(
-    toggle.checked ? "Select a transformer…" : "Select a charger…",
-    "",
-    true,
-    true
-  );
-  placeholder.disabled = true;
-  groupDropdown.insertBefore(placeholder, groupDropdown.firstChild);
-}
-
-// Picking an ID closes the panel and shows that charger/transformer on the map
-groupDropdown.addEventListener("change", function () {
-  const layer = toggle.checked ? transformerLayer : chargerLayer;
-  const highlight = toggle.checked ? highlightTrMarker : highlightCSMarker;
-
-  closePanel();
-
-  layer.eachLayer((marker) => {
-    if (marker.options.id == this.value) {
-      map.setView(marker.getLatLng(), 16);
-      marker.openPopup();
-      highlight(marker);
-    }
-  });
-});
-
-// Function to highlight a marker
-var previousMarker = null;
-var defaultCSIcon = L.icon({
-  iconUrl: "/images/charger_icon.png",
-  iconSize: [25, 25],
-  iconAnchor: [12.5, 25],
-  popupAnchor: [1, -25],
-});
-
-var defaultTrIcon = L.icon({
-  iconUrl: "/images/transformer_icon.png",
-  iconSize: [25, 25],
-  iconAnchor: [12.5, 25],
-  popupAnchor: [1, -25],
-});
-
-var highlightedIcon = L.icon({
-  iconUrl: "https://maps.gstatic.com/intl/en_us/mapfiles/markers2/marker.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
-
-function highlightCSMarker(marker) {
-  // Reset previous marker icon
-  if (previousMarker && previousMarker !== marker) {
-    previousMarker.setIcon(defaultCSIcon);
-  }
-
-  // Set highlighted icon
-  marker.setIcon(highlightedIcon);
-
-  // Add event listener to reset icon when popup closes
-  marker.on("popupclose", onCSPopupClose);
-
-  // Update previous marker
-  previousMarker = marker;
-}
-
-function highlightTrMarker(marker) {
-  // Reset previous marker icon
-  if (previousMarker && previousMarker !== marker) {
-    previousMarker.setIcon(defaultTrIcon);
-  }
-
-  // Set highlighted icon
-  marker.setIcon(highlightedIcon);
-
-  // Add event listener to reset icon when popup closes
-  marker.on("popupclose", onTrPopupClose);
-
-  // Update previous marker
-  previousMarker = marker;
-}
-
-// Event handler for popup close
-function onCSPopupClose(e) {
-  var marker = e.target;
-  marker.setIcon(defaultCSIcon);
-  // Remove this event listener to prevent multiple triggers
-  marker.off("popupclose", onCSPopupClose);
-}
-
-function onTrPopupClose(e) {
-  var marker = e.target;
-  marker.setIcon(defaultTrIcon);
-  // Remove this event listener to prevent multiple triggers
-  marker.off("popupclose", onTrPopupClose);
-}
 
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
@@ -999,7 +959,8 @@ function calculateLoadProfiles() {
               }
               const metadata = load_profiles[0]?.data?.source;
               document.getElementById("session-source-note").textContent = metadata
-                ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.`
+                ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.` +
+                  (metadata.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : "")
                 : "No charging points in this selection.";
 
               if (active_tab == "Load Profiles") {
@@ -1016,13 +977,6 @@ function calculateLoadProfiles() {
               console.log("Selected charger ids:", charger_ids_list);
               console.log("Selected transformer ids:", transformer_ids_list);
               console.log("Selected area names:", selected_area_names);
-
-              // update the dropdown with the charger ids
-              if (toggle.checked) {
-                initializeDropdown(transformer_ids_list, selected_area_names);
-              } else {
-                initializeDropdown(charger_ids_list, selected_area_names);
-              }
             })
             .catch((error) => {
               console.error("Error in Promise.all:", error);
@@ -1142,22 +1096,20 @@ function toggleChargerLayer() {
   const chargerCheckbox = document.getElementById("charger-checkbox");
   if (chargerCheckbox.checked) {
     vizualizeChargers = true;
-    map.addLayer(chargerLayer); // Show chargers
   } else {
     vizualizeChargers = false;
-    map.removeLayer(chargerLayer); // Hide chargers
   }
+  syncDetailLayers();
 }
 
 function toggleTransformerLayer() {
   const transformerCheckbox = document.getElementById("transformer-checkbox");
   if (transformerCheckbox.checked) {
     vizualizeTransformers = true;
-    map.addLayer(transformerLayer); // Show transformers
   } else {
     vizualizeTransformers = false;
-    map.removeLayer(transformerLayer); // Hide transformers
   }
+  syncDetailLayers();
 }
 
 // Add event listeners to checkboxes
@@ -1170,7 +1122,7 @@ transformerCheckbox.addEventListener("change", toggleTransformerLayer); // Attac
 // flexibilityCheckbox.addEventListener("change", toggleFlexHeatmapLayer); // Attach event listener
 
 // ---------------------------------------------------------------------------
-// Tabs: Load profiles / Flexibility / KPIs (with KPI sub-tabs)
+// Tabs: Load profiles / Flexibility / KPIs (with KPI category buttons)
 // ---------------------------------------------------------------------------
 
 const kpiSubnav = document.getElementById("kpi-subnav");
@@ -1237,31 +1189,36 @@ const kpiRenderers = {
 };
 
 function renderActiveKpi() {
+  const environmentalSummary = document.getElementById("environment-summary");
+  if (active_kpi === "environment_kpi") renderEnvironmentSummary(kpi_data_list, environmentalSummary);
+  else if (environmentalSummary) environmentalSummary.hidden = true;
   if (!kpi_data_list.length) {
     showGraphMessage("Select an area for KPIs", "Draw an area containing charging points.");
     return;
   }
-  if (active_kpi === "environment_kpi" && kpi_data_list.every(group => !group.kpi.environment.covered_steps)) {
+  if (active_kpi === "environment_kpi" && kpi_data_list.every(group => !group.kpi.environment.covered_steps &&
+      !Object.values(group.kpi.environment.strategies || {}).some(value => value.renewable_energy_coverage_pct > 0))) {
     showGraphMessage("Environmental data are unavailable for this range", "Choose dates with stored grid-mix data. Other KPIs use the selected session source.");
     return;
   }
   kpiRenderers[active_kpi](kpi_data_list);
   if (active_kpi === "environment_kpi") {
     const metadata = kpi_data_list[0].source;
-    document.getElementById("session-source-note").textContent = `${metadata.label}. ${metadata.note} Environmental values use the available grid-mix hours in this range.`;
+    const usesReference = kpi_data_list.some(group => group.kpi.environment.uses_historical_reference);
+    document.getElementById("session-source-note").textContent = `${metadata.label}. ${metadata.note} ${usesReference ? "Environmental estimates use a historical grid reference." : "Environmental estimates use matching-date grid data where available."}`;
   }
 }
 
-kpiSubnav.querySelectorAll(".subtab").forEach((button) => {
+kpiSubnav.querySelectorAll(".kpi-option").forEach(button => {
   button.addEventListener("click", () => {
     active_kpi = button.dataset.kpi;
-    kpiSubnav
-      .querySelectorAll(".subtab")
-      .forEach((b) => b.classList.toggle("active", b === button));
-    // KPI data is already loaded for the selected range; only redraw
-    if (kpi_data_list && kpi_data_list.length) {
-      renderActiveKpi();
-    }
+    kpiSubnav.querySelectorAll(".kpi-option").forEach(option => {
+      const selected = option === button;
+      option.classList.toggle("active", selected);
+      option.setAttribute("aria-pressed", String(selected));
+    });
+    // KPI data is already loaded for the selected source and range; only redraw.
+    if (kpi_data_list && kpi_data_list.length) renderActiveKpi();
   });
 });
 
@@ -1289,6 +1246,11 @@ document.addEventListener("keydown", function (event) {
 let loadingTimer = null;
 
 function clear_graph() {
+  const summary = document.getElementById("environment-summary");
+  if (summary) {
+    summary.hidden = true;
+    summary.innerHTML = "";
+  }
   const container = document.getElementById("graph");
 
   // Replace the container's content with the loading animation

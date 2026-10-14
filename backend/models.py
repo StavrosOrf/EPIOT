@@ -18,6 +18,9 @@ class Column(Model):
     comissioning_date: Mapped[str] = mapped_column(DateTime, nullable=True)
     net_capacity: Mapped[float] = mapped_column(Float, nullable=True)
     elaadnl_id: Mapped[str] = mapped_column(String, nullable=True)
+    # Open-data source and its ID; both empty for the Amsterdam pilot chargers
+    source: Mapped[str] = mapped_column(String, nullable=True)
+    external_id: Mapped[str] = mapped_column(String, nullable=True)
 
     charging_points: Mapped[List["ChargingPoint"]] = relationship(
         back_populates="column", cascade="all, delete-orphan"
@@ -32,6 +35,8 @@ class ChargingPoint(Model):
     column_id: Mapped[int] = mapped_column(ForeignKey("columns.id"))
     type: Mapped[str] = mapped_column(String, nullable=True)
     power: Mapped[float] = mapped_column(Float, nullable=True)
+    source: Mapped[str] = mapped_column(String, nullable=True)
+    external_id: Mapped[str] = mapped_column(String, nullable=True)
 
     column: Mapped["Column"] = relationship(back_populates="charging_points")
 
@@ -51,6 +56,8 @@ class Location(Model):
     geom: Mapped[Geometry] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326), nullable=True
     )
+    source: Mapped[str] = mapped_column(String, nullable=True)
+    external_id: Mapped[str] = mapped_column(String, nullable=True)
 
     columns: Mapped[List["Column"]] = relationship(
         back_populates="location", cascade="all, delete-orphan"

@@ -1573,6 +1573,18 @@ export function createEnvironmentKPIGraph(groupData) {
       d5,
       d6
     );
+    if (dataItem.kpi.co2_intensities_mincarbon) {
+      data.push({
+        x: timeSteps, y: dataItem.kpi.co2_intensities_mincarbon,
+        type: "scatter", mode: "lines", name: "Minimum Carbon",
+        line: {color: "#187040", shape: "hvh"},
+        xaxis: "x"+(2*index+1), yaxis: "y"+(2*index+1), showlegend: index===0,
+      }, {
+        x: ["Minimum Carbon"], y: [dataItem.kpi.renewable_energy_shared_mincarbon],
+        type: "bar", name: "Minimum Carbon", marker: {color: "#187040"},
+        xaxis: "x"+(2*index+2), yaxis: "y"+(2*index+2), showlegend: false,
+      });
+    }
 
 
     if (index == 0) {
@@ -1585,7 +1597,7 @@ export function createEnvironmentKPIGraph(groupData) {
     }
 
 
-    let label1 = "<b>Total Carbon Intensity</b>";
+    let label1 = "<b>Charging-weighted Carbon Intensity</b>";
     let label2 = "<b>Renewable Energy Share</b>";
 
 

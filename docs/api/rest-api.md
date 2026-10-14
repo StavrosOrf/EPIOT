@@ -22,6 +22,8 @@ the browser you can also script. All examples assume the development server at
 |---|---|---|
 | <span class="badge-endpoint badge-post">POST</span> | [`/stations/within`](#post-stationswithin) | Charging points inside a polygon |
 | <span class="badge-endpoint badge-get">GET</span> | [`/stations/all`](#get-stationsall) | All charging points |
+| <span class="badge-endpoint badge-get">GET</span> | [`/stations/density`](#get-stationsdensity) | Charging points aggregated on a grid, for overview zooms |
+| <span class="badge-endpoint badge-get">GET</span> | [`/stations/coverage`](#get-stationscoverage) | Searchable cities with charger counts, and the data sources |
 | <span class="badge-endpoint badge-get">GET</span> | [`/stations/aggregate_load`](#get-stationsaggregate_load) | Load and flexibility profile for a set of charging points |
 | <span class="badge-endpoint badge-post">POST</span> | [`/stations/charging-points-by-transformers`](#post-stationscharging-points-by-transformers) | Charging points connected to given transformers |
 | <span class="badge-endpoint badge-post">POST</span> | [`/features/transformers/within`](#post-featurestransformerswithin) | Transformers inside a polygon |
@@ -99,7 +101,10 @@ const { features } = await res.json();
 | `operator` | string | Operator name |
 | `power` | float \| null | Rated power in kW |
 | `type` | string | `regular` or `fast` |
-| `area_code` | string \| null | CBS neighbourhood code (`buurtcode`) |
+| `area_code` | string \| null | CBS neighbourhood code (`buurtcode`); pilot chargers only |
+| `source` | string | `pilot`, `ndw`, `bnetza` or `osm` (see `docs/charger_sources.md`) |
+| `city` | string \| null | Town or city |
+| `country` | string \| null | Country name |
 
 **Errors**: `400` *Could not handle request, expected GeoJSON*.
 
@@ -107,10 +112,50 @@ const { features } = await res.json();
 
 ## GET /stations/all
 
-Returns every charging point in the database, in the same format as `/stations/within`.
+Returns every charging point in the database, in the same format as `/stations/within`. With the
+national datasets imported that is several hundred thousand points, so filter by `source` where you can.
 
 ```bash
-curl http://127.0.0.1:5000/stations/all
+curl http://127.0.0.1:5000/stations/all?source=pilot
+```
+
+---
+
+## GET /stations/density
+
+Charging points from all sources counted on a grid whose cells are about 64 screen pixels at the given
+zoom (90 / 2^zoom degrees). The map uses it below zoom 12, where single chargers would be too many.
+Cells are computed once per zoom and import, then filtered to the bounding box.
+
+| Query parameter | Required | Description |
+|---|---|---|
+| `zoom` | yes | 3 to 11 |
+| `bbox` | no | `west,south,east,north` in degrees; default the whole world |
+
+```bash
+curl "http://127.0.0.1:5000/stations/density?zoom=6&bbox=-10,35,25,60"
+```
+
+**Response** `200`: `{"zoom": 6, "cell_degrees": 1.40625, "cells": [[lat, lon, points, fast, sites], ...]}`.
+`lat`/`lon` is the mean position of the cell's chargers, and `fast` counts points of 50 kW or more.
+
+---
+
+## GET /stations/coverage
+
+The cities offered in location search, with the charging sites and points inside each city's bounding
+box, plus the open-data sources and when each was last imported. Counts are `null` until
+`scripts/update_charger_data.py` has run.
+
+```json
+{
+  "regions": [{ "id": "rotterdam", "name": "Rotterdam", "country": "NL", "country_name": "Netherlands",
+                "lat": 51.9225, "lon": 4.4792, "zoom": 13, "bbox": [51.832, 4.339, 52.013, 4.619],
+                "sites": 6845, "points": 17484 }],
+  "sources": [{ "id": "ndw", "label": "NDW DOT-NL", "publisher": "Nationaal Dataportaal Wegverkeer (NDW)",
+                "licence": "Open data, free of charge (NDW terms)", "url": "https://docs.ndw.nu/en/faq/DOT-NL/",
+                "countries": ["NL"], "imported_at": "2026-10-14T09:23:40+00:00" }]
+}
 ```
 
 ---

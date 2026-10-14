@@ -15,6 +15,8 @@ def stations_to_geojson(query_result):
                     "power": r[1],
                     "type": r[2],
                     "operator": r[3],
+                    # Untagged rows are the Amsterdam pilot chargers
+                    **({"source": r[8] or "pilot", "city": r[9], "country": r[10]} if len(r) > 10 else {}),
                 },
             }
             for i, r in enumerate(query_result)

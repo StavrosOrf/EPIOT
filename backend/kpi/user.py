@@ -10,10 +10,11 @@ from sqlalchemy import select
 from backend.cpft import day_window
 from backend.cpft_runtime import CPFTUnavailable
 from backend.kpi.statistics import calculate_kpis, days_between
-from backend.models import ChargingPoint, Location, Session, PowerMix
+from backend.models import ChargingPoint, Location, Session
 from backend.scenario_sampling import ScenarioSession, UTC
 from backend.session_sources import SessionSourceService, SOURCE_LABELS
 from backend.spatial_profiles import DEFAULT_ATLAS
+from backend.grid_data import app_grid_hours
 
 kpi_data = Blueprint("kpi", "kpi")
 
@@ -67,9 +68,9 @@ def get_user_kpi():
         chargers = [dict(id=row[0], power=row[1], type=row[2], latitude=row[3], longitude=row[4]) for row in rows]
         left, _ = day_window(start_date, timezone_name)
         _, right = day_window(end_date, timezone_name)
-        mix = db.session.execute(select(PowerMix.datetime, PowerMix.renewable_percentage, PowerMix.co2_intensity)
-            .where(PowerMix.country_zone == "NL", PowerMix.datetime >= left.replace(tzinfo=None),
-                   PowerMix.datetime < right.replace(tzinfo=None)).order_by(PowerMix.datetime)).all()
+        mix = app_grid_hours(left, right, db.session,
+            cache_path=current_app.config.get("GRID_DATA_CACHE", Path(current_app.instance_path)/"grid_data.sqlite"),
+            allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name)
         metadata = dict(source=source, label=SOURCE_LABELS.get(source, "Stored sessions"),
             synthetic=source != "database", assumption=assumption if source != "database" else None,
             seed=seed, point_count=len(chargers), cache_hits=0,

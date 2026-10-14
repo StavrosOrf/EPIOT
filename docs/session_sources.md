@@ -5,6 +5,9 @@ options are **Simple session sampler**, **Spatial session sampler**, and **CPFT
 tool — synthetic history**. Low/base/high demand are sensitivity assumptions,
 not confidence intervals. KPIs use the selected source over an inclusive local
 calendar-date range. No verified local charging data are assumed.
+All five KPI categories appear as a button bar in the panel header, right of the analysis tabs.
+The logo, About and close controls retain fixed positions when categories are
+shown, and the analysis logo links to the EPIOT home page.
 
 ## Sources
 
@@ -115,18 +118,21 @@ Each day reuses that source's cached target-day data; its previous-day history
 is not counted again. Overnight occupancy/energy is restricted to each actual
 local day, and full session durations are retained for arrival statistics.
 Zero-use selected points are included in availability and daily distributions.
-Environmental KPIs use stored UTC grid-mix hours only; missing coverage returns
-null values rather than fabricated zero carbon/renewable measurements.
+Environmental KPIs use matching-date grid hours where available and a clearly
+labelled historical hourly reference otherwise. Missing values stay null when
+no valid reference exists. They report energy coverage, fixed-energy strategy
+comparisons and a minimum-carbon schedule. See [environmental KPI details](environmental_kpis.md)
+for provenance, the free/local data pipeline and the daily background job.
 
 ## Verification
 
 ```bash
 uv run --extra cpft pytest -q
-node --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs
+node --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs
 ```
 
 On restricted Windows/OneDrive checkouts where Node cannot resolve parent-folder
-symlinks, use `node --preserve-symlinks --preserve-symlinks-main --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs`.
+symlinks, use `node --preserve-symlinks --preserve-symlinks-main --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs`.
 
 Tests cover geographic assignment, missing-data fallback, source isolation,
 save/fetch across repeated selections, model failure, session constraints,
