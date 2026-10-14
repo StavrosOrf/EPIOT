@@ -186,7 +186,7 @@ def test_density_cells_aggregate_points_per_zoom_grid(connection):
     feed = [ndw_site("rotterdam-a", 51.92, 4.48), ndw_site("rotterdam-b", 51.93, 4.47), ndw_site("utrecht", 52.09, 5.12)]
     import_source(connection, "ndw", parse_ndw(feed), with_geometry=False)
     # Zoom 4 cells are 5.6 degrees: every charger, pilot included, shares one cell
-    [(lat, lon, points, fast, sites)] = density_cells(connection, 4)
+    [(lat, lon, points, fast, sites, *country)] = density_cells(connection, 4)
     assert (points, fast, sites) == (4, 0, 4) and 51.9 < lat < 52.4
     # Zoom 11 cells are 0.04 degrees: Amsterdam, Rotterdam and Utrecht separate
     assert sorted(cell[2] for cell in density_cells(connection, 11)) == [1, 1, 2]

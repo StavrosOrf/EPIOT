@@ -1,6 +1,6 @@
 # Offline country snapshots
 
-These files initialize a fresh EPIOT server without the raw supplier files or a pre-existing database. Total compressed data: **26.93 MB** (about 98% smaller than the 1.22 GB raw data folder).
+These files initialize a fresh EPIOT server without the raw supplier files or a pre-existing database. Total compressed data: **27.12 MB** (about 98% smaller than the 1.22 GB raw data folder).
 
 | Country | File | MB | Charging points | Coverage |
 |---|---|---:|---:|---|
@@ -11,7 +11,7 @@ These files initialize a fresh EPIOT server without the raw supplier files or a 
 | GB | [GB.json.gz](GB.json.gz) | 0.074 | 3,426 | London and Manchester |
 | IT | [IT.json.gz](IT.json.gz) | 0.035 | 1,408 | Milan, Rome and Turin |
 | LI | [LI.json.gz](LI.json.gz) | 0.001 | 11 | Sites supplied by BFE |
-| NL | [NL.json.gz](NL.json.gz) | 18.175 | 185,163 | National + Amsterdam pilot/grid |
+| NL | [NL.json.gz](NL.json.gz) | 18.362 | 192,836 | National + Amsterdam pilot/grid |
 | PT | [PT.json.gz](PT.json.gz) | 0.052 | 3,038 | Lisbon and Porto |
 
 `shared.json.gz` (9.7 KB) holds the four session-prior CSVs, unreferenced legacy operator records, shared application tables and original download/import provenance. `manifest.json` records format version, byte sizes, SHA-256 checksums, table counts and source licences/attribution URLs.
@@ -48,7 +48,7 @@ Each country file stores the application fields for locations, operators, column
 
 NL also contains the full Amsterdam neighbourhood geometry and the census attributes used by the spatial sampler, plus available original grid observations with their provenance. Geometry is not simplified. The importer recreates the local atlas GeoPackage, the four session CSVs, charger coverage manifest, SpatiaLite point geometry and indexes.
 
-The bundle retains all 586,291 charging points, 318,163 stored Amsterdam sessions, 28,260 transformers and 717 grid links. Stored sessions elsewhere remain unavailable. Original supplier downloads, live statuses, scenario caches and derived hourly-reference caches are unnecessary for initialization; scenario and grid-reference caches regenerate locally on demand. This does not add national coverage for OSM city datasets or invent missing observations.
+The bundle retains all 593,964 charging points, 318,163 stored Amsterdam sessions, 28,260 transformers and 717 grid links. Stored sessions elsewhere remain unavailable. Original supplier downloads, live statuses, scenario caches and derived hourly-reference caches are unnecessary for initialization; scenario and grid-reference caches regenerate locally on demand. This does not add national coverage for OSM city datasets or invent missing observations.
 
 The Isle of Wight error is corrected in FR: the eight Carrefour BAB2 Anglet points use the verified address location `(43.486703, -1.501622)`, keeping their IDs. Evidence and future-import protection are in [the correction record](../backend/data/charger_position_overrides.json).
 

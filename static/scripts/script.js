@@ -11,13 +11,13 @@ import {
   showGraphMessage,
 } from "./plotter.js";
 import { animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
-import { get_KPIs } from "./data_fetch.js";
+import { get_KPIs, get_LoadProfiles, get_EnvironmentKPIs } from "./data_fetch.js";
 import { pickerOptions } from "./date_selection.js";
 import { renderEnvironmentSummary } from "./environment_summary.js";
 import { initLocationSearch } from "./location_search.js";
 
 // Initialize Map using Leaflet.js
-var map = L.map("map", { zoomControl: false }).setView([52.3676, 4.9041], 16); // Centered on Amsterdam
+var map = L.map("map", { zoomControl: false }).setView([52.3547, 4.9041], 12); // All of Amsterdam, at the lowest zoom that still shows chargers
 L.control.zoom({ position: "topright" }).addTo(map);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -76,7 +76,9 @@ L.MarkerCluster.prototype._recalculateBounds = function () {
 // At street level (16) every site stands alone; its points fan out on click
 // (charger_sites.js), so the cluster library's own spiderfy stays off.
 const chargerLayer = L.markerClusterGroup({
-  chunkedLoading: false,
+  chunkedLoading: true,
+  chunkInterval: 80,
+  chunkDelay: 4,
   showCoverageOnHover: false,
   spiderfyOnMaxZoom: false,
   disableClusteringAtZoom: 16,
@@ -123,7 +125,6 @@ var vizualizeFlexHeatmap = false;
 
 let charger_ids_list = [];
 let transformer_ids_list = [];
-let connected_charger_ids_list = [];
 let load_profile_data = [];
 let kpi_data_list = [];
 
@@ -743,248 +744,44 @@ toggle.addEventListener("change", function () {
 ////////////////////////////////////////////////////////////
 
 let profileRequestVersion = 0;
-function calculateLoadProfiles() {
+async function calculateLoadProfiles() {
   const requestVersion = ++profileRequestVersion;
-  const sessionSource = document.getElementById("session-source").value;
-  const demandAssumption = document.getElementById("demand-assumption").value;
   const selectedDate = dateInput.value;
-  // allocate a list with selectedpolygons.length elements
-  charger_ids_list = Array(selected_polygons.length).fill(null);
-  transformer_ids_list = Array(selected_polygons.length).fill(null);
-  connected_charger_ids_list = Array(selected_polygons.length).fill(null);
-
-
-  console.log("=====================================");
-
-  // Collect all fetch promises
-  let fetchCSPromises = selected_polygons.map((selected_polygon, index) => {
-    const queryBody = selected_polygon.geometry;
-
-    return fetch("/stations/within", {
-      method: "POST",
-      body: JSON.stringify(queryBody),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        let charger_ids = data.features.map((feature) => feature.properties.id);
-        // Assign the charger_ids to the correct index in charger_ids_list
-        charger_ids_list[index] = charger_ids;
-      })
-      .catch((error) => {
-        console.error("Error fetching analysis data:", error);
-        animateSelectMessage("Could not fetch data. Please try again");
+  const gridView = toggle.checked && active_tab === "Load Profiles";
+  load_profile_data = [];
+  try {
+    const groups = await get_LoadProfiles(structuredClone(selected_polygons), selected_area_names.slice(),
+      selectedDate, {
+        sessionSource: document.getElementById("session-source").value,
+        demandAssumption: document.getElementById("demand-assumption").value,
+        strategy: document.getElementById("strategy").value, gridView,
       });
-  });
-
-  let fetchTransformersPromises = selected_polygons.map(
-    (selected_polygon, index) => {
-      const queryBody = selected_polygon.geometry;
-      queryBody.tr_type = "Middle";
-
-      return fetch("/features/transformers/within", {
-        method: "POST",
-        body: JSON.stringify(queryBody),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          let transformer_ids = data.features.map(
-            (feature) => feature.properties.id
-          );
-          transformer_ids_list[index] = transformer_ids;
-        })
-        .catch((error) => {
-          console.error("Error fetching analysis data:", error);
-          animateSelectMessage("Could not fetch data. Please try again");
-
-          return null;
-        });
-    }
-  );
-
-  // Wait for all fetches to complete
-  Promise.all(fetchCSPromises).then(() => {
-    Promise.all(fetchTransformersPromises).then(() => {
-
-      let fetchChargersByTransformersPromises = transformer_ids_list.map((transformer_ids_list, index) => {
-        if (toggle.checked && active_tab == "Load Profiles") {
-          console.log("Grid option selected!!!");
-        } else {
-          console.log("Charger option selected!!!");
-          return Promise.resolve(); // Skip fetching transformers if not needed
-        }
-        // If no transformers in this polygon, keep an empty list
-        console.log("Fetching chargers for transformers:", transformer_ids_list);
-
-        if (!Array.isArray(transformer_ids_list) || transformer_ids_list.length === 0) {
-          connected_charger_ids_list[index] = [];
-          console.log("No transformers found, skipping fetch.");
-          return Promise.resolve();
-        }
-
-        return fetch("/stations/charging-points-by-transformers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transformer_ids : transformer_ids_list }),
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-          })
-          .then((payload) => {
-            // Backend returns: { transformer_ids: [...], charging_point_ids: [...], count: N }
-            console.log("Chargers by transformers payload:", payload);
-            connected_charger_ids_list[index] = Array.isArray(payload.charging_point_ids)
-              ? payload.charging_point_ids
-              : [];
-          })
-          .catch((err) => {
-            console.log("Error fetching chargers-by-transformers:", err);
-            connected_charger_ids_list[index] = [];
-            // animateSelectMessage("Error fetching connected chargers. Please try again!");
-          });
-      });
-
-      // Use it like:
-      Promise.all(fetchChargersByTransformersPromises)
-        .then(() => {
-
-          if (toggle.checked && active_tab == "Load Profiles") {
-            console.log("Using connected chargers to transformers for analysis!!!!!\n\n");
-            // connected_charger_ids_list is now ready, aligned with selected_polygons
-            console.log("Connected chargers per polygon:", connected_charger_ids_list);
-            console.log("Selected charger ids:", charger_ids_list);
-            // #TODO check if toggle etc is checked and use the correct charger ids list
-            charger_ids_list = connected_charger_ids_list;
-            console.log("Selected charger ids (new):", charger_ids_list);
-            // ...continue your pipeline here
-          }
-
-          // get charging strategy from the dropdown
-          var chargingStrategy = document.getElementById("strategy").value;
-          console.log("Charging strategy:", chargingStrategy);
-
-          // Function to fetch aggregate load data for a single charger
-          function fetchAggregateLoadForCharger(chargerId, area_name) {
-            const query = {
-              selected_markers: chargerId, strategy: chargingStrategy,
-              date: selectedDate, session_source: sessionSource, demand_assumption: demandAssumption,
-            };
-            let url = "/stations/aggregate_load";
-
-            return fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(query),
-            })
-              .then(async (response) => {
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-                return data;
-              })
-              .then((data) => {
-                // #return the area_name too
-                data.area_name = area_name;
-                return data; // Resolved data for this specific charger
-              })
-              .catch((error) => {
-                console.error(
-                  `Error fetching data for charger ${chargerId}:`,
-                  error
-                );
-                return { error: error.message, area_name };
-              });
-          }
-
-          // Create promises for each chargerId and keep their order
-          let fetchPromises = charger_ids_list.map((chargerIds, index) => {
-            let chargerId = chargerIds;
-            let area_name = index;
-            return fetchAggregateLoadForCharger(chargerId, area_name)
-              .then((data) => {
-                console.log("Data for: ", data.area_name, data);
-                return { data };
-              })
-              .catch((error) => {
-                console.error(
-                  `Error fetching data for charger ID ${chargerId}:`,
-                  error
-                );
-                return { chargerId, data: null, error };
-              });
-          });
-
-          // Wait for all fetches to complete
-          Promise.all(fetchPromises)
-            .then((load_profiles) => {
-              if (requestVersion !== profileRequestVersion) return;
-              // load_profiles is an array of { chargerId, data }
-              console.log("Respones:", load_profiles);
-
-              load_profile_data = [];
-
-              const failed = load_profiles
-                .map((item, i) => (item.data && item.data.y ? null : selected_area_names[i]))
-                .filter((name) => name !== null);
-              if (failed.length) {
-                showGraphMessage(
-                  "Load profiles are not available for this selection",
-                  load_profiles.map((item) => item.data?.error).filter(Boolean).join(" ") ||
-                    `The prediction failed for ${failed.join(", ")}. Try another session source, date or charging strategy.`
-                );
-                return;
-              }
-
-              for (let i = 0; i < load_profiles.length; i++) {
-                // find area name from the selected_area_names
-                let area_name = selected_area_names[i];
-                const response = load_profiles[i].data;
-                const split = response.past_steps ?? 144;
-                let temp_data = {
-                  groupName: area_name,
-                  // get 144 values for the y-axis y data
-                  pastData: response.y.slice(0, split),
-                  futureData: response.y.slice(split),
-                  past_up_flex: response.up_flex.slice(0, split),
-                  past_down_flex: response.down_flex.slice(0, split),
-                  future_up_flex: response.up_flex.slice(split),
-                  future_down_flex: response.down_flex.slice(split),
-                  pastTimes: response.timestamps?.slice(0, split),
-                  futureTimes: response.timestamps?.slice(split),
-                  source: response.source,
-                  targetDate: selectedDate,
-                  number_of_chargers: charger_ids_list[i].length,
-                  number_of_transformers: transformer_ids_list[i].length,
-                };
-                load_profile_data.push(temp_data);
-              }
-              const metadata = load_profiles[0]?.data?.source;
-              document.getElementById("session-source-note").textContent = metadata
-                ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.` +
-                  (metadata.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : "")
-                : "No charging points in this selection.";
-
-              if (active_tab == "Load Profiles") {
-                if (toggle.checked) {
-                  createGraph(load_profile_data, false, dateInput.value);
-                } else {
-                  createGraph(load_profile_data, true, dateInput.value);
-                }
-              } else if (active_tab == "Flexibility") {
-                createFlexGraph(load_profile_data, false, dateInput.value);
-              }
-
-              console.log("Load profiles:", load_profile_data);
-              console.log("Selected charger ids:", charger_ids_list);
-              console.log("Selected transformer ids:", transformer_ids_list);
-              console.log("Selected area names:", selected_area_names);
-            })
-            .catch((error) => {
-              console.error("Error in Promise.all:", error);
-              showGraphMessage("Something went wrong while drawing the chart", String(error));
-            });
-        });
+    if (requestVersion !== profileRequestVersion) return;
+    charger_ids_list = groups.map(group => group.chargerIds);
+    transformer_ids_list = groups.map(group => group.transformerIds);
+    load_profile_data = groups.map(group => {
+      const response = group.response, split = response.past_steps ?? 144;
+      return {
+        groupName: group.groupName,
+        pastData: response.y.slice(0, split), futureData: response.y.slice(split),
+        past_up_flex: response.up_flex.slice(0, split), future_up_flex: response.up_flex.slice(split),
+        past_down_flex: response.down_flex.slice(0, split), future_down_flex: response.down_flex.slice(split),
+        pastTimes: response.timestamps?.slice(0, split), futureTimes: response.timestamps?.slice(split),
+        source: response.source, targetDate: selectedDate,
+        number_of_chargers: group.chargerIds.length, number_of_transformers: group.transformerIds.length,
+      };
     });
-  });
+    const metadata = groups[0]?.response.source;
+    document.getElementById("session-source-note").textContent = metadata
+      ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}.` +
+        (metadata.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : "")
+      : "No charging points in this selection.";
+    if (active_tab === "Load Profiles") createGraph(load_profile_data, !gridView, selectedDate);
+    else if (active_tab === "Flexibility") createFlexGraph(load_profile_data, false, selectedDate);
+  } catch (error) {
+    if (requestVersion !== profileRequestVersion) return;
+    showGraphMessage("Load profiles are not available for this selection", error.message);
+  }
 }
 
 // add event listener to the strategy-dropdown to recalculate the load profiles
@@ -1110,6 +907,8 @@ function toggleTransformerLayer() {
     vizualizeTransformers = false;
   }
   syncDetailLayers();
+  // Transformers load on demand, so switching them on fetches the current view
+  fetch_markers(map, chargerLayer, transformerLayer, vizualizeChargers, vizualizeTransformers);
 }
 
 // Add event listeners to checkboxes
@@ -1188,7 +987,27 @@ const kpiRenderers = {
   city_kpi: createCityKPIGraph,
 };
 
-function renderActiveKpi() {
+async function ensureEnvironmentKpis(groups) {
+  if (!groups.length || groups.every(group => group.kpi.environment)) return groups;
+  const result = await get_EnvironmentKPIs(groups);
+  if (kpi_data_list === groups) kpi_data_list = result;
+  return result;
+}
+
+async function renderActiveKpi() {
+  const requestVersion = profileRequestVersion;
+  if (active_kpi === "environment_kpi" && kpi_data_list.some(group => !group.kpi.environment)) {
+    clear_graph();
+    try {
+      await ensureEnvironmentKpis(kpi_data_list);
+    } catch (error) {
+      if (requestVersion === profileRequestVersion && active_tab === "KPIs" && active_kpi === "environment_kpi") {
+        showGraphMessage("Environmental KPIs are not available", error.message);
+      }
+      return;
+    }
+    if (requestVersion !== profileRequestVersion || active_tab !== "KPIs" || active_kpi !== "environment_kpi") return;
+  }
   const environmentalSummary = document.getElementById("environment-summary");
   if (active_kpi === "environment_kpi") renderEnvironmentSummary(kpi_data_list, environmentalSummary);
   else if (environmentalSummary) environmentalSummary.hidden = true;
@@ -1217,13 +1036,24 @@ kpiSubnav.querySelectorAll(".kpi-option").forEach(button => {
       option.classList.toggle("active", selected);
       option.setAttribute("aria-pressed", String(selected));
     });
-    // KPI data is already loaded for the selected source and range; only redraw.
+    // Basic categories redraw immediately; environment loads on first opening.
     if (kpi_data_list && kpi_data_list.length) renderActiveKpi();
   });
 });
 
-document.getElementById("download-btn").addEventListener("click", function () {
-  generateAndDownloadExcel(charger_ids_list, load_profile_data, kpi_data_list);
+document.getElementById("download-btn").addEventListener("click", async function () {
+  if (this.disabled) return;
+  this.disabled = true;
+  const ids = charger_ids_list, profiles = load_profile_data, groups = kpi_data_list;
+  try {
+    // A full KPI workbook includes the lazy environment section even if unopened.
+    const complete = await ensureEnvironmentKpis(groups);
+    generateAndDownloadExcel(ids, profiles, complete);
+  } catch (error) {
+    animateSelectMessage(error.message);
+  } finally {
+    this.disabled = false;
+  }
 });
 
 $(function () {

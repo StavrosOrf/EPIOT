@@ -38,5 +38,8 @@ def get_transformers_wtithin():
     if transformer_type:
         statement = statement.filter(Transformer.type == transformer_type)
     
+    if request.args.get("ids_only") == "1":
+        ids = db.session.execute(statement.with_only_columns(Transformer.id).order_by(Transformer.id)).scalars().all()
+        return jsonify(ids=ids)
     query_result = db.session.execute(statement)
     return jsonify(transformers_to_geojson(query_result))

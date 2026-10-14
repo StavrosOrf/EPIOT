@@ -37,6 +37,16 @@ the browser you can also script. All examples assume the development server at
 
 Returns the charging points whose location lies inside a polygon.
 
+Append `?ids_only=1` for the compact response `{"ids": [40405, 40406]}`
+instead of GeoJSON. The same option is supported by
+`POST /features/transformers/within`, including its `tr_type` filter.
+
+`GET /stations/analysis-version` returns opaque `infrastructure` and
+`analysis` revisions with `Cache-Control: no-store`. The first tracks the
+application database/import manifest; the second also tracks calculation code,
+scenario inputs/models, grid data and relevant configuration. The UI checks
+these before reusing cached selections or profiles.
+
 **Body**: a GeoJSON geometry (`Polygon` or `MultiPolygon`).
 
 ::::{tab-set}
@@ -125,7 +135,10 @@ curl http://127.0.0.1:5000/stations/all?source=pilot
 
 Charging points from all sources counted on a grid whose cells are about 64 screen pixels at the given
 zoom (90 / 2^zoom degrees). The map uses it below zoom 12, where single chargers would be too many.
-Cells are computed once per zoom and import, then filtered to the bounding box.
+One database snapshot of location totals is shared by all overview zooms. Cells are
+aggregated with vectorized reductions once per zoom, then filtered to the bounding
+box. Database, WAL, manifest or `ANALYSIS_DATA_REVISION` changes invalidate the
+app-local snapshot. Concurrent requests share the same build.
 
 | Query parameter | Required | Description |
 |---|---|---|
@@ -137,7 +150,9 @@ curl "http://127.0.0.1:5000/stations/density?zoom=6&bbox=-10,35,25,60"
 ```
 
 **Response** `200`: `{"zoom": 6, "cell_degrees": 1.40625, "cells": [[lat, lon, points, fast, sites], ...]}`.
-`lat`/`lon` is the mean position of the cell's chargers, and `fast` counts points of 50 kW or more.
+`lat`/`lon` is the real charger location nearest the cell's point-weighted mean,
+and `fast` counts points of 50 kW or more. Responses have an ETag and a private
+30-second HTTP cache lifetime. Non-finite or reversed bounding boxes return `400`.
 
 ---
 
@@ -275,6 +290,13 @@ Returns the transformers inside a polygon, optionally filtered by voltage level.
 ---
 
 ## GET /kpi/user
+
+Both GET and POST are supported. The optional `section` parameter is `all`
+(default, legacy combined response), `basic` (behavioural/occupancy KPIs only),
+or `environment` (environmental comparison and its chart fields only).
+Basic requests do not load grid data or run strategy simulations. Environmental
+requests do not recompute behavioural distributions. Excel export in the UI
+fetches any missing environmental section before writing the full workbook.
 
 Computes all KPI dashboards for a set of charging points over a date range.
 

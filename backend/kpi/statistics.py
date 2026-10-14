@@ -37,7 +37,25 @@ def union_seconds(intervals, left, right):
     return total
 
 
-def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name, power_mix=()):
+def environment_fields(environment):
+    output = {"environment": environment}
+    for strategy, label in [("afap", "uncontrolled"), ("alap", "delayed"), ("avg", "avg"), ("mincarbon", "mincarbon")]:
+        metrics = environment["strategies"][strategy]
+        output[f"co2_intensities_{label}"] = metrics["intensity_by_hour"]
+        output[f"renewable_energy_shared_{label}"] = metrics["renewable_share_pct"]
+    return output
+
+
+def calculate_environment_kpis(chargers, daily_sessions, timezone_name, power_mix):
+    """Environmental-only request: do not repeat behavioural/occupancy aggregation."""
+    comparison = EnvironmentalComparison(power_mix, timezone_name)
+    for day, records in daily_sessions:
+        left, right = day_window(day, timezone_name)
+        comparison.add_day(chargers, records, left, right)
+    return environment_fields(comparison.result())
+
+
+def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name, power_mix=(), *, include_environment=True):
     """Each daily input is the same target-day scenario used by load profiles.
 
     Daily windows are disjoint: never count a scenario's previous-day history as
@@ -57,7 +75,8 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
     exposure = {kind: np.zeros(48) for kind in distributions}
     occupied_by_point = defaultdict(float)
     profiles_energy = dict(afap=0., alap=0., avg=0.)
-    environmental = EnvironmentalComparison(power_mix, timezone_name)
+    environmental = EnvironmentalComparison(power_mix, timezone_name) if include_environment else None
+    basic_energy = 0.
     session_count, duration_total, session_energy_total = 0, 0., 0.
     range_seconds = 0.
     daily_totals = []
@@ -90,6 +109,8 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
                 session_count += 1
                 duration_total += seconds/3600
                 session_energy_total += energy
+                # Same arrival-cohort average-energy total, without scheduling strategies.
+                basic_energy += energy*max(0., min(relative_end, len(timeline)*600)-relative_start)/seconds
             if left <= record.end < right:
                 distributions[kind]["departure"].append(record.end.astimezone(zone).hour)
         # Local half-hour bins average actual elapsed time, including repeated
@@ -107,9 +128,10 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
         daily_totals.append(dict(date=str(day), session_count=sum(day_counts.values()), energy_kwh=sum(daily_energy.values())))
         range_seconds += (right-left).total_seconds()
         # Each day's arrivals up to midnight, so a range equals the sum of its days
-        day_scheduled_energy = environmental.add_day(chargers, records, left, right)
-        for strategy in profiles_energy:
-            profiles_energy[strategy] += day_scheduled_energy[strategy]
+        if environmental is not None:
+            day_scheduled_energy = environmental.add_day(chargers, records, left, right)
+            for strategy in profiles_energy:
+                profiles_energy[strategy] += day_scheduled_energy[strategy]
     output = {}
     for kind, fields in distributions.items():
         for field, bins, upper, name in [("arrival", 24, 24, "arrival"), ("departure", 24, 24, "departure"),
@@ -124,17 +146,14 @@ def calculate_kpis(chargers, daily_sessions, start_date, end_date, timezone_name
         output[f"sessions_per_day_{weekday}"] = histogram(sessions_by_weekday[weekday], 6, 6, True)
     ratios = [occupied_by_point[cp_id]/range_seconds if range_seconds else 0 for cp_id in ids]
     output["occupation_ratio_dist"] = histogram(ratios, 20, 1, True)
-    environment = environmental.result()
-    for strategy, label in [("afap", "uncontrolled"), ("alap", "delayed"), ("avg", "avg"), ("mincarbon", "mincarbon")]:
-        metrics = environment["strategies"][strategy]
-        output[f"co2_intensities_{label}"] = metrics["intensity_by_hour"]
-        output[f"renewable_energy_shared_{label}"] = metrics["renewable_share_pct"]
+    if environmental is not None:
+        output.update(environment_fields(environmental.result()))
     output["range"] = dict(start_date=str(start_date), end_date=str(end_date), inclusive=True,
                           day_count=(end_date-start_date).days+1, timezone=timezone_name, elapsed_hours=range_seconds/3600)
     output["summary"] = dict(point_count=points, session_count=session_count,
-        session_energy_kwh=session_energy_total, energy_kwh=profiles_energy["avg"],
+        session_energy_kwh=session_energy_total, energy_kwh=profiles_energy["avg"] if include_environment else basic_energy,
         mean_duration_hours=duration_total/session_count if session_count else 0.,
-        mean_occupancy_ratio=float(np.mean(ratios)) if ratios else 0., daily=daily_totals,
-        scheduled_energy_kwh=profiles_energy)
-    output["environment"] = environment
+        mean_occupancy_ratio=float(np.mean(ratios)) if ratios else 0., daily=daily_totals)
+    if include_environment:
+        output["summary"]["scheduled_energy_kwh"] = profiles_energy
     return output

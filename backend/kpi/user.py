@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from backend.cpft import day_window
 from backend.cpft_runtime import CPFTUnavailable
-from backend.kpi.statistics import calculate_kpis, days_between
+from backend.kpi.statistics import calculate_kpis, calculate_environment_kpis, days_between
 from backend.models import ChargingPoint, Location, Session
 from backend.scenario_sampling import ScenarioSession, UTC
 from backend.session_sources import SessionSourceService, SOURCE_LABELS
@@ -36,6 +36,9 @@ def get_user_kpi():
     if arguments is None or not hasattr(arguments, "get"):
         return jsonify(error="Expected a JSON object"), 400
     try:
+        section = arguments.get("section", "all")
+        if section not in {"all", "basic", "environment"}:
+            raise ValueError("Unknown KPI section")
         timezone_name = current_app.config.get("SESSION_SCENARIO_TIMEZONE", "Europe/Amsterdam")
         zone = ZoneInfo(timezone_name)
         start_date = calendar_date(arguments.get("start_date"), zone)
@@ -70,7 +73,7 @@ def get_user_kpi():
         _, right = day_window(end_date, timezone_name)
         mix = app_grid_hours(left, right, db.session,
             cache_path=current_app.config.get("GRID_DATA_CACHE", Path(current_app.instance_path)/"grid_data.sqlite"),
-            allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name)
+            allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name) if section != "basic" else ()
         metadata = dict(source=source, label=SOURCE_LABELS.get(source, "Stored sessions"),
             synthetic=source != "database", assumption=assumption if source != "database" else None,
             seed=seed, point_count=len(chargers), cache_hits=0,
@@ -104,9 +107,14 @@ def get_user_kpi():
                     metadata["label"], metadata["note"] = daily_metadata["label"], daily_metadata["note"]
                     yield day, records
             daily = scenarios()
-        output = calculate_kpis(chargers, daily, start_date, end_date, timezone_name, mix)
-        metadata["point_days"] = len(chargers)*output["range"]["day_count"]
+        if section == "environment":
+            output = calculate_environment_kpis(chargers, daily, timezone_name, mix)
+        else:
+            output = calculate_kpis(chargers, daily, start_date, end_date, timezone_name, mix,
+                                    include_environment=section != "basic")
+        metadata["point_days"] = len(chargers)*((end_date-start_date).days+1)
         output["source"] = metadata
+        output["section"] = section
         return jsonify(output)
     except (ValueError, TypeError, KeyError) as exc:
         return jsonify(error=str(exc)), 400

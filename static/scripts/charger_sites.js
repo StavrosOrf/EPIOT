@@ -46,7 +46,6 @@ export function chargerPopupHtml(props, { index, total } = {}) {
       ${place ? `<div class="cp-popup__place">${escapeHtml(place)}</div>` : ""}
       <dl class="cp-popup__facts">
         <dt>Operator</dt><dd>${escapeHtml(props.operator || "Unknown")}</dd>
-        <dt>Point ID</dt><dd>${escapeHtml(props.id)}</dd>
       </dl>
       <div class="cp-popup__source">${escapeHtml(SOURCE_LABELS[props.source] || SOURCE_LABELS.pilot)}</div>
     </div>`;

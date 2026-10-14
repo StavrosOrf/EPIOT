@@ -37,7 +37,9 @@ def configure_spatialite() -> str:
         os.environ["PATH"] = f"{BUNDLE_DIR}{os.pathsep}{os.environ.get('PATH', '')}"
 
     configured = os.environ.get("SPATIALITE_LIBRARY_PATH")
-    if configured is not None:
+    # A stale value (e.g. a removed conda env) would break every connection;
+    # only a bare library name or an existing file is respected.
+    if configured is not None and (not os.path.isabs(configured) or os.path.exists(configured)):
         return configured
 
     try:

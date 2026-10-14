@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "created_at": "2026-10-14T12:03:45+00:00",
+  "created_at": "2026-10-14T13:30:56+00:00",
   "countries": {
     "CH": {
       "file": "CH.json.gz",
@@ -123,13 +123,13 @@
     },
     "NL": {
       "file": "NL.json.gz",
-      "bytes": 18175428,
-      "sha256": "90e0fe3566cbc5f44b8f5b200b7531baef401f0a423fe2c461cae7f8dd8cb3a7",
+      "bytes": 18361851,
+      "sha256": "45f0e5f1df9026ba17bf19c8756fef87d67fee6fae5c9e9c07dbcf7a2e431c08",
       "tables": {
-        "operators": 138,
-        "locations": 105319,
-        "columns": 77567,
-        "charging_points": 185163,
+        "operators": 141,
+        "locations": 107140,
+        "columns": 79388,
+        "charging_points": 192836,
         "transformers": 28260,
         "grid_connections": 717,
         "power_mixes": 72,
@@ -228,9 +228,9 @@
   ],
   "total_rows": {
     "operators": 12385,
-    "locations": 239676,
-    "columns": 254422,
-    "charging_points": 586291,
+    "locations": 241497,
+    "columns": 256243,
+    "charging_points": 593964,
     "transformers": 28260,
     "grid_connections": 717,
     "power_mixes": 72,
@@ -242,10 +242,10 @@
   },
   "shared": {
     "file": "shared.json.gz",
-    "bytes": 9678,
-    "sha256": "e848133d3ed6c776741a8e935de4fb57144e1b62e1653061a75b65d5bb9c4083",
+    "bytes": 9650,
+    "sha256": "1f75eccd5fc0bbefdd602fdc64aea960e3a07e7cdc77a672794813eabc21d4bd",
     "tables": {
-      "operators": 8,
+      "operators": 5,
       "gamma_distributions": 0,
       "forecast_runs": 0
     }

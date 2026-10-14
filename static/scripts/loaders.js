@@ -1,5 +1,7 @@
 import { createSiteLayer } from "./charger_sites.js";
+import { createDensityLoader } from "./map_density.js";
 
+let lastRequested = null; // the polygon of the most recent request, forgotten again if it fails
 let requestedPolygons = []; // Array to store previously requested polygons as GeoJSON Features
 
 
@@ -90,6 +92,7 @@ function getNewBoundsQueryBody(map) {
 
   // Add the new polygon to the list of requested polygons
   requestedPolygons.push(newPolygon);
+  lastRequested = newPolygon;
   return finalGeoJsonPolygon.geometry;
 }
 
@@ -116,45 +119,9 @@ export function bubbleIcon(count, fastShare = 0) {
   });
 }
 
-let densityController = null;
-
-// Overview bubbles for the current view; clicking one zooms towards it
-export async function fetchDensity(map, densityLayer) {
-  const zoom = map.getZoom();
-  if (zoom >= DETAIL_ZOOM) {
-    densityLayer.clearLayers();
-    return;
-  }
-  densityController?.abort();
-  densityController = new AbortController();
-  const b = map.getBounds();
-  const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(4)).join(",");
-  let data;
-  try {
-    const response = await fetch(`/stations/density?zoom=${zoom}&bbox=${bbox}`, { signal: densityController.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    data = await response.json();
-  } catch (error) {
-    if (error.name !== "AbortError") console.error("Error fetching charger overview:", error);
-    return;
-  }
-  if (map.getZoom() !== zoom) return; // the user zoomed on meanwhile
-  const markers = data.cells.map(([lat, lon, points, fast, sites]) => {
-    const marker = L.marker([lat, lon], {
-      icon: bubbleIcon(points, fast / points),
-      points,
-      fast,
-      title: `${points.toLocaleString("en-GB")} charging points at ${sites.toLocaleString("en-GB")} sites` +
-        (fast ? ` · ${fast.toLocaleString("en-GB")} fast` : ""),
-      riseOnHover: true,
-    });
-    marker.on("click", () => map.flyTo([lat, lon], Math.min(zoom + 3, DETAIL_ZOOM), { duration: 0.8 }));
-    return marker;
-  });
-  densityLayer.clearLayers();
-  if (densityLayer.addLayers) densityLayer.addLayers(markers);
-  else markers.forEach((marker) => densityLayer.addLayer(marker));
-}
+export const fetchDensity = createDensityLoader({
+  marker: (...args) => L.marker(...args), icon: bubbleIcon, detailZoom: DETAIL_ZOOM,
+});
 
 // One site controller per charger layer: groups points by location and fans
 // them out on click (see charger_sites.js)
@@ -177,69 +144,81 @@ async function fetchChargingStations(
   const sites = chargerSites(map, chargerLayer);
 
   // Fetch the charging stations using the backend API
-  await fetch("/stations/within", {
-    method: "POST",
-    body: JSON.stringify(queryBody),
-  })
-    .then((response) => response.json())
-    .then((data) => sites.add(data.features))
-    .catch((error) => console.error("Error fetching data:", error));
+  const requested = lastRequested;
+  try {
+    const response = await fetch("/stations/within", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(queryBody),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    sites.add((await response.json()).features);
+  } catch (error) {
+    // Forget the area so the next pan or zoom asks for it again
+    requestedPolygons = requestedPolygons.filter((polygon) => polygon !== requested);
+    console.error("Error fetching data:", error);
+  }
 
   // The user may have zoomed out to the overview while this was loading
   if (vizualizeChargers && map.getZoom() >= DETAIL_ZOOM) map.addLayer(chargerLayer);
   else map.removeLayer(chargerLayer);
 }
 
-// Function to fetch transformers from backend
-async function fetchTransformers(
-  map,
-  queryBody,
-  transformerLayer,
-  vizualizeTransformers
-) {
- 
+// Transformers are only fetched while their layer is switched on, and per
+// viewport: the Amsterdam view alone is several megabytes of them.
+const loadedTransformerBounds = [];
+const transformerIds = new Set();
+let transformerRequest = 0;
+
+async function fetchTransformers(map, transformerLayer, vizualizeTransformers) {
+  if (!vizualizeTransformers || map.getZoom() < DETAIL_ZOOM) return;
+  const view = map.getBounds();
+  if (loadedTransformerBounds.some((loaded) => loaded.contains(view))) return;
+  // Fetch a little beyond the view so small pans stay inside the loaded area
+  const bounds = view.pad(0.25);
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const request = ++transformerRequest;
+
   const transformerIcon = L.icon({
     iconUrl: transformerIconUrl,
-    iconSize: [25, 25], // Adjust as needed
+    iconSize: [25, 25],
     iconAnchor: [12, 25],
     popupAnchor: [1, -25],
   });
 
-  // Get the current map bounds
-  const bounds = map.getBounds();
-  const southWest = bounds.getSouthWest();
-  const northEast = bounds.getNorthEast();
-  queryBody.tr_type = "Middle";
-
-  // Fetch the transformer data using the backend API
-  await fetch("/features/transformers/within", {
-    method: "POST",
-    body: JSON.stringify(queryBody),
-  })
-    .then((response) => response.json())
-    .then((data) => {
-
-      // Add markers to the map for each transformer
-      data.features.forEach((element) => {
-        const props = element.properties;
-        const coords = element.geometry.coordinates;
-        const popupContent = `
-                  <strong>Transformer</strong><br>
-                  <strong>ID:</strong> ${props.id || "Unknown"}<br>
-                  <strong>Type:</strong> ${props.type || "Unknown"}<br>
-                `;
-
-        const marker = L.marker([coords[1], coords[0]], {
-          icon: transformerIcon,
-          markerType: "transformer",
-          id: props.id,
-        });
-        marker.bindPopup(popupContent);
-        transformerLayer.addLayer(marker);
+  try {
+    const response = await fetch("/features/transformers/within", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "Polygon",
+        coordinates: [[[sw.lng, sw.lat], [sw.lng, ne.lat], [ne.lng, ne.lat], [ne.lng, sw.lat], [sw.lng, sw.lat]]],
+        tr_type: "Middle",
+      }),
+    });
+    const data = await response.json();
+    const markers = [];
+    for (const element of data.features) {
+      const props = element.properties;
+      if (transformerIds.has(props.id)) continue;
+      transformerIds.add(props.id);
+      const coords = element.geometry.coordinates;
+      const marker = L.marker([coords[1], coords[0]], {
+        icon: transformerIcon,
+        markerType: "transformer",
+        id: props.id,
       });
-    })
-    .catch((error) => console.error("Error fetching transformer data:", error));
-
+      marker.bindPopup(`
+                  <strong>Transformer</strong><br>
+                  <strong>Type:</strong> ${props.type || "Unknown"}<br>
+                `);
+      markers.push(marker);
+    }
+    markers.forEach((marker) => transformerLayer.addLayer(marker));
+    if (request === transformerRequest) loadedTransformerBounds.push(bounds);
+  } catch (error) {
+    console.error("Error fetching transformer data:", error);
+  }
   if (vizualizeTransformers && map.getZoom() >= DETAIL_ZOOM) map.addLayer(transformerLayer);
   else map.removeLayer(transformerLayer);
 }
@@ -253,12 +232,12 @@ export async function fetch_markers(
 ) {
   // Overview zooms use fetchDensity; skip here so the area is not marked as loaded
   if (map.getZoom() < DETAIL_ZOOM) return;
+  fetchTransformers(map, transformerLayer, vizualizeTransformers);
   var queryBody = getNewBoundsQueryBody(map);
   if (!queryBody) {
     return;
   }
   fetchChargingStations(map, queryBody, chargerLayer, vizualizeChargers);
-  fetchTransformers(map, queryBody, transformerLayer, vizualizeTransformers);
 }
 
 

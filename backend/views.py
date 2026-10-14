@@ -1,11 +1,14 @@
 from json import JSONDecodeError
 from flask import abort, jsonify, request
 import geojson as gj
-from shapely.geometry import shape
+from shapely.geometry import box, shape
 from shapely.errors import GeometryTypeError
 from backend.models import ChargingPoint, Column, Location, Operator, Session, GridConnection
 from backend.charger_sources import COUNTRY_NAMES, LEGACY_SOURCE, MANIFEST, REGIONS, SOURCES, load_manifest
-from backend.charger_import import cell_degrees, density_cells
+from backend.charger_import import cell_degrees
+from backend.station_cache import StationCache
+from backend.map_density import DensityCache, density_version
+import math
 from backend.utils import stations_to_geojson
 import datetime
 
@@ -31,6 +34,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 from backend.grid_data import app_grid_hours
 from backend.carbon_charging import CarbonScheduleUnavailable, daily_profiles
+from backend.analysis_versions import analysis_versions
 
 
 station_data = Blueprint("station_data", "station_data")
@@ -82,12 +86,33 @@ def get_stations_within():
     statement = station_columns().filter(
         Location.latitude.between(south, north),
         Location.longitude.between(west, east),
-        func.ST_Within(Location.geom, func.ST_GeomFromEWKT(polygon)),
     )
+    # The bounding-box test is exact for a rectangle (the map viewport)
+    if geometry.geom_type != "Polygon" or not geometry.equals(box(west, south, east, north)):
+        statement = statement.filter(func.ST_Within(Location.geom, func.ST_GeomFromEWKT(polygon)))
+
+    if request.args.get("ids_only") == "1":
+        ids = db.session.execute(statement.with_only_columns(ChargingPoint.id).order_by(ChargingPoint.id)).scalars().all()
+        return jsonify(ids=ids)
+
+    if geometry.geom_type in ("Polygon", "MultiPolygon"):
+        cache = current_app.extensions.setdefault("station_cache", StationCache())
+        version = density_version(current_app, db.engine)
+        found = cache.features(db.session, station_columns(), Location, version, geometry)
+        if found is not None:
+            body = '{"type":"FeatureCollection","features":[' + ",".join(found) + "]}"
+            return current_app.response_class(body, mimetype="application/json")
 
     query_result = db.session.execute(statement)
 
     return jsonify(stations_to_geojson(query_result))
+
+
+@station_data.route("/analysis-version", methods=["GET"])
+def get_analysis_version():
+    response = jsonify(analysis_versions(current_app))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @station_data.route("/all", methods=["GET"])
@@ -123,7 +148,6 @@ def get_coverage():
 
 # Overview zooms (below city level) get aggregated bubbles, never single points
 DENSITY_ZOOMS = range(3, 12)
-_density_cache = {}
 
 
 @station_data.route("/density", methods=["GET"])
@@ -132,21 +156,23 @@ def get_density():
     try:
         zoom = int(request.args.get("zoom", ""))
         bbox = [float(value) for value in request.args.get("bbox", "-180,-90,180,90").split(",")]
-        if zoom not in DENSITY_ZOOMS or len(bbox) != 4:
+        if (zoom not in DENSITY_ZOOMS or len(bbox) != 4 or not all(math.isfinite(v) for v in bbox)
+                or bbox[0] > bbox[2] or bbox[1] > bbox[3]):
             raise ValueError
     except ValueError:
         return jsonify(error=f"zoom must be {DENSITY_ZOOMS.start}-{DENSITY_ZOOMS.stop-1}, "
                              "bbox west,south,east,north"), 400
-    # Cells for the whole dataset, computed once per zoom and import
-    version = MANIFEST.stat().st_mtime_ns if MANIFEST.exists() else 0
-    if _density_cache.get(zoom, (None,))[0] != version:
-        with current_app.config["station_data.db"].engine.connect() as connection:
-            _density_cache[zoom] = (version, density_cells(connection, zoom))
+    engine = current_app.config["station_data.db"].engine
+    version = density_version(current_app, engine)
+    cache = current_app.extensions.setdefault("map_density", DensityCache())
     west, south, east, north = bbox
     pad = cell_degrees(zoom)
-    cells = [cell for cell in _density_cache[zoom][1]
+    cells = [cell for cell in cache.get(engine, version, zoom)
              if south-pad <= cell[0] <= north+pad and west-pad <= cell[1] <= east+pad]
-    return jsonify(zoom=zoom, cell_degrees=pad, cells=cells)
+    response = jsonify(zoom=zoom, cell_degrees=pad, cells=cells)
+    response.set_etag(f"{version}-{zoom}-{'-'.join(map(str, bbox))}")
+    response.headers["Cache-Control"] = "private, max-age=30"
+    return response.make_conditional(request)
 
 
 @station_data.route("/aggregate_load", methods=["GET", "POST"])

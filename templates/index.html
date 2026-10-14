@@ -293,103 +293,6 @@
         ></div>
       </form>
 
-      <!-- Step 2: draw the areas to analyse -->
-      <div id="draw-toolbar-wrap" class="draw-tools draw-tools--prompt">
-        <div
-          id="draw-toolbar"
-          class="draw-toolbar"
-          role="toolbar"
-          aria-label="Area selection tools"
-        >
-          <span class="draw-toolbar__label" aria-hidden="true">
-            <i class="fa fa-pencil" aria-hidden="true"></i>
-            <span>Draw area</span>
-          </span>
-          <span
-            id="draw-count"
-            class="draw-toolbar__count"
-            title="Areas drawn (up to 3)"
-            >0/3</span
-          >
-          <button
-            id="btn-draw-polygon"
-            class="draw-btn"
-            title="Draw polygon"
-            aria-label="Draw polygon"
-          >
-            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-              <path
-                d="M6 9 L11 5 L20 9 L18 18 L7 19 Z"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linejoin="round"
-              />
-              <circle cx="6" cy="9" r="1.5" />
-              <circle cx="11" cy="5" r="1.5" />
-              <circle cx="20" cy="9" r="1.5" />
-              <circle cx="18" cy="18" r="1.5" />
-              <circle cx="7" cy="19" r="1.5" />
-            </svg>
-          </button>
-          <button
-            id="btn-draw-rectangle"
-            class="draw-btn"
-            title="Draw rectangle"
-            aria-label="Draw rectangle"
-          >
-            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-              <rect
-                x="4.5"
-                y="6.5"
-                width="15"
-                height="11"
-                rx="2"
-                ry="2"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-              <circle cx="4.5" cy="6.5" r="1.5" />
-              <circle cx="19.5" cy="6.5" r="1.5" />
-              <circle cx="19.5" cy="17.5" r="1.5" />
-              <circle cx="4.5" cy="17.5" r="1.5" />
-            </svg>
-          </button>
-          <span class="draw-toolbar__sep" aria-hidden="true"></span>
-          <button
-            id="btn-draw-delete"
-            class="draw-btn draw-btn--danger"
-            title="Delete shapes"
-            aria-label="Delete shapes"
-          >
-            <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
-              <path
-                d="M3 6h18M8 6V4h8v2M7 6l1 14h8l1-14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-              <path
-                d="M10 10v8M14 10v8"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-        <div
-          id="draw-hint"
-          class="draw-hint"
-          role="status"
-          aria-live="polite"
-          hidden
-        ></div>
-      </div>
-
       <!-- Forces the second row on narrow screens -->
       <span class="app-bar__break" aria-hidden="true"></span>
 
@@ -433,6 +336,105 @@
       <div id="select-message" class="action-bar__message" role="status" aria-live="polite">
         Draw an area for analysis
       </div>
+        <span class="action-bar__sep" aria-hidden="true"></span>
+        <!-- Step 2: draw the areas to analyse -->
+        <div id="draw-toolbar-wrap" class="draw-tools draw-tools--prompt">
+          <div
+            id="draw-toolbar"
+            class="draw-toolbar"
+            role="toolbar"
+            aria-label="Area selection tools"
+          >
+            <span class="draw-toolbar__label" aria-hidden="true">
+              <i class="fa fa-pencil" aria-hidden="true"></i>
+              <span>Draw area</span>
+            </span>
+            <span
+              id="draw-count"
+              class="draw-toolbar__count"
+              title="Areas drawn (up to 3)"
+              >0/3</span
+            >
+            <button
+              id="btn-draw-polygon"
+              class="draw-btn"
+              title="Draw polygon"
+              aria-label="Draw polygon"
+            >
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                <path
+                  d="M6 9 L11 5 L20 9 L18 18 L7 19 Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+                <circle cx="6" cy="9" r="1.5" />
+                <circle cx="11" cy="5" r="1.5" />
+                <circle cx="20" cy="9" r="1.5" />
+                <circle cx="18" cy="18" r="1.5" />
+                <circle cx="7" cy="19" r="1.5" />
+              </svg>
+            </button>
+            <button
+              id="btn-draw-rectangle"
+              class="draw-btn"
+              title="Draw rectangle"
+              aria-label="Draw rectangle"
+            >
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                <rect
+                  x="4.5"
+                  y="6.5"
+                  width="15"
+                  height="11"
+                  rx="2"
+                  ry="2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <circle cx="4.5" cy="6.5" r="1.5" />
+                <circle cx="19.5" cy="6.5" r="1.5" />
+                <circle cx="19.5" cy="17.5" r="1.5" />
+                <circle cx="4.5" cy="17.5" r="1.5" />
+              </svg>
+            </button>
+            <span class="draw-toolbar__sep" aria-hidden="true"></span>
+            <button
+              id="btn-draw-delete"
+              class="draw-btn draw-btn--danger"
+              title="Delete shapes"
+              aria-label="Delete shapes"
+            >
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true">
+                <path
+                  d="M3 6h18M8 6V4h8v2M7 6l1 14h8l1-14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M10 10v8M14 10v8"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div
+            id="draw-hint"
+            class="draw-hint"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+        </div>
+
+      <span class="action-bar__sep" aria-hidden="true"></span>
       <div id="header-buttons" class="action-bar__actions">
         <button id="calc-button" class="btn btn-primary-app">
           <i class="fa fa-line-chart" aria-hidden="true"></i>

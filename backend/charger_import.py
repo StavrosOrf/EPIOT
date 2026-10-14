@@ -13,7 +13,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 import math
 
-from backend.charger_sources import COUNTRY_NAMES, REGIONS, LEGACY_SOURCE, plausible
+from backend.charger_sources import COUNTRY_BOUNDS, COUNTRY_NAMES, REGIONS, LEGACY_SOURCE, plausible
 
 ID_BASE = {"ndw": 1_000_000_000_000, "bnetza": 2_000_000_000_000, "osm": 3_000_000_000_000,
            "bfe": 4_000_000_000_000, "irve": 5_000_000_000_000, "digitraffic": 6_000_000_000_000}
@@ -195,7 +195,54 @@ def cell_degrees(zoom):
     return 90/2**zoom
 
 
-def density_cells(connection, zoom):
+# At and below this zoom the overview groups per country instead of per grid cell
+COUNTRY_ZOOM = 6
+
+
+def density_locations(connection):
+    """Read the location totals once; all overview zooms share this snapshot."""
+    import numpy as np
+    has_country = any(row[1] == "country" for row in connection.exec_driver_sql("PRAGMA table_info(locations)"))
+    rows = connection.exec_driver_sql(
+        # Aggregate ports before joining locations. Each column then appears
+        # once, so counting sites needs no expensive COUNT(DISTINCT) temporary set.
+        "SELECT l.latitude, l.longitude, SUM(cp.points), SUM(cp.fast), COUNT(c.id), " + ("MAX(l.country) " if has_country else "NULL ") +
+        " "
+        "FROM (SELECT column_id, COUNT(*) points, SUM(COALESCE(power, 0) >= 50) fast "
+        "FROM charging_points GROUP BY column_id) cp "
+        "JOIN columns c ON c.id = cp.column_id JOIN locations l ON l.id = c.location_id "
+        "WHERE l.latitude IS NOT NULL AND l.longitude IS NOT NULL GROUP BY l.id").all()
+    # SQLAlchemy Row's sequence probing is expensive in np.asarray(rows).
+    # Column conversion also avoids a second full list of Python row tuples.
+    if not rows:
+        return np.empty((0, 6 if has_country else 5))
+    codes = {name: index for index, name in enumerate(COUNTRY_NAMES.values())}
+    # Untagged rows are the Amsterdam pilot. A name that is unknown (one legacy
+    # Amsterdam record says "United States") falls back to the coordinates.
+    codes_by_position = list(COUNTRY_NAMES)
+
+    def locate(row):
+        index = codes.get(row[5] or COUNTRY_NAMES["NL"])
+        if index is not None:
+            return index
+        for code in COUNTRY_BOUNDS:
+            if plausible(code, row[0], row[1]):
+                return codes_by_position.index(code)
+        return -1
+
+    countries = [locate(row) for row in rows]
+    columns = [np.asarray(column, dtype=float) for column in list(zip(*rows))[:5]]
+    if not has_country:
+        return np.column_stack(columns)
+    return np.column_stack([*columns, np.asarray(countries, dtype=float)])
+
+
+def country_code(index):
+    names = list(COUNTRY_NAMES)
+    return names[int(index)] if 0 <= index < len(names) else None
+
+
+def aggregate_density(rows, zoom):
     """Charging points per grid cell, all sources: [lat, lon, points, fast, sites].
 
     The bubble sits on the charging location nearest the cell's mean position.
@@ -204,24 +251,48 @@ def density_cells(connection, zoom):
     """
     import numpy as np
     size = cell_degrees(zoom)
-    rows = connection.exec_driver_sql(
-        # Unknown power is not fast; a bare SUM would be NULL where no power is known
-        "SELECT l.latitude, l.longitude, COUNT(cp.id), SUM(COALESCE(cp.power, 0) >= 50), COUNT(DISTINCT c.id) "
-        "FROM charging_points cp JOIN columns c ON c.id = cp.column_id JOIN locations l ON l.id = c.location_id "
-        "WHERE l.latitude IS NOT NULL AND l.longitude IS NOT NULL GROUP BY l.id").all()
-    if not rows:
+    if not len(rows):
         return []
-    lat, lon, points, fast, sites = (np.array(column, dtype=float) for column in zip(*rows))
+    lat, lon, points, fast, sites = rows[:, :5].T
     cell = (np.floor((lat+90)/size).astype(np.int64) << 32) + np.floor((lon+180)/size).astype(np.int64)
+    by_country = zoom <= COUNTRY_ZOOM and rows.shape[1] > 5
+    if by_country:
+        cell = rows[:, 5].astype(np.int64)
     order = np.argsort(cell, kind="stable")
-    cells, starts = np.unique(cell[order], return_index=True)
-    output = []
-    for begin, end in zip(starts, list(starts[1:])+[len(order)]):
-        members = order[begin:end]
-        weights = points[members]
-        mean_lat, mean_lon = np.average(lat[members], weights=weights), np.average(lon[members], weights=weights)
-        scale = math.cos(math.radians(mean_lat))
-        nearest = members[np.argmin((lat[members]-mean_lat)**2+((lon[members]-mean_lon)*scale)**2)]
-        output.append([round(float(lat[nearest]), 5), round(float(lon[nearest]), 5), int(weights.sum()),
-                       int(fast[members].sum()), int(sites[members].sum())])
-    return output
+    _, starts = np.unique(cell[order], return_index=True)
+    lengths = np.diff(np.append(starts, len(order)))
+    lat, lon, points, fast, sites = (values[order] for values in (lat, lon, points, fast, sites))
+    country = rows[order, 5] if by_country else None
+    # Segmented reductions replace one Python/NumPy loop per cell (tens of
+    # thousands of loops at city-overview zooms). Representatives still sit on
+    # real chargers, nearest the point-weighted mean, with stable tie breaking.
+    totals = np.add.reduceat(points, starts)
+    mean_lat = np.repeat(np.add.reduceat(lat * points, starts) / totals, lengths)
+    mean_lon = np.repeat(np.add.reduceat(lon * points, starts) / totals, lengths)
+    distances = (lat - mean_lat)**2 + ((lon - mean_lon) * np.cos(np.deg2rad(mean_lat)))**2
+    minima = np.repeat(np.minimum.reduceat(distances, starts), lengths)
+    nearest = np.minimum.reduceat(np.where(distances == minima, np.arange(len(order)), len(order)), starts)
+    # Preserve the old representative even for floating-point ties: segmented
+    # sums can round a midpoint differently from np.average. Only ambiguous
+    # multi-location cells need the original calculation.
+    ambiguous = np.flatnonzero(np.add.reduceat((distances - minima <= 1e-12).astype(int), starts) > 1)
+    for group in ambiguous:
+        begin, length = starts[group], lengths[group]
+        stop = begin + length
+        y, x, weights = lat[begin:stop], lon[begin:stop], points[begin:stop]
+        cy, cx = np.average(y, weights=weights), np.average(x, weights=weights)
+        nearest[group] = begin + np.argmin((y-cy)**2 + ((x-cx)*math.cos(math.radians(cy)))**2)
+    cells = [[round(float(lat[index]), 5), round(float(lon[index]), 5), int(count), int(rapid), int(locations)]
+             for index, count, rapid, locations in zip(nearest, totals, np.add.reduceat(fast, starts),
+                                                      np.add.reduceat(sites, starts))]
+    if by_country:  # the country code rides along for the bubble's label
+        for cell_, index in zip(cells, nearest):
+            code = country_code(country[index])
+            if code:
+                cell_.append(code)
+    return cells
+
+
+def density_cells(connection, zoom):
+    """Uncached convenience function for imports and command-line consumers."""
+    return aggregate_density(density_locations(connection), zoom)

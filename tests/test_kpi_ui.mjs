@@ -72,10 +72,10 @@ function requester(fetch) {
 test("KPI requests use JSON point IDs, local dates and the selected source", async () => {
   const calls = [];
   const getKpis = requester(async (url, request) => {
-    const body = JSON.parse(request.body);
+    const body = request.body ? JSON.parse(request.body) : undefined;
     calls.push({url, request, body});
     const data = url === "/kpi/user" ? { source: { label: "CPFT", source: body.session_source } }
-      : { features: [{ properties: { id: url.includes("stations") ? 17 : 25 } }] };
+      : url.endsWith("analysis-version") ? { infrastructure: "i1", analysis: "a1" } : { ids: [17] };
     return { ok: true, json: async () => data };
   });
   const polygon = { geometry: { type: "Polygon", coordinates: [] } };
@@ -84,9 +84,10 @@ test("KPI requests use JSON point IDs, local dates and the selected source", asy
   const request = calls.find(call => call.url === "/kpi/user");
   assert.equal(request.request.method, "POST");
   assert.deepEqual(request.body, { selected_markers: [17], start_date: "2025-10-13", end_date: "2025-10-14",
-    session_source: "cpft", demand_assumption: "high", seed: 8 });
+    session_source: "cpft", demand_assumption: "high", seed: 8, section: "basic" });
   assert.equal(result[0].source.source, "cpft");
-  assert.equal(result[0].number_of_transformers, 1);
+  assert.equal(result[0].number_of_transformers, 0);
+  assert.ok(!calls.some(call => call.url.includes("transformers")));
   assert.ok(!("tr_type" in polygon.geometry));
 });
 
@@ -95,7 +96,8 @@ test("an incomplete range makes no request and model errors remain visible", asy
   const getKpis = requester(async url => {
     calls++;
     return url === "/kpi/user" ? { ok: false, json: async () => ({ error: "CPFT checkpoint unavailable" }) }
-      : { ok: true, json: async () => ({ features: [] }) };
+      : { ok: true, json: async () => url.endsWith("analysis-version")
+        ? { infrastructure: "i1", analysis: "a1" } : { ids: [] } };
   });
   await assert.rejects(getKpis([], [], [new Date()], {}), /both dates/);
   assert.equal(calls, 0);

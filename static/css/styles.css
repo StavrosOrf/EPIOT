@@ -1003,8 +1003,9 @@ body.analysis-open .app-bar {
 /* Instructions drop down below the tools */
 .draw-hint {
   position: absolute;
-  top: calc(100% + 12px);
-  left: 0;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
   width: max-content;
   max-width: min(340px, calc(100vw - var(--gap) * 4));
   padding: 10px 12px;
@@ -1022,11 +1023,12 @@ body.analysis-open .app-bar {
 .draw-hint::before {
   content: "";
   position: absolute;
-  top: -6px;
-  left: 28px;
+  bottom: -6px;
+  left: 50%;
+  margin-left: -6px;
   border: 6px solid transparent;
-  border-top: 0;
-  border-bottom-color: rgba(20, 26, 23, 0.92);
+  border-bottom: 0;
+  border-top-color: rgba(20, 26, 23, 0.92);
 }
 
 .draw-hint--alert {
@@ -1036,8 +1038,8 @@ body.analysis-open .app-bar {
 }
 
 .draw-hint--alert::before {
-  top: -7px;
-  border-bottom-color: var(--attention);
+  bottom: -7px;
+  border-top-color: var(--attention);
 }
 
 .draw-hint strong {
@@ -1081,12 +1083,33 @@ body.analysis-open .app-bar {
 @keyframes message-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    translate: 0 4px;
   }
   to {
     opacity: 1;
-    transform: none;
+    translate: 0 0;
   }
+}
+
+.action-bar__sep {
+  flex: none;
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+}
+
+/* Draw tools sit in the same row as the status message and Analyse */
+.action-bar .draw-toolbar {
+  height: 44px;
+  padding: 4px 6px 4px 14px;
+  background: linear-gradient(180deg, #fff, var(--brand-50));
+  box-shadow: inset 0 0 0 1px var(--brand-100), 0 1px 2px rgba(20, 26, 23, 0.06);
+  border-color: transparent;
+}
+
+.action-bar .draw-btn {
+  width: 38px;
+  height: 36px;
 }
 
 .action-bar__actions {
@@ -1674,8 +1697,8 @@ select.control {
   left: 0;
   bottom: var(--safe-bottom);
   z-index: var(--z-map-ui);
-  padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.8);
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.85);
   border-top-right-radius: var(--radius-sm);
 }
 
@@ -1686,7 +1709,7 @@ select.control {
 }
 
 .custom-attribution img {
-  height: 18px;
+  height: 28px;
   width: auto;
 }
 
@@ -1728,10 +1751,6 @@ select.control {
     order: 5;
     flex: 1 1 220px;
     max-width: none;
-  }
-
-  .draw-tools {
-    order: 6;
   }
 }
 
@@ -1843,14 +1862,28 @@ select.control {
     transform: none;
     width: auto;
     max-width: none;
+    flex-wrap: wrap;
+    gap: 8px 10px;
     bottom: calc(30px + var(--safe-bottom));
     padding: 8px 8px 8px 16px;
     border-radius: var(--radius-lg);
   }
 
   .action-bar__message {
-    flex: 1;
+    flex: 1 1 100%;
     font-size: 13px;
+  }
+
+  .action-bar__sep {
+    display: none;
+  }
+
+  .action-bar .draw-tools {
+    flex: 1 1 auto;
+  }
+
+  .action-bar .draw-toolbar {
+    justify-content: space-between;
   }
 
   /* Analysis panel becomes a full-screen sheet */
@@ -1939,7 +1972,7 @@ select.control {
   }
 
   .custom-attribution img {
-    height: 14px;
+    height: 22px;
   }
 }
 

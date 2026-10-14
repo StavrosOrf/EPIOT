@@ -1,13 +1,16 @@
 # Map and layers
 
 The map is built with [Leaflet](https://leafletjs.com/) on OpenStreetMap tiles. It opens centred on
-Amsterdam (52.3676 N, 4.9041 E) and is limited to zoom levels **14 to 16**, the range in which
-individual charging points remain readable and the marker queries stay small.
+Amsterdam (52.3676 N, 4.9041 E) and supports zoom levels **4 to 16**. Below zoom 12,
+bubbles summarize charging points; zooming in reveals charging sites and their points.
+At zoom 6 and below the bubbles merge into one per country (with its name in the tooltip).
+Zoom 7 to 11 group by map grid cell.
 
 ## Charging points
 
-Every charger icon is one **charging point** (a connector) from the database. Several points on the
-same street pole share a location, so their icons overlap. Click an icon to open its pop-up:
+Every charger icon is one **site**. Its badge counts the charging points at that
+location. Click a multi-point site to spread out its points, then click a point
+to open its pop-up. A single-point site opens the pop-up directly:
 
 ```{figure} ../_static/screenshots/charger-popup.jpg
 :class: screenshot
@@ -58,6 +61,15 @@ analysis use the `Middle` level only:
 
 ## How markers are loaded
 
+At overview zooms, the backend reads charger totals once and shares that snapshot
+across zoom levels. A database update invalidates it. The browser remembers up to
+16 overview viewports for 30 seconds and retains unchanged bubbles when panning.
+Outdated requests are cancelled, and large marker additions yield between batches
+so the map remains responsive. Returning to a cached view avoids a network request.
+
+At city and street zooms, sites use Leaflet's chunked cluster loading to avoid one
+long insertion task.
+
 Markers are fetched lazily: when the map finishes moving, EPIOT asks the backend only for the part of
 the viewport that it has not requested before. The already-requested rectangles are subtracted from
 the new viewport with the Martinez polygon-clipping algorithm, so panning back over a known area
@@ -90,6 +102,6 @@ arrow button. EPIOT queries the
 zoom 15. If nothing matches, the status bar says *No results for "…"*.
 
 :::{note}
-The charging-point and transformer data currently cover **Amsterdam**. Searching elsewhere moves the
-map, but no markers will appear outside the data coverage.
+Charging-point coverage depends on the open-data sources imported into this installation.
+Transformer data covers Amsterdam; a location search can move beyond either dataset's coverage.
 :::

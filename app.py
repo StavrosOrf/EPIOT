@@ -4,7 +4,11 @@ This is the main file for the Flask server. It contains the endpoints for the da
 
 DEBUG = True
 
-from flask import Flask, render_template, jsonify, url_for, send_from_directory
+import gzip
+import os
+import threading
+
+from flask import Flask, render_template, jsonify, request, url_for, send_from_directory
 from flask_alembic import Alembic
 from flask_sqlalchemy_lite import SQLAlchemy
 
@@ -33,11 +37,42 @@ app = Flask(
     template_folder="templates",
 )
 app.config["SQLALCHEMY_ENGINES"] = {"default": "sqlite:///default.sqlite"}
+# Debug mode would pretty-print JSON, which triples the charger payloads
+app.json.compact = True
 app.config.from_prefixed_env()
 db.init_app(app)
 
 
 app.config["station_data.db"] = db
+
+
+def warm_start_view():
+    """Read the Amsterdam start view's tiles before the first visitor asks."""
+    from backend.map_density import density_version
+    from backend.models import Location
+    from backend.station_cache import StationCache
+    from backend.views import station_columns
+    try:
+        with app.app_context():
+            cache = app.extensions.setdefault("station_cache", StationCache())
+            version = density_version(app, db.engine)
+            cache.warm(db.session, station_columns(), Location, version, (4.5, 52.1, 5.3, 52.6))
+    except Exception as error:  # a cold cache is only slower
+        app.logger.warning("Could not warm the charger cache: %s", error)
+
+
+@app.after_request
+def compress_json(response):
+    """Gzip large JSON bodies (the charger and transformer lists run to megabytes)."""
+    if (response.mimetype == "application/json" and not response.direct_passthrough
+            and response.status_code == 200 and "Content-Encoding" not in response.headers
+            and "gzip" in request.headers.get("Accept-Encoding", "")):
+        body = response.get_data()
+        if len(body) > 4096:
+            response.set_data(gzip.compress(body, compresslevel=5))
+            response.headers["Content-Encoding"] = "gzip"
+            response.headers.add("Vary", "Accept-Encoding")
+    return response
 
 
 fp_config = Path("./backend/config.yaml")
@@ -108,6 +143,9 @@ def get_marker_icon():
         }
     )
 
+
+if __name__ == "__main__" and (not DEBUG or os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
+    threading.Thread(target=warm_start_view, daemon=True).start()
 
 if __name__ == "__main__":
 

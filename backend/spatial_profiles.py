@@ -60,7 +60,6 @@ class SpatialAtlas:
             self.frame = self.frame[self.frame.geometry.notna() & ~self.frame.geometry.is_empty].reset_index(drop=True)
 
     def resolve(self, charger):
-        from shapely.geometry import Point
         lat, lon = charger.get("latitude"), charger.get("longitude")
         try:
             lat, lon = float(lat), float(lon)
@@ -68,6 +67,12 @@ class SpatialAtlas:
             return {**profile_from_attributes(), "fallback_reason": "missing_coordinates"}
         if not (math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180):
             return {**profile_from_attributes(), "fallback_reason": "invalid_coordinates"}
+        return self._resolve_coordinates(lat, lon)
+
+    @lru_cache(maxsize=32768)
+    def _resolve_coordinates(self, lat, lon):
+        # A new atlas instance (file revision) or changed coordinates misses the cache.
+        from shapely.geometry import Point
         if self.frame is None:
             return {**profile_from_attributes(), "fallback_reason": "atlas_unavailable"}
         matches = self.frame.sindex.query(Point(lon, lat), predicate="intersects")

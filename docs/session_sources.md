@@ -118,6 +118,34 @@ Each day reuses that source's cached target-day data; its previous-day history
 is not counted again. Overnight occupancy/energy is restricted to each actual
 local day, and full session durations are retained for arrival statistics.
 Zero-use selected points are included in availability and daily distributions.
+
+### Fast retrieval
+
+Load Profiles and Flexibility share the same cached response for identical
+charger IDs, date, strategy, source, demand assumption and seed. Area membership
+is cached independently of date and strategy. Analysis requests use compact
+IDs-only spatial responses; transformer membership is resolved only for the
+grid view. A lightweight `GET /stations/analysis-version` checks freshness on
+each analysis action, so database/configuration/input-file changes invalidate
+affected results. Browser caches are page-local and bounded to 64 entries each;
+simultaneous identical requests share a promise, and failures are not retained.
+
+The UI requests `section=basic` from `POST /kpi/user` first. This returns User,
+Grid, Mobility and City statistics without reading grid-mix data or simulating
+charging strategies. Opening Environment requests `section=environment` using
+the captured charger IDs, dates and source. Its response is merged into those
+basic results. Excel export also waits for this section if it has not yet been
+opened. The default `section=all` retains the combined API response for existing
+clients. Basic summaries omit `scheduled_energy_kwh`; their average-energy
+total is calculated analytically with the same arrival-cohort/window convention.
+
+Scenario-cache reads use one SQLite connection per selected day, with queries
+of at most 900 keys. Geographic profiles are memoized by atlas instance and
+coordinates (at most 32,768 entries); changing the atlas file or coordinates
+causes a fresh spatial lookup. Existing session-cache identity and source
+isolation are preserved. Non-file database deployments should update the
+`ANALYSIS_DATA_REVISION` Flask setting when underlying data changes.
+
 Environmental KPIs use matching-date grid hours where available and a clearly
 labelled historical hourly reference otherwise. Missing values stay null when
 no valid reference exists. They report energy coverage, fixed-energy strategy
@@ -138,3 +166,40 @@ Tests cover geographic assignment, missing-data fallback, source isolation,
 save/fetch across repeated selections, model failure, session constraints,
 energy conservation, overnight connections, both DST transitions, chart/export
 timestamps and actual checkpoint reproduction against its original saved output.
+
+### Reproducible speed comparison
+
+Run the before/after benchmark from the repository root:
+
+```bash
+uv run python scripts/benchmark_analysis.py --repeats 5
+```
+
+It compares the exact pre-optimization code at Git revision `4ba8f16` with the
+working tree, using disposable synthetic data, SQLite, real SpatiaLite and
+localhost HTTP. It does not open application databases or contact external
+services. The default cases use 100 chargers over 7 days for the HTTP workflow,
+1,000 cached points, and a larger 500-charger/30-day KPI calculation.
+Node.js, the bundled session priors, the Amsterdam atlas and SpatiaLite are
+required. Startup/import/fixture preparation are outside the measured window.
+
+Each comparison alternates execution order, discards a warmup and records every
+timing sample. Profile values, basic statistics and environmental results are
+checked for equivalence. The script refuses to compare different numerical
+dependencies. Reports are written to `reports/analysis_speed_comparison.json`
+and `.md`. Timings exclude chart rendering and real-world network latency;
+CPFT inference and the external optimizer are not measured. Cold-cache timings
+include real scenario generation, while cached timings measure retrieval.
+
+For the smaller executable regression test in PowerShell:
+
+```powershell
+$env:EPIOT_BENCHMARK = "1"
+uv run pytest tests/test_analysis_benchmark.py -q
+Remove-Item Env:EPIOT_BENCHMARK
+```
+
+The test checks results and avoided requests, without asserting a machine-dependent
+speedup. If the default uv cache is inaccessible, add
+`--cache-dir .cache/uv --no-sync` to `uv run` when the project environment is
+already installed.

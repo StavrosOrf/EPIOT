@@ -36,11 +36,21 @@ class ScenarioCache:
             connection.close()
 
     def get(self, key):
-        if not self.path:
-            return None
+        return self.get_many([key]).get(key)
+
+    def get_many(self, keys):
+        """Read a day's selection with one connection, below SQLite's bind limit."""
+        keys = list(dict.fromkeys(keys))
+        if not self.path or not keys:
+            return {}
+        values = {}
         with self.connect() as connection:
-            row = connection.execute("SELECT payload FROM scenario_cache WHERE cache_key=?", (key,)).fetchone()
-        return json.loads(row[0]) if row else None
+            for offset in range(0, len(keys), 900):
+                batch = keys[offset:offset+900]
+                rows = connection.execute(
+                    f"SELECT cache_key,payload FROM scenario_cache WHERE cache_key IN ({','.join('?' for _ in batch)})", batch)
+                values.update((key, json.loads(payload)) for key, payload in rows)
+        return values
 
     def save(self, entries):
         if self.path and entries:
@@ -72,22 +82,30 @@ class SessionSourceService:
         if len({int(charger["id"]) for charger in chargers}) != len(chargers):
             raise ValueError("Duplicate charging-point IDs")
         point_values, missing, profiles, keys = {}, [], {}, {}
+        atlas = get_atlas(self.atlas_path) if source != "simple" and chargers else None
+        model_files = None
+        if source == "cpft" and chargers:
+            from backend.cpft_runtime import MODEL_DIR
+            model_files = {}
+            for name in ["best_availability.keras", "best_kwh.keras"]:
+                info = (MODEL_DIR/name).stat()
+                model_files[name] = (info.st_mtime_ns, info.st_size)
         for charger in chargers:
             cp_id = int(charger["id"])
-            profile = get_atlas(self.atlas_path).resolve(charger) if source != "simple" else None
+            profile = atlas.resolve(charger) if atlas else None
             profiles[cp_id] = profile
             identity = dict(source=source, date=str(target_date), charger=charger, profile=profile, assumption=assumption,
                             seed=seed, timezone=timezone_name, version=self.version, daily_arrivals=self.daily_arrivals)
             # Model replacement invalidates even a previously populated cache.
             if source == "cpft":
-                from backend.cpft_runtime import MODEL_DIR
-                identity["model_files"] = {name: (int((MODEL_DIR/name).stat().st_mtime_ns), (MODEL_DIR/name).stat().st_size)
-                                           for name in ["best_availability.keras", "best_kwh.keras"]}
+                identity["model_files"] = model_files
             key = hashlib.sha256(json.dumps(identity, sort_keys=True, allow_nan=False).encode()).hexdigest()
             keys[cp_id] = key
-            cached = self.cache.get(key)
-            if cached:
-                point_values[cp_id] = cached
+        cached = self.cache.get_many(keys.values())
+        for charger in chargers:
+            cp_id = int(charger["id"])
+            if keys[cp_id] in cached:
+                point_values[cp_id] = cached[keys[cp_id]]
             else:
                 missing.append(charger)
         if source == "cpft" and missing:
