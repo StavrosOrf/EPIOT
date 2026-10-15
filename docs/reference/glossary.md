@@ -7,10 +7,16 @@ Area
 : A polygon or rectangle drawn on the map; the unit of comparison in every chart. Up to three per analysis.
 
 Availability (City KPI)
-: A relative index of how many chargers are free at a time of day, derived from summed occupancy.
+: The average share of the selected chargers that are free in a half-hour of the day, counting a charger as occupied while a vehicle is connected.
+
+Blocking probability (City KPI)
+: The share of a half-hour in which every selected charger is occupied.
 
 Charging point (CP)
 : One connector at which one vehicle can charge. The unit EPIOT simulates and reports on.
+
+Coincidence factor (Grid KPI)
+: The peak of the uncontrolled load divided by the sum of the rated powers of the selected chargers; near 1 means the chargers all draw at once.
 
 Column
 : A physical charging station (pole or cabinet) holding one or more charging points.
@@ -26,6 +32,12 @@ DSO
 
 Grid view
 : Load-profile mode that aggregates the charging points connected to the MV/LV transformers inside an area.
+
+Idle time (User KPI)
+: The part of a stay that is not needed to deliver the energy at the charger's rated power: the time charging can be moved within.
+
+Load factor (Grid KPI)
+: Mean uncontrolled load divided by its peak; near 1 is a flat load.
 
 MV/LV transformer
 : A medium-voltage to low-voltage installation feeding a neighbourhood's low-voltage network. Stored with `type = Middle`.
@@ -53,6 +65,9 @@ Strategy
 
 Upward flexibility
 : Additional power connected vehicles could draw at a time step (≥ 0).
+
+Utilisation (City KPI)
+: Energy a charger delivered over the range divided by what it could deliver at its rated power in that time. Unlike occupancy, it ignores time a finished vehicle stays connected.
 
 V2X
 : Vehicle-to-everything: bidirectional charging in which vehicles can also feed energy back.

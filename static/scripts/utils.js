@@ -185,6 +185,35 @@ function generateKPIsSheet(kpi_data_list) {
   wsData.push(["weekday_availability", ...kpi_data_list.weekday_availability]);
   wsData.push(["weekend_availability", ...kpi_data_list.weekend_availability]);
 
+  // Series of newer responses; older ones simply lack them
+  const series = [
+    ...["wd", "we"].flatMap((kind) => [`slack_dist_${kind}`, `load_profile_${kind}`]),
+    "load_duration_kw", "weekday_blocking", "weekend_blocking",
+    "sessions_per_day_mean", "sessions_per_day_p90", "sessions_per_day_observations",
+  ];
+  for (const name of series) {
+    if (Array.isArray(kpi_data_list[name])) wsData.push([name, ...kpi_data_list[name]]);
+  }
+  const usage = kpi_data_list.charger_usage;
+  if (usage?.id?.length) {
+    wsData.push(["Charger", "Occupancy (share of time)", "Utilisation (energy / rated power)", "Sessions", "Energy (kWh)"]);
+    usage.id.forEach((id, i) => wsData.push([id, usage.occupancy[i], usage.utilisation[i], usage.sessions[i], usage.energy_kwh[i]]));
+  }
+  const summary = kpi_data_list.summary;
+  if (summary) {
+    const figures = [
+      ["Sessions", summary.session_count], ["Median stay (h)", summary.median_duration_hours],
+      ["90th percentile stay (h)", summary.p90_duration_hours], ["Mean arrival (local hour)", summary.mean_arrival_hour],
+      ["Idle share of stay time", summary.slack_share], ["Peak uncontrolled load (kW)", summary.peak_kw],
+      ["Peak time (local)", summary.peak_time], ["Load factor", summary.load_factor],
+      ["Coincidence factor", summary.coincidence_factor], ["Idle charger-day share", summary.idle_charger_day_share],
+      ["Sessions per used charger-day", summary.sessions_per_used_charger_day],
+      ["Median gap between sessions (h)", summary.median_idle_gap_hours],
+      ["Mean utilisation", summary.mean_utilisation], ["Highest all-busy probability", summary.max_blocking_probability],
+    ];
+    for (const [name, value] of figures) if (value !== undefined) wsData.push([name, value]);
+  }
+
   // Convert the 2D array to a worksheet
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   return ws;

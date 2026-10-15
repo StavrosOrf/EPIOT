@@ -21,6 +21,7 @@ import { calendarDate, pickerOptions } from "./date_selection.js";
 import { calendarNote } from "./calendar_note.js";
 import { renderEnvironmentSummary } from "./environment_summary.js";
 import { initLocationSearch } from "./location_search.js";
+import { initPanelHeader } from "./panel_header.js";
 
 // Initialize Map using Leaflet.js
 var map = L.map("map", { zoomControl: false }).setView([52.3547, 4.9041], 12); // All of Amsterdam, at the lowest zoom that still shows chargers
@@ -928,6 +929,9 @@ document.getElementById("load-tab").addEventListener("click", () => showTab("loa
 document.getElementById("flex-tab").addEventListener("click", () => showTab("flex-tab"));
 document.getElementById("stats-tab").addEventListener("click", () => showTab("stats-tab"));
 
+// Gliding highlight and arrow-key navigation for the header's tabs
+initPanelHeader();
+
 const kpiRenderers = {
   user_kpi: createUserKPIGraph,
   grid_kpi: createGridKPIGraph,
@@ -1006,10 +1010,9 @@ document.getElementById("download-btn").addEventListener("click", async function
 });
 
 $(function () {
-  // The tab strip scrolls horizontally, which Bootstrap would otherwise use as
-  // the positioning boundary, flipping the tooltip on top of the tabs.
+  // The panel header's tooltips are set up in panel_header.js; any info dot
+  // elsewhere on the page gets the same hover and focus behaviour here.
   const tooltipOptions = { container: "body", boundary: "window" };
-  $(".tabs [data-toggle='tooltip']").tooltip({ ...tooltipOptions, trigger: "hover" });
   $(".info-dot[data-toggle='tooltip']").tooltip({ ...tooltipOptions, trigger: "hover focus" });
 });
 

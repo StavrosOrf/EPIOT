@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#1f7a3f" />
+    <meta name="theme-color" content="#1b201e" />
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
     <title>EPIOT: Quantifying EV Flexibility</title>
 
@@ -245,7 +245,7 @@
 
     <!-- App bar -->
     <header id="header-bar" class="app-bar">
-      <a href="" id="logo" class="logo" aria-label="EPIOT home">
+      <a href="" id="logo" class="logo logo--on-dark" aria-label="EPIOT home">
         <span class="logo__mark" aria-hidden="true"
           ><i class="fa fa-bolt"></i
         ></span>
@@ -451,7 +451,7 @@
       hidden
     >
       <header class="panel__header">
-        <a href="{{ url_for('index') }}" id="panel-logo" class="panel__brand logo" aria-label="EPIOT home">
+        <a href="{{ url_for('index') }}" id="panel-logo" class="panel__brand logo logo--on-dark" aria-label="EPIOT home">
           <span class="logo__mark" aria-hidden="true"
             ><i class="fa fa-bolt"></i
           ></span>
@@ -460,15 +460,6 @@
         <span class="panel__divider" aria-hidden="true"></span>
         <div class="panel__title">
           <h2 id="panel-title">Analysis</h2>
-          <span
-            class="info-dot"
-            data-toggle="tooltip"
-            data-placement="bottom"
-            tabindex="0"
-            title="Choose a session source to compare synthetic charging scenarios. These are not calibrated forecasts of observed local charging."
-            ><i class="fa fa-info-circle" aria-hidden="true"></i
-            ><span class="sr-only">About these predictions</span></span
-          >
         </div>
 
         <div class="panel__nav">
@@ -477,77 +468,95 @@
               id="load-tab"
               class="tab active"
               role="tab"
+              aria-selected="true"
+              aria-controls="analysis-view"
               data-toggle="tooltip"
               data-placement="bottom"
-              title="Power consumption of EVs over time."
+              title="EV power demand over time"
             >
-              Load profiles
+              <i class="fa fa-area-chart" aria-hidden="true"></i><span>Load profiles</span>
             </button>
             <button
               id="flex-tab"
               class="tab"
               role="tab"
+              aria-selected="false"
+              aria-controls="analysis-view"
+              tabindex="-1"
               data-toggle="tooltip"
               data-placement="bottom"
-              title="Ability to shift the power consumption of EVs over time."
+              title="How far charging can be shifted"
             >
-              Flexibility
+              <i class="fa fa-arrows-v" aria-hidden="true"></i><span>Flexibility</span>
             </button>
             <button
               id="stats-tab"
               class="tab"
               role="tab"
+              aria-selected="false"
+              aria-controls="analysis-view"
+              tabindex="-1"
               data-toggle="tooltip"
               data-placement="bottom"
-              title="Key performance indicators for the selected areas and date range."
+              title="Key indicators for your areas"
             >
-              KPIs
+              <i class="fa fa-tachometer" aria-hidden="true"></i><span>KPIs</span>
             </button>
           </nav>
+        </div>
 
-          <div id="kpi-subnav" class="kpi-options" role="group" aria-label="KPI category" hidden>
-            <button type="button" class="kpi-option active" data-kpi="user_kpi" aria-pressed="true">
-              <i class="fa fa-user-o" aria-hidden="true"></i><span>User</span>
-            </button>
-            <button type="button" class="kpi-option" data-kpi="grid_kpi" aria-pressed="false">
-              <i class="fa fa-bolt" aria-hidden="true"></i><span>Grid</span>
-            </button>
-            <button type="button" class="kpi-option" data-kpi="environment_kpi" aria-pressed="false">
-              <i class="fa fa-leaf" aria-hidden="true"></i><span>Environment</span>
-            </button>
-            <button type="button" class="kpi-option" data-kpi="mobility_kpi" aria-pressed="false">
-              <i class="fa fa-car" aria-hidden="true"></i><span>Mobility</span>
-            </button>
-            <button type="button" class="kpi-option" data-kpi="city_kpi" aria-pressed="false">
-              <i class="fa fa-building-o" aria-hidden="true"></i><span>City</span>
-            </button>
-            <span class="info-dot" data-toggle="tooltip" data-placement="bottom" tabindex="0"
-              title="KPI categories. User: arrival, duration and departure times. Grid: energy per session and per day. Environment: carbon intensity and renewable share per strategy. Mobility: sessions per charger and weekday. City: charger availability and occupancy."
-              ><i class="fa fa-info-circle" aria-hidden="true"></i
-              ><span class="sr-only">About the KPI categories</span></span
-            >
+        <!-- KPI categories: their own row, which opens under the tabs on the
+             KPI tab so the header grows smoothly instead of re-wrapping -->
+        <div class="panel__sub">
+          <div class="panel__sub-inner">
+            <div id="kpi-subnav" class="kpi-options" role="group" aria-label="KPI category" hidden>
+              <button type="button" class="kpi-option active" data-kpi="user_kpi" aria-pressed="true"
+                data-toggle="tooltip" data-placement="bottom" title="Arrival, duration and departure times">
+                <i class="fa fa-user-o" aria-hidden="true"></i><span>User</span>
+              </button>
+              <button type="button" class="kpi-option" data-kpi="grid_kpi" aria-pressed="false"
+                data-toggle="tooltip" data-placement="bottom" title="Energy per session and per day">
+                <i class="fa fa-bolt" aria-hidden="true"></i><span>Grid</span>
+              </button>
+              <button type="button" class="kpi-option" data-kpi="environment_kpi" aria-pressed="false"
+                data-toggle="tooltip" data-placement="bottom" title="Carbon intensity and renewable share">
+                <i class="fa fa-leaf" aria-hidden="true"></i><span>Environment</span>
+              </button>
+              <button type="button" class="kpi-option" data-kpi="mobility_kpi" aria-pressed="false"
+                data-toggle="tooltip" data-placement="bottom" title="Sessions per charger and weekday">
+                <i class="fa fa-car" aria-hidden="true"></i><span>Mobility</span>
+              </button>
+              <button type="button" class="kpi-option" data-kpi="city_kpi" aria-pressed="false"
+                data-toggle="tooltip" data-placement="bottom" title="Charger availability and occupancy">
+                <i class="fa fa-building-o" aria-hidden="true"></i><span>City</span>
+              </button>
+            </div>
           </div>
         </div>
 
         <div class="panel__tools">
-          <div class="source-pill">
+          <!-- The pill's tooltip describes the selected source; each source's
+               own text sits on its option (script keeps the two in sync) -->
+          <div
+            class="source-pill"
+            data-toggle="tooltip"
+            data-placement="bottom"
+            title="Generic session distributions"
+          >
             <i class="fa fa-flask" aria-hidden="true"></i>
             <label for="session-source" class="source-pill__label">Source</label>
-            <select id="session-source" aria-describedby="session-source-note" title="Session source">
-              <option value="simple">Simple</option>
-              <option value="spatial">Spatial</option>
-              <option value="cpft">CPFT</option>
+            <select id="session-source" aria-describedby="session-source-note">
+              <option value="simple" title="Generic session distributions">Simple</option>
+              <option value="spatial" title="Tuned to the area around each charger">Spatial</option>
+              <option value="cpft" title="Sessions from the CPFT neural network">CPFT</option>
             </select>
-            <span class="info-dot" data-toggle="tooltip" data-placement="bottom" tabindex="0"
-              title="Where the charging sessions come from. Simple: generic arrival, duration and energy distributions. Spatial: the same, adapted to the neighbourhood around each charger. CPFT: sessions from the CPFT neural-network library. All are synthetic scenarios, not measured charging."
-              ><i class="fa fa-info-circle" aria-hidden="true"></i
-              ><span class="sr-only">About the session source</span></span
-            >
           </div>
           <button
             type="button"
             id="download-btn"
             class="tool-btn"
+            data-toggle="tooltip"
+            data-placement="bottom"
             title="Download report (.xlsx)"
             aria-label="Download report"
           >
@@ -559,7 +568,10 @@
           type="button"
           id="open-landing-panel"
           class="help-btn panel__help"
-          title="About EPIOT and how to use it"
+          data-toggle="tooltip"
+          data-placement="bottom"
+          title="About EPIOT"
+          aria-label="About EPIOT"
           onclick="window.EPIOT.openLanding()"
         >
           <i class="fa fa-question-circle-o" aria-hidden="true"></i>
@@ -568,6 +580,8 @@
         <button
           id="minimize-btn"
           class="icon-btn"
+          data-toggle="tooltip"
+          data-placement="bottom"
           aria-label="Close analysis"
           title="Close (Esc)"
         >
@@ -576,7 +590,12 @@
       </header>
 
       <p id="session-source-note" class="session-source-note" role="status">Synthetic scenarios with assumed demand, not verified local charging forecasts.</p>
-      <div class="panel__body">
+      <div
+        id="analysis-view"
+        class="panel__body"
+        role="tabpanel"
+        aria-labelledby="load-tab"
+      >
         <section id="environment-summary" class="environment-summary" aria-label="Environmental scenario summary" hidden></section>
         <div id="graph"></div>
       </div>

@@ -5,8 +5,8 @@ three options are **Simple** (session sampler), **Spatial** (session sampler), a
 (tool — synthetic history). Low/base/high demand is chosen per area on its card; these are
 sensitivity assumptions, not confidence intervals. KPIs use the selected source over an inclusive local
 calendar-date range. No verified local charging data are assumed.
-All five KPI categories appear as a button bar in the panel header, right of the analysis tabs.
-The logo, About and close controls retain fixed positions when categories are
+All five KPI categories appear as a button bar in a row that opens under the analysis tabs in the
+panel header. The logo, tabs, About and close controls retain fixed positions when categories are
 shown, and the analysis logo links to the EPIOT home page.
 
 Every scenario is **generated when it is requested**, for any past or future date.

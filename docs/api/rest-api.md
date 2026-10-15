@@ -319,8 +319,9 @@ Computes all KPI dashboards for a set of charging points over a date range.
 curl "http://127.0.0.1:5000/kpi/user?selected_markers=40405,40406&start_date=2025-09-08&end_date=2025-10-20"
 ```
 
-**Response** `200`: an object with 28 fields, defined in {doc}`../concepts/kpi-methodology`. Fields may
-contain `NaN` literals for empty groups; replace them with `null` before strict JSON parsing:
+**Response** `200`: distributions, series and a `summary`, defined in {doc}`../concepts/kpi-methodology`.
+Empty groups are `null`, but a field can still contain `NaN` literals; replace them with `null` before
+strict JSON parsing:
 
 ```javascript
 const data = JSON.parse((await res.text()).replace(/NaN/g, "null"));

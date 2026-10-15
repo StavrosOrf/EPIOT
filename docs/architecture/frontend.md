@@ -27,6 +27,7 @@ flowchart LR
 | `data_fetch.js` | `get_KPIs`: resolves charging points per area, calls `/kpi/user` per area, and renders the active KPI dashboard. |
 | `plotter.js` | All chart builders: `createGraph` (load profiles), `createPolytopeGraph` (flexibility), five KPI dashboards, and `showGraphMessage`. `renderGroupPanels` draws one card per area (rail with name and actions, plus its own Plotly plot) and handles sizing, typography, small-screen stacking and responsive re-layout on resize. The page registers the card actions through `setGroupControls`. |
 | `group_actions.js` | Pure helpers for editing the area list from the cards: `moved`, `removed`, `copied`, `copyName`, `validName`, `escapeHtml`, `freeColor` and the `MAX_AREAS` limit. |
+| `panel_header.js` | Behaviour of the analysis panel header that CSS cannot express: positions the gliding highlight under the active tab and KPI category (it watches the `active` class `script.js` toggles, so tab switching stays in one place) and gives the tab list its keyboard model (one tab stop, arrow keys, Home/End; Enter or Space activates). `nextTabIndex` and `glideTo` are pure and unit-tested. |
 | `utils.js` | `animateSelectMessage` for the status bar, and `generateAndDownloadExcel` with its sheet builders. |
 | `hexUtils.js` | H3 hexagon helpers (currently unused). |
 
@@ -100,4 +101,26 @@ All charts go through `renderPlot(data, layout)`, which:
 tabs, segmented control, responsive rules); `static/css/landing.css` styles the welcome dialog. The
 `--header-h` CSS variable is kept in sync with the app bar height by a `ResizeObserver`, so floating
 controls and the panel sit below the bar even when it wraps on small screens. The theme colour is
-`#1f7a3f`.
+`#1b201e`.
+
+The whole interface shares one dark graphite design system, defined as tokens in `:root`
+(`--hdr-*`, `--dark-surface`, `--ctl`, `--seg`, `--ease-*`). It is used by the top app bar, the
+bottom action bar (status message, draw tools, **Analyse**), the zoom control, the search dropdown,
+tooltips and the analysis panel header; the map popups and the results stay light. `.logo--on-dark`
+styles the logo on those surfaces. The palette is deliberately restrained: grey surfaces and one
+light, soft green (`--hdr-accent`) for focus rings, highlights and status dots. The same green fills
+whatever is primary or selected (`--hdr-select`, with dark `--hdr-on-select` text): the **Analyse**
+button, the active drawing tool and the active KPI category. The active tab or switched-on layer is
+the raised white pill.
+
+The bars' faint light-green and grey wash drifts by animating a background position only. Motion is limited to
+`transform`, `opacity`, background position and one grid-track transition, and is switched off by
+`prefers-reduced-motion`. For the analysis panel header specifically:
+
+- the active tab and KPI category are highlighted by a glider (the group's `::before`) positioned
+  with `--glider-x/y/w/h`; without script the active item paints its own pill instead;
+- the KPI categories sit in a second header row (`.panel__sub`) that opens by animating its grid
+  track from `0fr` to `1fr`, so the header grows smoothly instead of re-wrapping;
+- while a calculation runs (`.loading-container` or a busy area card, detected with `:has()`), the
+  header's bottom edge becomes a progress sweep and the dot beside the title pulses;
+- on touch screens (`pointer: coarse`) controls grow to 44 px (40 px for tabs and categories).

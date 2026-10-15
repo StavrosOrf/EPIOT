@@ -42,7 +42,9 @@ Charger availability and occupancy.
    instant: all five dashboards come from the same response, so only the chart is redrawn.
 
 Each dashboard has one card per area, so up to three areas are compared directly, each over its own
-date range. There is no strategy setting here: behavioural KPIs do not depend on it, and the environment KPIs compute all
+date range. Distributions are shown as **shares of their own day type**: weekdays (five days) and
+weekends (two) add up to 100 % each, so one is not dwarfed by the other, and areas of different size
+or range read against each other. Counts are in the hover text. Areas share each chart's scale. There is no strategy setting here: behavioural KPIs do not depend on it, and the environment KPIs compute all
 three local strategies at once.
 
 :::{note}
@@ -61,9 +63,14 @@ User KPIs: arrival, duration and departure distributions, weekdays (blue) agains
 
 | Chart | x-axis | y-axis | Question it answers |
 |---|---|---|---|
-| **Arrival Distribution** | Hour of arrival (0–23) | Number of sessions | When do drivers plug in? |
-| **Duration Distribution** | Connection time in hours (0–24) | Number of sessions | How long do vehicles stay connected? |
-| **Departure Distribution** | Hour of departure (0–23) | Number of sessions | When do drivers unplug? |
+| **Arrival time** | Hour of arrival (0–24) | Share of sessions (%) | When do drivers plug in? |
+| **Connection time** | Hours connected (0–24+) | Share of sessions (%) | How long do vehicles stay connected? |
+| **Departure time** | Hour of departure (0–24) | Share of sessions (%) | When do drivers unplug? |
+| **Idle while plugged in** | Hours not needed to charge (0–24+) | Share of sessions (%) | How much of a stay could charging be moved within? |
+
+The card beside the charts gives the number of sessions, the mean arrival time, the median and 90th
+percentile stay, and the share of connected time that is idle. A "24+" label means the last bin also
+holds longer stays; the card says how many there were.
 
 ## Grid
 
@@ -71,14 +78,21 @@ User KPIs: arrival, duration and departure distributions, weekdays (blue) agains
 :class: screenshot
 :alt: Grid KPI dashboard with session energy charts
 
-Grid KPIs: energy demand per arrival hour, per day and per session.
+Grid KPIs: uncontrolled load and the energy demand per arrival hour, per day and per session.
 ```
 
 | Chart | x-axis | y-axis | Question it answers |
 |---|---|---|---|
-| **Session Energy Distribution** | Hour of arrival | Mean energy per session (kWh) | Which arrival hours bring the most energy demand? |
-| **Daily Charger Energy Consumption** | Energy (kWh, 10 bins of 20 kWh) | Count | How much energy do chargers deliver? |
-| **Session Energy Consumption Distribution** | Energy per session (kWh, 10 bins of 10 kWh) | Number of sessions | How large is a typical charging session? |
+| **Uncontrolled load** | Hour of day (local) | Mean power (kW) | What does charging draw from the grid at each time of day if nothing is controlled? |
+| **Load duration** | Share of time the power is exceeded (%) | Power (kW) | How peaky is the load, and for how long is it near its peak? |
+| **Energy per session by arrival hour** | Hour of arrival | Mean energy (kWh) | Which arrival hours bring the most energy? Hours without arrivals are left empty |
+| **Daily energy per charger** | Energy (kWh, 10 bins of 20 kWh, 200+) | Share of active charger-days (%) | How much does a charger deliver on a day it is used? |
+| **Energy per session** | Energy per session (kWh, 10 bins of 10 kWh, 100+) | Share of sessions (%) | How large is a typical charging session? |
+
+The card gives the peak load and when it happens, the **load factor** (mean over peak load; near 1 is
+flat) and the **coincidence factor** (peak over the sum of rated powers; near 1 means everything
+charges at once), and the share of charger-days with no charging at all. Those idle charger-days are
+left out of *Daily energy per charger*, so they do not dwarf the days that charged.
 
 ## Environment
 
@@ -102,28 +116,39 @@ clearly labelled historical reference day, resolved for each request; see {doc}`
 
 ```{figure} ../_static/screenshots/kpi-mobility.jpg
 :class: screenshot
-:alt: Mobility KPI dashboard with one curve per weekday
+:alt: Mobility KPI dashboard with sessions per charger for each weekday
 
-Mobility KPIs: distribution of sessions per charger per day, one curve per weekday.
+Mobility KPIs: sessions per charger and day for each weekday.
 ```
 
 | Chart | x-axis | y-axis | Question it answers |
 |---|---|---|---|
-| **Number of Charger Sessions per Day** | Sessions per charger per day (0–5) | Probability | How often is a charger used on a Monday, a Tuesday, …? |
+| **Sessions per charger and day** | Weekday | Mean (bars) and 90th percentile (markers) | How often is a charger used on a Monday, a Tuesday, …? |
+| **Charger-days by number of sessions** | Weekday | Share of charger-days (%), stacked by 0, 1, … 5+ sessions | How many charger-days are unused, or used several times? |
+
+Weekdays that the date range does not contain are left empty, not drawn as zero. The card gives the
+sessions per *used* charger-day, the median gap between two sessions on the same charger (how
+quickly a charger turns over) and the share of charger-days without a session.
 
 ## City
 
 ```{figure} ../_static/screenshots/kpi-city.jpg
 :class: screenshot
-:alt: City KPI dashboard with availability by half-hour and occupancy ratio distribution
+:alt: City KPI dashboard with free chargers by half-hour and occupancy per charger
 
-City KPIs: charger availability by time of day and the occupancy-ratio distribution.
+City KPIs: free chargers and the chance that all are busy by time of day, and the use of each charger.
 ```
 
 | Chart | x-axis | y-axis | Question it answers |
 |---|---|---|---|
-| **Charger Availability Probability** | Time of day (48 half-hour slots) | Relative availability index | At what time of day are chargers most likely to be free? |
-| **Charger Occupancy Ratio** | Share of time a charger is occupied (%) | Probability density | Are chargers in this area under- or over-used? |
+| **Free chargers** | Hour of day (local) | Share of chargers free | At what time of day is a charger most likely to be free? |
+| **All chargers busy** | Hour of day (local) | Probability | When would an arriving driver find nothing free? |
+| **Occupancy and utilisation** | Charger, busiest first | Share of time | Which chargers are connected most, and how much of their capacity delivers energy? |
+
+*Occupancy* counts the time a vehicle is connected, including vehicles that have finished charging;
+*utilisation* is the energy delivered against what the charger could deliver at its rated power. A big
+gap between the two means chargers are occupied by vehicles that are not charging. For more than 30
+chargers, the third chart shows how occupancy is spread over the chargers instead.
 
 ## Definitions
 

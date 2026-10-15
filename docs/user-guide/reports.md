@@ -67,13 +67,22 @@ cell is its name, the following cells are its values.
 |---|---|---|
 | `arrival_dist_wd`, `arrival_dist_we` | 24 | Sessions per arrival hour, weekday / weekend |
 | `consumption_dist_wd`, `consumption_dist_we` | 10 | Sessions per energy bin (0–100 kWh) |
-| `daily_consumption_dist_wd`, `daily_consumption_dist_we` | 10 | Count per energy bin (0–200 kWh) |
+| `daily_consumption_dist_wd`, `daily_consumption_dist_we` | 10 | Charger-days per energy bin (0–200 kWh), idle charger-days included |
 | `departure_dist_wd`, `departure_dist_we` | 24 | Sessions per departure hour |
 | `duration_dist_wd`, `duration_dist_we` | 24 | Sessions per duration bin (0–24 h) |
-| `hour_of_arrival_consumption_wd`, `…_we` | 24 | Mean energy per session by arrival hour (kWh) |
-| `occupation_ratio_dist` | 20 | Density of charger occupancy ratio (0–1) |
-| `sessions_per_day_0` … `sessions_per_day_6` | 5 | Density of sessions per charger per day, Monday (0) to Sunday (6) |
-| `weekday_availability`, `weekend_availability` | 48 | Relative availability index per half-hour slot |
+| `slack_dist_wd`, `slack_dist_we` | 24 | Sessions per idle-time bin (0–24 h) |
+| `hour_of_arrival_consumption_wd`, `…_we` | 24 | Mean energy per session by arrival hour (kWh); empty for hours without arrivals |
+| `load_profile_wd`, `load_profile_we` | 48 | Mean uncontrolled load (kW) per half-hour |
+| `load_duration_kw` | 21 | Load exceeded for 0, 5, …, 100 % of the time (kW) |
+| `occupation_ratio_dist` | 20 | Share of chargers per occupancy-ratio bin (0–1) |
+| `sessions_per_day_0` … `sessions_per_day_6` | 6 | Share of charger-days per sessions bin (0–5+), Monday (0) to Sunday (6) |
+| `sessions_per_day_mean`, `…_p90`, `…_observations` | 7 | Mean, 90th percentile and number of charger-days per weekday |
+| `weekday_availability`, `weekend_availability` | 48 | Share of chargers free per half-hour slot |
+| `weekday_blocking`, `weekend_blocking` | 48 | Share of each half-hour in which all chargers are occupied |
+
+Rows are only written for series the response carries. After the series come a table with one row per
+charger (`Charger`, occupancy, utilisation, sessions, energy) and the headline figures (peak load,
+load factor, median stay, and so on).
 
 The environment KPIs are not part of the export. See {doc}`../concepts/kpi-methodology` for the
 definition of each row.

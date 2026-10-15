@@ -17,6 +17,8 @@ const CARD_CHROME = 56;
 // on narrow screens it moves above the plot and needs room of its own
 const RAIL_MIN_HEIGHT = 212;
 const NARROW_RAIL_HEIGHT = 104;
+// Each headline figure a KPI dashboard adds under the area's name
+const SUMMARY_LINE_HEIGHT = 17;
 const MAX_NAME_LENGTH = 40;
 
 // Categorical series colours (checked for colour-vision safety) and ink tokens
@@ -148,6 +150,8 @@ function createCard(group, index, count, chart) {
   rename.append(pencil);
   heading.append(name, rename);
   identity.append(heading, element("p", "group-card__meta", plural(group.number_of_chargers || 0, "charger")));
+  // Headline figures of a KPI dashboard sit with the area's identity
+  (chart.summary || []).forEach((line) => identity.append(element("p", "group-card__meta", line)));
 
   const actions = element("div", "group-card__actions");
   actions.setAttribute("role", "group");
@@ -287,9 +291,11 @@ function renderGroupPanels(groups, buildChart) {
 
   // Sizes depend on the laid-out width, so measure once the cards are in place
   entries.forEach((entry) => {
+    // Headline lines lengthen the rail, which sets the least height of a card
+    const railHeight = RAIL_MIN_HEIGHT + SUMMARY_LINE_HEIGHT * (entry.summary ? entry.summary.length : 0);
     if (entry.message) {
       entry.plot.append(element("p", "group-card__empty", entry.message));
-      entry.root.style.minHeight = `${narrow ? NARROW_RAIL_HEIGHT + CARD_CHROME : RAIL_MIN_HEIGHT}px`;
+      entry.root.style.minHeight = `${narrow ? NARROW_RAIL_HEIGHT + CARD_CHROME : railHeight}px`;
       return;
     }
     const grid = entry.layout.grid;
@@ -299,7 +305,7 @@ function renderGroupPanels(groups, buildChart) {
     const rowHeight = rows > 1 ? STACKED_ROW_MIN_HEIGHT : ROW_MIN_HEIGHT;
     const chrome = CARD_CHROME + (narrow ? NARROW_RAIL_HEIGHT : 0);
     const plotHeight = rows * rowHeight + chrome;
-    entry.root.style.minHeight = `${narrow ? plotHeight : Math.max(plotHeight, RAIL_MIN_HEIGHT)}px`;
+    entry.root.style.minHeight = `${narrow ? plotHeight : Math.max(plotHeight, railHeight)}px`;
   });
   entries.forEach((entry) => {
     if (entry.message) return;
@@ -647,873 +653,424 @@ export function createPolytopeGraph(groupData) {
   renderGroupPanels(groupData, (item) => polytopeChart(item, { range }));
 }
 
-function userKpiChart(groupData) {
-  var data = [];
+// ---------------------------------------------------------------------------
+// KPI dashboards (User, Grid, Mobility, City). Each is a small grid of panels
+// per area. Distributions are drawn as shares of their own day type, so
+// weekdays (five days) and weekends (two) and areas of different size or date
+// range can be read against each other; counts stay in the hover text. A panel
+// is a plain object, { title, traces, xaxis, yaxis, shared, peak, stack }, which
+// kpiChart lays out. Panels whose data a response lacks are left out.
+// ---------------------------------------------------------------------------
 
-  var layout = {
-    grid: {
-      rows: groupData.length,
-      // rows: 1,
-      columns: 3,
-      pattern: "independent",
-    },
-    showlegend: true,
-    hovermode: "x unified", // Synchronize hover over x-axis
-    legend: {
-      orientation: "h",
-      x: 0.5,
-      y: 1.1,
-      xanchor: "center",
-      yanchor: "bottom",
-      traceorder: "normal",
-      ncols: 2,
-    },
-    // automargin: true,
-    margin: { t: 80, b: 100, l: 80, r: 80 },
-    xaxis1: { title: "Time (Hour)" },
-    yaxis1: { title: "Sessions Count" },
-    xaxis2: { title: "Time (Hour)" },
-    yaxis2: { title: "Sessions Count" },
-    xaxis3: { title: "Time (Hour)" },
-    yaxis3: { title: "Sessions Count" },
-    xaxis4: { title: "Time (Hour)" },
-    yaxis4: { title: "Sessions Count" },
-    xaxis5: { title: "Time (Hour)" },
-    yaxis5: { title: "Sessions Count" },
-    xaxis6: { title: "Time (Hour)" },
-    yaxis6: { title: "Sessions Count" },
-    xaxis7: { title: "Time (Hour)" },
-    yaxis7: { title: "Sessions Count" },
-    xaxis8: { title: "Time (Hour)" },
-    yaxis8: { title: "Sessions Count" },
-    xaxis9: { title: "Time (Hour)" },
-    yaxis9: { title: "Sessions Count" },
-  };
+const DAY_TYPES = [
+  { key: "wd", name: "Weekdays", color: SERIES[0] },
+  { key: "we", name: "Weekends", color: SERIES[1] },
+];
+const MONDAY_FIRST = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const HOUR_EDGES = Array.from({ length: 25 }, (_, i) => i);
+const SLOT_EDGES = Array.from({ length: 49 }, (_, i) => i / 2);
+const HOUR_TICKS = [0, 6, 12, 18, 24];
+// Above this many chargers, per-charger bars give way to a distribution
+const MAX_BAR_CHARGERS = 30;
+// Below this, "all chargers busy" is not worth a chart of its own
+const MIN_BLOCKING = 0.005;
 
-  layout.shapes = [];
-  layout.annotations = [];
+const isNumber = (value) => typeof value === "number" && Number.isFinite(value);
+const isSeries = (values, length) => Array.isArray(values) && values.length === length;
+const sum = (values) => values.reduce((total, value) => total + (isNumber(value) ? value : 0), 0);
+const shareOf = (values) => {
+  const total = sum(values);
+  return values.map((value) => (total && isNumber(value) ? (100 * value) / total : 0));
+};
+// A step line over bin edges needs one closing value to end the last bin
+const closed = (values) => values.concat(values.slice(-1));
+const peakOf = (traces) =>
+  Math.max(0, ...traces.flatMap((trace) => (trace.y || []).filter(isNumber)));
 
-  let today = new Date();
-  let startDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() - 1,
-    0,
-    0,
-    0
-  );
-
-  // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 24 }, (_, i) => {
-    let date = new Date(startDate.getTime());
-    date.setHours(date.getHours() + i);
-    return date.getHours();
-  });
-
-  groupData.forEach((dataItem, index) => {
-    // Create traces for past and future data as step plots
-    var pastTrace_up = {
-      x: timeSteps,
-      y: dataItem.kpi.arrival_dist_wd,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "spline" },
-      name: "Weekdays",
-      xaxis: "x" + (3 * index + 1),
-      yaxis: "y" + (3 * index + 1),
-      opacity: 0.3,
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-    };
-
-    var pastTrace_down = {
-      x: timeSteps,
-      y: dataItem.kpi.arrival_dist_we,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "spline" }, // Step plot
-      name: "Weekends",
-      xaxis: "x" + (3 * index + 1),
-      yaxis: "y" + (3 * index + 1),
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-      opacity: 0.3,
-    };
-
-    var dist_2_wd = {
-      x: timeSteps,
-      y: dataItem.kpi.duration_dist_wd,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "spline" },
-      name: "Weekdays",
-      opacity: 0.3,
-      xaxis: "x" + (3 * index + 2),
-      yaxis: "y" + (3 * index + 2),
-      // legendgroup: "group",
-      showlegend: false,
-    };
-
-    var dist_2_we = {
-      x: timeSteps,
-      y: dataItem.kpi.duration_dist_we,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "spline" },
-      name: "Weekends",
-      xaxis: "x" + (3 * index + 2),
-      yaxis: "y" + (3 * index + 2),
-      legendgroup: "group",
-      showlegend: false,
-    };
-
-    var dist_3_we = {
-      x: timeSteps,
-      y: dataItem.kpi.departure_dist_we,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "spline" },
-      name: "Weekends",
-      xaxis: "x" + (3 * index + 3),
-      yaxis: "y" + (3 * index + 3),
-      legendgroup: "group",
-      showlegend: false,
-    };
-
-    var dist_3_wd = {
-      x: timeSteps,
-      y: dataItem.kpi.departure_dist_wd,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "spline" },
-      name: "Weekdays",
-      opacity: 0.3,
-      xaxis: "x" + (3 * index + 3),
-      yaxis: "y" + (3 * index + 3),
-      legendgroup: "group",
-      showlegend: false,
-    };
-
-    data.push(
-      pastTrace_down,
-      pastTrace_up,
-      dist_2_we,
-      dist_2_wd,
-      dist_3_we,
-      dist_3_wd
-    );
-
-    if (groupData.length === 2) {
-      layout.xaxis1.title = '';
-      layout.xaxis2.title = '';
-      layout.xaxis3.title = '';
-    } else if (groupData.length === 3) {
-      layout.xaxis1.title = '';
-      layout.xaxis2.title = '';
-      layout.xaxis3.title = '';
-      layout.xaxis4.title = '';
-      layout.xaxis5.title = '';
-      layout.xaxis6.title = '';
-    }
-
-    if (index == 0) {
-      // change y-axis title
-      layout.yaxis1.title = `Sessions Count`;
-    } else if (index == 1) {
-      layout.yaxis4.title = `Sessions Count`;
-    } else if (index == 2) {
-      layout.yaxis7.title = `Sessions Count`;
-    }
-
-    let label = "";
-
-    label =
-      "<b>User Probability Distributions: " +
-      dataItem.groupName +
-      " (" +
-      dataItem.number_of_chargers +
-      " chargers)" +
-      "</b>";
-
-    let label1 = "<b>Arrival Distribution</b>";
-    let label2 = "<b>Duration Distribution</b>";
-    let label3 = "<b>Departure Distribution</b>";
-
-    if (index == 0) {
-      // Add titles to each subplot
-      layout.annotations.push({
-        text: label1,
-        xref: "x" + (3 * index + 1) + " domain",
-        yref: "y" + (3 * index + 1) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-      layout.annotations.push({
-        text: label2,
-        xref: "x" + (3 * index + 2) + " domain",
-        yref: "y" + (3 * index + 2) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-      layout.annotations.push({
-        text: label3,
-        xref: "x" + (3 * index + 3) + " domain",
-        yref: "y" + (3 * index + 3) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-    }
-  });
-
-  // //   add the plot main x-axis
-
-  //     layout.xaxis = {
-  //         showticklabels: false, // Show tick labels only on the last subplot
-  //         tickangle: -45, // Rotate labels if needed
-  //         };
-
-  return { data, layout };
+function hoursText(value) {
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} h`;
 }
 
-function gridKpiChart(groupData) {
-  var data = [];
-
-  var layout = {
-    grid: {
-      rows: groupData.length,
-      // rows: 1,
-      columns: 3,
-      pattern: "independent",
-    },
-    showlegend: true,
-    hovermode: "x unified", // Synchronize hover over x-axis
-    legend: {
-      orientation: "h",
-      x: 0.5,
-      y: 1.1,
-      xanchor: "center",
-      yanchor: "bottom",
-      traceorder: "normal",
-      ncols: 2,
-    },
-    // automargin: true,
-    margin: { t: 80, b: 100, l: 80, r: 80 },
-    xaxis1: { title: "Arrival Time (Hour)" },
-    yaxis1: { title: "Charged Energy (kWh)" },
-    xaxis2: { title: "Daily Charged Energy (kWh)" },
-    yaxis2: { title: "Days Count" },
-    xaxis3: { title: "Session Energy Charged (kWh)" },
-    yaxis3: { title: "Sessions Count" },
-
-    xaxis4: { title: "Arrival Time (Hour)" },
-    yaxis4: { title: "Charged Energy (kWh)" },
-    xaxis5: { title: "Daily Charged Energy (kWh)" },
-    yaxis5: { title: "Days Count" },
-    xaxis6: { title: "Session Energy Charged (kWh)" },
-    yaxis6: { title: "Sessions Count" },
-
-    xaxis7: { title: "Arrival Time (Hour)" },
-    yaxis7: { title: "Charged Energy (kWh)" },
-    xaxis8: { title: "Daily Charged Energy (kWh)" },
-    yaxis8: { title: "Days Count" },
-    xaxis9: { title: "Session Energy Charged (kWh)" },
-    yaxis9: { title: "Sessions Count" },
-
-  };
-
-  layout.shapes = [];
-  layout.annotations = [];
-
-  let today = new Date();
-  let startDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() - 1,
-    0,
-    0,
-    0
-  );
-
-  // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 24 }, (_, i) => {
-    let date = new Date(startDate.getTime());
-    date.setHours(date.getHours() + i);
-    return date.getHours();
-  });
-
-  groupData.forEach((dataItem, index) => {
-    // Create traces for past and future data as step plots
-    var pastTrace_up = {
-      x: timeSteps,
-      y: dataItem.kpi.hour_of_arrival_consumption_wd,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "hv" },
-      name: "Weekdays",
-      xaxis: "x" + (3 * index + 1),
-      yaxis: "y" + (3 * index + 1),
-      opacity: 0.3,
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-    };
-
-    var pastTrace_down = {
-      x: timeSteps,
-      y: dataItem.kpi.hour_of_arrival_consumption_we,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "hv" }, // Step plot
-      name: "Weekends",
-      xaxis: "x" + (3 * index + 1),
-      yaxis: "y" + (3 * index + 1),
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-      opacity: 0.3,
-    };
-
-    var dist_2_wd = {
-      x: Array.from({length: 10}, (_, i) => 10+20*i),
-      y: dataItem.kpi.daily_consumption_dist_wd,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "spline" },
-      name: "Weekdays",
-      opacity: 0.3,
-      xaxis: "x" + (3 * index + 2),
-      yaxis: "y" + (3 * index + 2),
-      // legendgroup: "group",
-      showlegend: false,
-    };
-
-    var dist_2_we = {
-      x: Array.from({length: 10}, (_, i) => 10+20*i),
-      y: dataItem.kpi.daily_consumption_dist_we,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "spline" },
-      name: "Weekends",
-      xaxis: "x" + (3 * index + 2),
-      yaxis: "y" + (3 * index + 2),
-      legendgroup: "group",
-      showlegend: false,
-    };
-
-    var dist_3_wd = {
-      x: Array.from({length: 10}, (_, i) => 5+10*i),
-      y: dataItem.kpi.consumption_dist_wd,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "spline" },
-      name: "Weekdays",
-      opacity: 0.3,
-      xaxis: "x" + (3 * index + 3),
-      yaxis: "y" + (3 * index + 3),
-      // legendgroup: "group",
-      showlegend: false,
-    };
-
-    var dist_3_we = {
-      x: Array.from({length: 10}, (_, i) => 5+10*i),
-      y: dataItem.kpi.consumption_dist_we,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "spline" },
-      name: "Weekends",
-      xaxis: "x" + (3 * index + 3),
-      yaxis: "y" + (3 * index + 3),
-      legendgroup: "group",
-      showlegend: false,
-    };
-
-
-    data.push(
-      pastTrace_down,
-      pastTrace_up,
-      dist_2_we,
-      dist_2_wd,
-      dist_3_we,
-      dist_3_wd
-    );
-
-    // if (groupData.length === 2) {
-    //   layout.xaxis1.title = '';
-    //   layout.xaxis2.title = '';      
-    // } else
-     if (groupData.length === 3) {
-      layout.xaxis1.title = '';
-      layout.xaxis2.title = '';
-      layout.xaxis3.title = '';
-      layout.xaxis4.title = '';
-      layout.xaxis5.title = '';
-      layout.xaxis6.title = '';
-    }
-
-    if (index == 0) {
-      // change y-axis title
-      layout.yaxis1.title = `Charged Energy (kWh)`;
-    } else if (index == 1) {
-      layout.yaxis4.title = `Charged Energy (kWh)`;
-    } else if (index == 2) {
-      layout.yaxis7.title = `Charged Energy (kWh)`;
-    }
-
-
-    let label1 = "<b>Session Energy Distribution</b>";
-    let label2 = "<b>Daily Charger Energy Consumption</b>";
-    let label3 = "<b>Session Energy Consumption Distribution</b>";
-
-
-    if (index == 0) {
-      // Add titles to each subplot
-      layout.annotations.push({
-        text: label1,
-        xref: "x" + (2 * index + 1) + " domain",
-        yref: "y" + (2 * index + 1) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-      layout.annotations.push({
-        text: label2,
-        xref: "x" + (2 * index + 2) + " domain",
-        yref: "y" + (2 * index + 2) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-      layout.annotations.push({
-        text: label3,
-        xref: "x" + (2 * index + 3) + " domain",
-        yref: "y" + (2 * index + 3) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-     
-    }
-  });
-
- 
-
-  return { data, layout };
+function clockText(hours) {
+  const minutes = Math.round(hours * 60) % 1440;
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
-function mobilityKpiChart(groupData) {
-  var data = [];
-
-  var layout = {
-    grid: {
-      rows: groupData.length,
-      // rows: 1,
-      columns: 1,
-      pattern: "independent",
-    },
-    showlegend: true,
-    hovermode: "x unified", // Synchronize hover over x-axis
-    legend: {
-      orientation: "h",
-      x: 0.5,
-      y: 1.1,
-      xanchor: "center",
-      yanchor: "bottom",
-      traceorder: "normal",
-      ncols: 2,
-    },
-    // automargin: true,
-    margin: { t: 80, b: 100, l: 80, r: 80 },
-    xaxis1: { title: "Number of Sessions per Charger" },
-    yaxis1: { title: "Charged Energy (kWh)" },
-    xaxis2: { title: "Number of Sessions per Charger" },
-    yaxis2: { title: "Days Count" },
-    xaxis3: { title: "Number of Sessions per Charger" },
-    yaxis3: { title: "Sessions Count" },
-
-  };
-
-  layout.shapes = [];
-  layout.annotations = [];
-
-  let today = new Date();
-  let startDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() - 1,
-    0,
-    0,
-    0
-  );
-
-  // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 24 }, (_, i) => {
-    let date = new Date(startDate.getTime());
-    date.setHours(date.getHours() + i);
-    return date.getHours();
-  });
-
-  groupData.forEach((dataItem, index) => {
-    // Create traces for past and future data as step plots
-    var day_0 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_0,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Monday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-    };
-    var day_1 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_1,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Tuesday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      showlegend: index === 0,
-    };
-
-    var day_2 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_2,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Wednesday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      showlegend: index === 0,
-    };
-    var day_3 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_3,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Thursday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      showlegend: index === 0,
-    };
-    var day_4 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_4,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Friday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      showlegend: index === 0,
-    };
-    var day_5 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_5,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Saturday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      showlegend: index === 0,
-    };
-
-    var day_6 = {
-      x: [0,1,2,3,4,5],
-      y: dataItem.kpi.sessions_per_day_6,
-      type: "scatter",
-      mode: "lines",
-      // fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: {shape: "spline" },
-      name: "Sunday",
-      xaxis: "x" + (1 * index + 1),
-      yaxis: "y" + (1 * index + 1),
-      opacity: 1,
-      showlegend: index === 0,
-    };
-    
-
-
-    data.push(
-      day_0,
-      day_1,
-      day_2,
-      day_3,
-      day_4,
-      day_5,
-      day_6
-    );
-
-    // if (groupData.length === 2) {
-    //   layout.xaxis1.title = '';
-    //   layout.xaxis2.title = '';      
-    // } else
-    //  if (groupData.length === 3) {
-    //   layout.xaxis1.title = '';
-    //   layout.xaxis2.title = '';
-    //   layout.xaxis3.title = '';
-    //   layout.xaxis4.title = '';
-    //   layout.xaxis5.title = '';
-    //   layout.xaxis6.title = '';
-    // }
-
-    if (index == 0) {
-      // change y-axis title
-      layout.yaxis1.title = `Probability`;
-    } else if (index == 1) {
-      layout.yaxis2.title = `Probability`;
-    } else if (index == 2) {
-      layout.yaxis3.title = `Probability`;
-    }
-
-
-    let label1 = "<b>Number of Charger Sessions per Day</b>";
-    // let label2 = "<b>Daily Charger Energy Consumption</b>";
-    // let label3 = "<b>Session Energy Consumption Distribution</b>";
-
-
-    if (index == 0) {
-      // Add titles to each subplot
-      layout.annotations.push({
-        text: label1,
-        xref: "x" + (1 * index + 1) + " domain",
-        yref: "y" + (1 * index + 1) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-     
-    }
-  });
-
- 
-
-  return { data, layout };
+function percentText(fraction) {
+  return `${Math.round(100 * fraction)}%`;
 }
 
-
-function cityKpiChart(groupData) {
-  var data = [];
-
-  var layout = {
-    grid: {
-      rows: groupData.length,
-      // rows: 1,
-      columns: 2,
-      pattern: "independent",
-    },
-    showlegend: true,
-    hovermode: "x unified", // Synchronize hover over x-axis
-    legend: {
-      orientation: "h",
-      x: 0.5,
-      y: 1.1,
-      xanchor: "center",
-      yanchor: "bottom",
-      traceorder: "normal",
-      ncols: 2,
-    },
-    // automargin: true,
-    margin: { t: 80, b: 100, l: 80, r: 80 },
-    xaxis1: { title: "Time of the Day (Hour)" },
-    yaxis1: { title: "Probability" },
-    xaxis2: { title: "Occupancy Ratio (%)" },
-    yaxis2: { title: "Probability" },
-    xaxis3: { title: "Time of the Day (Hour)" },
-    yaxis3: { title: "Probability" },
-    xaxis4: { title: "Occupancy Ratio (%)" },
-    yaxis4: { title: "Probability" },
-    xaxis5: { title: "Time of the Day (Hour)" },
-    yaxis5: { title: "Probability" },
-    xaxis6: { title: "Occupancy Ratio (%)" },
-    yaxis6: { title: "Probability" },
-
-
-  };
-
-  layout.shapes = [];
-  layout.annotations = [];
-
-  let today = new Date();
-  let startDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() - 1,
-    0,
-    0,
-    0
-  );
-
-  // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 48 }, (_, i) => i/2);
-  // console.log(timeSteps);
-  groupData.forEach((dataItem, index) => {
-    // Create traces for past and future data as step plots
-    var pastTrace_up = {
-      x: timeSteps,
-      y: dataItem.kpi.weekday_availability,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "hvh" },
-      name: "Weekdays",
-      xaxis: "x" + (2 * index + 1),
-      yaxis: "y" + (2 * index + 1),
-      opacity: 0.3,
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-    };
-
-    var pastTrace_down = {
-      x: timeSteps,
-      y: dataItem.kpi.weekend_availability,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "hvh" }, // Step plot
-      name: "Weekends",
-      xaxis: "x" + (2 * index + 1),
-      yaxis: "y" + (2 * index + 1),
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-      opacity: 0.3,
-    };
-
-    var dist_2_wd = {
-      x: Array.from({length: 20}, (_, i) => 2.5+5*i),
-      y: dataItem.kpi.occupation_ratio_dist
-      ,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[2], shape: "spline" },
-      name: "Whole Week",
-      opacity: 0.3,
-      xaxis: "x" + (2 * index + 2),
-      yaxis: "y" + (2 * index + 2),
-      // legendgroup: "group",
-      showlegend: index === 0,
-    };
-
-
-    data.push(
-      pastTrace_down,
-      pastTrace_up,
-      dist_2_wd,
-    );
-
-    // if (groupData.length === 2) {
-    //   layout.xaxis1.title = '';
-    //   layout.xaxis2.title = '';      
-    // } else
-    //  if (groupData.length === 3) {
-    //   layout.xaxis1.title = '';
-    //   layout.xaxis2.title = '';
-    //   layout.xaxis3.title = '';
-    //   layout.xaxis4.title = '';
-    //   layout.xaxis5.title = '';
-    //   layout.xaxis6.title = '';
-    // }
-
-    if (index == 0) {
-      // change y-axis title
-      layout.yaxis1.title = `Probability`;
-    } else if (index == 1) {
-      layout.yaxis3.title = `Probability`;
-    } else if (index == 2) {
-      layout.yaxis5.title = `Probability`;
-    }
-
-
-    let label1 = "<b>Charger Availability Probability</b>";
-    let label2 = "<b>Charger Occupancy Ratio</b>";
-
-
-
-    if (index == 0) {
-      // Add titles to each subplot
-      layout.annotations.push({
-        text: label1,
-        xref: "x" + (2 * index + 1) + " domain",
-        yref: "y" + (2 * index + 1) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-      layout.annotations.push({
-        text: label2,
-        xref: "x" + (2 * index + 2) + " domain",
-        yref: "y" + (2 * index + 2) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
-
-     
-    }
-  });
-
-  return { data, layout };
+// The response carries local wall-clock time with its offset; reading the
+// pieces avoids the browser re-expressing it in its own zone
+function localStamp(iso) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(iso || "");
+  if (!match) return null;
+  const weekday = WEEKDAYS[new Date(Date.UTC(+match[1], +match[2] - 1, +match[3])).getUTCDay()];
+  return `${weekday} ${match[3]}/${match[2]} ${match[4]}`;
 }
 
+// A histogram as step lines on its bin edges, one trace per day type that has
+// data. `activeOnly` leaves idle charger-days (exactly zero energy, always in
+// the first bin) out, so they do not dwarf the days that charged. `open` marks
+// a last bin that also holds everything above its edge.
+function histogramPanel(kpi, spec) {
+  const { field, title, xTitle, bins, upper, tick, noun = "sessions", open = false, activeOnly = false } = spec;
+  const edges = Array.from({ length: bins + 1 }, (_, i) => (i * upper) / bins);
+  const traces = [];
+  DAY_TYPES.forEach(({ key, name, color }) => {
+    const counts = kpi[`${field}_dist_${key}`];
+    if (!isSeries(counts, bins)) return;
+    const used = counts.slice();
+    const idle = kpi[`idle_charger_days_${key}`];
+    if (activeOnly && isNumber(idle)) used[0] = Math.max(0, used[0] - idle);
+    traces.push({
+      x: edges,
+      y: closed(shareOf(used)),
+      customdata: closed(used),
+      mode: "lines",
+      fill: "tozeroy",
+      line: { color, shape: "hv", width: 1.75 },
+      name,
+      hovertemplate: `%{y:.1f}% (%{customdata:,.0f} ${noun})<extra>${name}</extra>`,
+    });
+  });
+  if (!traces.length) return null;
+  const tickvals = edges.filter((edge) => edge % tick === 0);
+  return {
+    title,
+    traces,
+    xaxis: {
+      title: xTitle,
+      range: [0, upper],
+      tickvals,
+      ticktext: tickvals.map((value) => (open && value === upper ? `${value}+` : String(value))),
+    },
+    yaxis: { title: `Share of ${noun} (%)`, rangemode: "tozero" },
+    shared: true,
+    peak: peakOf(traces),
+  };
+}
 
+// A value per day type over the 24 hours (`edges` of 24 bins) or 48 half-hours
+function profilePanel(kpi, { fields, title, yTitle, edges, unit, fraction = false, range = null }) {
+  const bins = edges.length - 1;
+  const traces = [];
+  DAY_TYPES.forEach(({ key, name, color }) => {
+    const values = kpi[fields[key]];
+    if (!isSeries(values, bins)) return;
+    traces.push({
+      x: edges,
+      y: closed(values),
+      mode: "lines",
+      fill: fraction ? "none" : "tozeroy",
+      line: { color, shape: "hv", width: 1.75 },
+      name,
+      connectgaps: false,
+      hovertemplate: fraction ? `%{y:.0%}<extra>${name}</extra>` : `%{y:,.1f} ${unit}<extra>${name}</extra>`,
+    });
+  });
+  if (!traces.length) return null;
+  return {
+    title,
+    traces,
+    xaxis: { title: "Hour of day (local)", range: [0, 24], tickvals: HOUR_TICKS },
+    yaxis: {
+      title: yTitle,
+      rangemode: "tozero",
+      ...(fraction ? { tickformat: ".0%" } : {}),
+      ...(range ? { range } : {}),
+    },
+    // A pinned axis is already the same for every area
+    shared: !range,
+    peak: peakOf(traces),
+  };
+}
+
+function userPanels(kpi) {
+  return [
+    histogramPanel(kpi, { field: "arrival", title: "Arrival time", xTitle: "Hour of day (local)", bins: 24, upper: 24, tick: 6 }),
+    histogramPanel(kpi, { field: "duration", title: "Connection time", xTitle: "Hours connected", bins: 24, upper: 24, tick: 6, open: true }),
+    histogramPanel(kpi, { field: "departure", title: "Departure time", xTitle: "Hour of day (local)", bins: 24, upper: 24, tick: 6 }),
+    histogramPanel(kpi, { field: "slack", title: "Idle while plugged in", xTitle: "Hours not needed to charge", bins: 24, upper: 24, tick: 6, open: true }),
+  ];
+}
+
+function userSummary(kpi) {
+  const s = kpi.summary || {};
+  const lines = [];
+  if (isNumber(s.session_count)) {
+    const arrival = isNumber(s.mean_arrival_hour) ? ` · arrive ~${clockText(s.mean_arrival_hour)}` : "";
+    lines.push(`${s.session_count.toLocaleString()} sessions${arrival}`);
+  }
+  if (isNumber(s.median_duration_hours) && isNumber(s.p90_duration_hours)) {
+    lines.push(`Stay: median ${hoursText(s.median_duration_hours)} · P90 ${hoursText(s.p90_duration_hours)}`);
+  }
+  if (isNumber(s.slack_share)) lines.push(`${percentText(s.slack_share)} of stay time is idle`);
+  const over = kpi.overflow && kpi.overflow.duration;
+  const long = over ? (over.wd || 0) + (over.we || 0) : 0;
+  if (long) lines.push(`${long} stays over 24 h, in the last bin`);
+  return lines;
+}
+
+function gridPanels(kpi) {
+  const loadDuration = kpi.load_duration_kw;
+  const durationPanel = isSeries(loadDuration, 21)
+    ? {
+        title: "Load duration",
+        traces: [{
+          x: Array.from({ length: 21 }, (_, i) => 5 * i),
+          y: loadDuration,
+          mode: "lines",
+          fill: "tozeroy",
+          line: { color: SERIES[2], shape: "hv", width: 1.75 },
+          name: "Whole range",
+          hideLegend: true,
+          hovertemplate: "%{y:,.1f} kW<extra>exceeded %{x}% of the time</extra>",
+        }],
+        xaxis: { title: "Share of time power is exceeded (%)", range: [0, 100], tickvals: [0, 25, 50, 75, 100] },
+        yaxis: { title: "Power (kW)", rangemode: "tozero" },
+        shared: true,
+        peak: Math.max(0, ...loadDuration.filter(isNumber)),
+      }
+    : null;
+  return [
+    profilePanel(kpi, {
+      fields: { wd: "load_profile_wd", we: "load_profile_we" },
+      title: "Uncontrolled load", yTitle: "Mean power (kW)", edges: SLOT_EDGES, unit: "kW",
+    }),
+    durationPanel,
+    profilePanel(kpi, {
+      fields: { wd: "hour_of_arrival_consumption_wd", we: "hour_of_arrival_consumption_we" },
+      title: "Energy per session by arrival hour", yTitle: "Mean energy (kWh)", edges: HOUR_EDGES, unit: "kWh",
+    }),
+    histogramPanel(kpi, {
+      field: "daily_consumption", title: "Daily energy per charger", xTitle: "kWh per charger and day",
+      bins: 10, upper: 200, tick: 40, open: true, activeOnly: true, noun: "active charger-days",
+    }),
+    histogramPanel(kpi, {
+      field: "consumption", title: "Energy per session", xTitle: "kWh per session",
+      bins: 10, upper: 100, tick: 20, open: true,
+    }),
+  ];
+}
+
+function gridSummary(kpi) {
+  const s = kpi.summary || {};
+  const lines = [];
+  if (isNumber(s.peak_kw) && s.peak_kw > 0) {
+    const when = localStamp(s.peak_time);
+    lines.push(`Peak ${s.peak_kw.toFixed(s.peak_kw < 100 ? 1 : 0)} kW${when ? ` · ${when}` : ""}`);
+  }
+  if (isNumber(s.load_factor) && isNumber(s.coincidence_factor)) {
+    lines.push(`Load factor ${s.load_factor.toFixed(2)} · coincidence ${s.coincidence_factor.toFixed(2)}`);
+  }
+  if (isNumber(s.idle_charger_day_share)) lines.push(`${percentText(s.idle_charger_day_share)} of charger-days idle`);
+  const over = kpi.overflow || {};
+  const above = (key) => (over[key] ? (over[key].wd || 0) + (over[key].we || 0) : 0);
+  if (above("consumption")) lines.push(`${above("consumption")} sessions over 100 kWh, in the last bin`);
+  return lines;
+}
+
+// Sessions per charger and day: the mean (bars) and the busiest tenth of days
+// (markers), then how charger-days split by number of sessions
+function mobilityPanels(kpi) {
+  const histograms = Array.from({ length: 7 }, (_, day) => kpi[`sessions_per_day_${day}`]);
+  if (!histograms.every((values) => isSeries(values, 6))) return [];
+  const observed = isSeries(kpi.sessions_per_day_observations, 7)
+    ? kpi.sessions_per_day_observations
+    : histograms.map((values) => (sum(values) > 0 ? 1 : 0));
+  // Older responses only carry the histograms; the last bin then reads as "5"
+  const mean = isSeries(kpi.sessions_per_day_mean, 7)
+    ? kpi.sessions_per_day_mean
+    : histograms.map((values) => values.reduce((total, share, count) => total + count * share, 0));
+  const hasData = (day) => observed[day] > 0;
+  const days = MONDAY_FIRST;
+  const meanPanel = {
+    title: "Sessions per charger and day",
+    traces: [{
+      x: days,
+      y: mean.map((value, day) => (hasData(day) && isNumber(value) ? value : null)),
+      type: "bar",
+      marker: { color: SERIES[0] },
+      name: "Mean",
+      hideLegend: true,
+      hovertemplate: "%{y:.2f}<extra>Mean</extra>",
+    }].concat(isSeries(kpi.sessions_per_day_p90, 7) ? [{
+      x: days,
+      y: kpi.sessions_per_day_p90.map((value, day) => (hasData(day) && isNumber(value) ? value : null)),
+      mode: "markers",
+      marker: { color: INK, symbol: "diamond", size: 8 },
+      name: "90th percentile",
+      hideLegend: true,
+      hovertemplate: "%{y:.1f}<extra>90th percentile</extra>",
+    }] : []),
+    xaxis: { type: "category" },
+    yaxis: { title: "Mean (bar) · 90th percentile (◆)", rangemode: "tozero" },
+    shared: true,
+  };
+  meanPanel.peak = peakOf(meanPanel.traces);
+  const labels = ["0 sessions", "1 session", "2 sessions", "3 sessions", "4 sessions", "5+ sessions"];
+  const shares = {
+    title: "Charger-days by number of sessions",
+    traces: labels.map((name, count) => ({
+      x: days,
+      y: histograms.map((values, day) => (hasData(day) ? 100 * values[count] : null)),
+      type: "bar",
+      name,
+      marker: { color: withAlpha(SERIES[0], [0.14, 0.3, 0.46, 0.62, 0.8, 1][count]) },
+      hovertemplate: `%{y:.0f}%<extra>${name}</extra>`,
+    })),
+    xaxis: { type: "category" },
+    yaxis: { title: "Share of charger-days (%)", range: [0, 100] },
+    stack: true,
+  };
+  return [meanPanel, shares];
+}
+
+function mobilitySummary(kpi) {
+  const s = kpi.summary || {};
+  const lines = [];
+  if (isNumber(s.sessions_per_used_charger_day)) {
+    lines.push(`${s.sessions_per_used_charger_day.toFixed(1)} sessions per used charger-day`);
+  }
+  if (isNumber(s.median_idle_gap_hours)) lines.push(`Median idle gap ${hoursText(s.median_idle_gap_hours)}`);
+  if (isNumber(s.idle_charger_day_share)) lines.push(`${percentText(s.idle_charger_day_share)} of charger-days unused`);
+  return lines;
+}
+
+// Occupancy (connected) and utilisation (energy against rated power) of each
+// charger when there are few; otherwise the spread of occupancy
+function usagePanel(kpi) {
+  const usage = kpi.charger_usage;
+  const count = usage && Array.isArray(usage.id) ? usage.id.length : 0;
+  if (count && count <= MAX_BAR_CHARGERS && isSeries(usage.occupancy, count) && isSeries(usage.utilisation, count)) {
+    const order = usage.id.map((_, i) => i).sort((a, b) => usage.occupancy[b] - usage.occupancy[a]);
+    const x = order.map((i) => `#${usage.id[i]}`);
+    const bar = (values, name, color, hint) => ({
+      x,
+      y: order.map((i) => values[i]),
+      customdata: order.map((i) => usage.id[i]),
+      type: "bar",
+      name,
+      marker: { color },
+      hovertemplate: `Charger %{customdata}: %{y:.0%}<extra>${hint}</extra>`,
+    });
+    return {
+      title: "Occupancy and utilisation",
+      traces: [
+        bar(usage.occupancy, "Occupied", SERIES[0], "Occupied"),
+        bar(usage.utilisation, "Utilisation", SERIES[2], "Energy ÷ rated power"),
+      ],
+      xaxis: { type: "category", title: "Chargers, busiest first", showticklabels: count <= 12 },
+      yaxis: { title: "Share of time", tickformat: ".0%", rangemode: "tozero" },
+    };
+  }
+  const bins = kpi.occupation_ratio_dist;
+  if (!isSeries(bins, 20)) return null;
+  const edges = Array.from({ length: 21 }, (_, i) => 5 * i);
+  const used = bins.map((value) => 100 * value);
+  const trace = {
+    x: edges,
+    y: closed(used),
+    mode: "lines",
+    fill: "tozeroy",
+    line: { color: SERIES[2], shape: "hv", width: 1.75 },
+    name: "Chargers",
+    hovertemplate: "%{y:.1f}%<extra>of chargers</extra>",
+  };
+  return {
+    title: "Occupancy by charger",
+    traces: [trace],
+    xaxis: { title: "Share of time occupied (%)", range: [0, 100], tickvals: [0, 25, 50, 75, 100] },
+    yaxis: { title: "Share of chargers (%)", rangemode: "tozero" },
+    shared: true,
+    peak: peakOf([trace]),
+  };
+}
+
+function cityPanels(kpi) {
+  const blocking = [kpi.weekday_blocking, kpi.weekend_blocking];
+  const hasBlocking = blocking.some(
+    (values) => isSeries(values, 48) && values.some((value) => isNumber(value) && value >= MIN_BLOCKING));
+  return [
+    profilePanel(kpi, {
+      fields: { wd: "weekday_availability", we: "weekend_availability" },
+      title: "Free chargers", yTitle: "Share of chargers free", edges: SLOT_EDGES, fraction: true, range: [0, 1],
+    }),
+    hasBlocking
+      ? profilePanel(kpi, {
+          fields: { wd: "weekday_blocking", we: "weekend_blocking" },
+          title: "All chargers busy", yTitle: "Probability", edges: SLOT_EDGES, fraction: true,
+        })
+      : null,
+    usagePanel(kpi),
+  ];
+}
+
+function citySummary(kpi) {
+  const s = kpi.summary || {};
+  const lines = [];
+  if (isNumber(s.mean_occupancy_ratio)) {
+    const used = isNumber(s.mean_utilisation) ? ` · utilisation ${percentText(s.mean_utilisation)}` : "";
+    lines.push(`Occupancy ${percentText(s.mean_occupancy_ratio)}${used}`);
+  }
+  if (isNumber(s.max_blocking_probability)) {
+    lines.push(s.max_blocking_probability < MIN_BLOCKING
+      ? "Never all busy at once"
+      : `All busy up to ${percentText(s.max_blocking_probability)} of a half-hour`);
+  }
+  return lines;
+}
+
+function kpiChart(panels, columns, summary) {
+  if (!panels.length) return { message: "No KPI data for this area and range." };
+  columns = Math.min(columns, panels.length);
+  const data = [];
+  const seen = new Set();
+  const layout = {
+    grid: { rows: Math.ceil(panels.length / columns), columns, pattern: "independent" },
+    hovermode: "x unified",
+    barmode: panels.some((panel) => panel.stack) ? "stack" : "group",
+    annotations: [],
+  };
+  panels.forEach((panel, i) => {
+    const n = i + 1;
+    panel.traces.forEach(({ hideLegend, ...trace }) => {
+      // One legend entry per series name, however many panels repeat it
+      const first = !hideLegend && !seen.has(trace.name);
+      seen.add(trace.name);
+      data.push({ ...trace, xaxis: "x" + n, yaxis: "y" + n, legendgroup: trace.name, showlegend: first });
+    });
+    layout["xaxis" + n] = { ...panel.xaxis };
+    layout["yaxis" + n] = { ...panel.yaxis };
+    layout.annotations.push({
+      text: `<b>${panel.title}</b>`,
+      xref: `x${n} domain`, yref: `y${n} domain`,
+      x: 0, y: 1.05, xanchor: "left", yanchor: "bottom", showarrow: false,
+    });
+  });
+  return { data, layout, summary };
+}
+
+// Areas share each panel's scale, so one reads against another at a glance
+function renderKpiPanels(groupData, columns, panelsFor, summaryFor) {
+  const built = groupData.map((group) => panelsFor(group.kpi || {}));
+  const peaks = [];
+  built.forEach((panels) =>
+    panels.forEach((panel, i) => {
+      if (panel && panel.shared) peaks[i] = Math.max(peaks[i] || 0, panel.peak || 0);
+    }));
+  renderGroupPanels(groupData, (group, index) => {
+    const panels = built[index]
+      .map((panel, i) =>
+        panel && panel.shared && peaks[i] > 0
+          ? { ...panel, yaxis: { ...panel.yaxis, range: [0, peaks[i] * 1.1] } }
+          : panel)
+      .filter(Boolean);
+    return kpiChart(panels, columns, summaryFor(group.kpi || {}));
+  });
+}
 
 function environmentKpiChart(groupData) {
     var data = [];
@@ -1728,19 +1285,19 @@ function environmentKpiChart(groupData) {
 }
 
 export function createUserKPIGraph(groupData) {
-  renderGroupPanels(groupData, (group) => userKpiChart([group]));
+  renderKpiPanels(groupData, 2, userPanels, userSummary);
 }
 
 export function createGridKPIGraph(groupData) {
-  renderGroupPanels(groupData, (group) => gridKpiChart([group]));
+  renderKpiPanels(groupData, 3, gridPanels, gridSummary);
 }
 
 export function createMobilityKPIGraph(groupData) {
-  renderGroupPanels(groupData, (group) => mobilityKpiChart([group]));
+  renderKpiPanels(groupData, 2, mobilityPanels, mobilitySummary);
 }
 
 export function createCityKPIGraph(groupData) {
-  renderGroupPanels(groupData, (group) => cityKpiChart([group]));
+  renderKpiPanels(groupData, 3, cityPanels, citySummary);
 }
 
 export function createEnvironmentKPIGraph(groupData) {

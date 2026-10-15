@@ -36,6 +36,35 @@
 
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
+  /* Dark slate surfaces: app bar, action bar, map controls and the analysis
+     header all draw from these, so the whole app reads as one instrument */
+  --hdr-ink: #1b201e;
+  --hdr-ink-2: #272d2a;
+  --hdr-text: #ffffff;
+  --hdr-muted: rgba(255, 255, 255, 0.76);
+  --hdr-line: rgba(255, 255, 255, 0.16);
+  --hdr-glass: rgba(255, 255, 255, 0.08);
+  --hdr-glass-hover: rgba(255, 255, 255, 0.15);
+  /* Graphite grey surfaces with one light, soft green: it marks focus,
+     highlights and status, and fills whatever is primary or selected (with
+     dark text on it) */
+  --hdr-accent: #a9d3b8;
+  --hdr-accent-rgb: 169, 211, 184;
+  --hdr-steel: #c3ccc7;
+  --hdr-select: linear-gradient(135deg, #b7dcc5, #94c7a9);
+  --hdr-on-select: #14201a;
+  --dark-surface: linear-gradient(
+    135deg,
+    rgba(27, 32, 30, 0.95),
+    rgba(39, 45, 42, 0.93) 60%,
+    rgba(34, 40, 38, 0.95)
+  );
+  /* Round controls and segment height; roomier for touch (pointer: coarse) */
+  --ctl: 40px;
+  --seg: 36px;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   /* Layering */
   --z-map-ui: 1000;
   --z-header: 1010;
@@ -102,23 +131,98 @@ body.analysis-open #map {
   top: calc(var(--header-h) + var(--gap));
 }
 
+/* Zoom control: the same dark glass as the bars. Leaflet paints its own white
+   buttons, so these need !important. */
 .leaflet-bar {
-  border: none !important;
-  box-shadow: var(--shadow) !important;
-  border-radius: var(--radius-sm) !important;
+  background: var(--dark-surface);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 10px 28px rgba(8, 12, 10, 0.38) !important;
+  border-radius: var(--radius) !important;
   overflow: hidden;
 }
 
-.leaflet-bar a {
-  width: 36px !important;
-  height: 36px !important;
-  line-height: 36px !important;
-  color: var(--text) !important;
+.leaflet-bar a,
+.leaflet-bar a:focus {
+  width: var(--ctl) !important;
+  height: var(--ctl) !important;
+  line-height: var(--ctl) !important;
+  font-family: var(--font) !important;
+  font-size: 20px !important;
+  font-weight: 500 !important;
+  color: var(--hdr-text) !important;
+  background-color: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.leaflet-bar a:last-child {
+  border-bottom: none !important;
+}
+
+.leaflet-bar a:hover {
+  color: var(--hdr-accent) !important;
+  background-color: var(--hdr-glass-hover) !important;
+}
+
+.leaflet-bar a.leaflet-disabled {
+  color: rgba(255, 255, 255, 0.35) !important;
+  background-color: transparent !important;
+  cursor: default;
+}
+
+.leaflet-bar a:focus-visible {
+  outline: 2px solid var(--hdr-accent);
+  outline-offset: -3px;
 }
 
 .leaflet-popup-content-wrapper {
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: 0 14px 34px rgba(8, 12, 10, 0.28);
+}
+
+/* Tooltips (Bootstrap): small dark-glass labels, to match the bars they
+   describe */
+.tooltip {
+  font-family: var(--font);
+}
+
+.tooltip.show {
+  opacity: 1;
+}
+
+.tooltip-inner {
+  max-width: 240px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--hdr-text);
+  background: rgba(24, 29, 27, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 22px rgba(5, 8, 7, 0.4);
+}
+
+.bs-tooltip-top .arrow::before,
+.bs-tooltip-auto[x-placement^="top"] .arrow::before {
+  border-top-color: rgba(24, 29, 27, 0.96);
+}
+
+.bs-tooltip-bottom .arrow::before,
+.bs-tooltip-auto[x-placement^="bottom"] .arrow::before {
+  border-bottom-color: rgba(24, 29, 27, 0.96);
+}
+
+.bs-tooltip-left .arrow::before,
+.bs-tooltip-auto[x-placement^="left"] .arrow::before {
+  border-left-color: rgba(24, 29, 27, 0.96);
+}
+
+.bs-tooltip-right .arrow::before,
+.bs-tooltip-auto[x-placement^="right"] .arrow::before {
+  border-right-color: rgba(24, 29, 27, 0.96);
 }
 
 .leaflet-popup-content {
@@ -375,48 +479,49 @@ body.analysis-open #map {
    Buttons
    -------------------------------------------------------------------------- */
 
-.btn-primary-app,
-.btn-outline-app {
+/* The one primary action (Analyse): deep brand green with white text, the same
+   green as a selected tool or category */
+.btn-primary-app {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 0 18px;
+  min-height: var(--ctl);
+  padding: 0 20px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--hdr-on-select);
+  background: var(--hdr-select);
+  border: 0;
   border-radius: 999px;
+  box-shadow: 0 6px 16px rgba(var(--hdr-accent-rgb), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease,
-    transform 0.15s ease, color 0.15s ease;
-}
-
-.btn-primary-app {
-  color: #fff;
-  background: var(--brand);
-  border: 1px solid var(--brand);
-  box-shadow: 0 4px 12px rgba(31, 138, 76, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .btn-primary-app:hover {
-  color: #fff;
-  background: var(--brand-600);
+  color: var(--hdr-on-select);
+  filter: brightness(1.06);
+  box-shadow: 0 8px 20px rgba(var(--hdr-accent-rgb), 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
 }
 
 .btn-primary-app:active {
-  transform: translateY(1px);
+  transform: translateY(0) scale(0.98);
 }
 
-.btn-outline-app {
-  color: var(--brand-600);
-  background: var(--surface);
-  border: 1px solid var(--brand-100);
+.btn-primary-app .fa {
+  transition: transform 0.3s var(--ease-spring);
 }
 
-.btn-outline-app:hover {
-  background: var(--brand-50);
-  border-color: var(--brand);
+.btn-primary-app:hover .fa {
+  transform: scale(1.18) rotate(-6deg);
 }
 
 /* Attention pulse once an area has been drawn */
@@ -427,10 +532,12 @@ body.analysis-open #map {
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 4px 12px rgba(31, 138, 76, 0.35), 0 0 0 0 rgba(31, 138, 76, 0.45);
+    box-shadow: 0 6px 16px rgba(var(--hdr-accent-rgb), 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 0 0 rgba(var(--hdr-accent-rgb), 0.5);
   }
   50% {
-    box-shadow: 0 4px 12px rgba(31, 138, 76, 0.35), 0 0 0 10px rgba(31, 138, 76, 0);
+    box-shadow: 0 6px 16px rgba(var(--hdr-accent-rgb), 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 0 12px rgba(var(--hdr-accent-rgb), 0);
   }
 }
 
@@ -438,8 +545,8 @@ body.analysis-open #map {
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: var(--ctl);
+  height: var(--ctl);
   font-size: 18px;
   color: var(--text-muted);
   background: transparent;
@@ -459,25 +566,94 @@ body.analysis-open #map {
   align-items: center;
   gap: 6px;
   flex: none;
-  height: 36px;
-  padding: 0 12px;
+  height: var(--ctl);
+  padding: 0 14px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--hdr-muted);
   background: none;
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .help-btn .fa {
   font-size: 17px;
+  transition: transform 0.3s var(--ease-spring);
 }
 
 .help-btn:hover {
-  color: var(--brand-600);
-  background: var(--brand-50);
+  color: var(--hdr-text);
+  background: var(--hdr-glass-hover);
+}
+
+.help-btn:hover .fa {
+  transform: scale(1.15) rotate(-8deg);
+}
+
+/* --------------------------------------------------------------------------
+   Dark slate surfaces: app bar and action bar (the analysis header and the
+   map controls share the same tokens). A faint teal and steel wash drifts
+   slowly behind the controls; it only moves a background position.
+   -------------------------------------------------------------------------- */
+
+.app-bar,
+.action-bar {
+  isolation: isolate;
+  color: var(--hdr-text);
+  background: var(--dark-surface);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 36px rgba(8, 12, 10, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.app-bar::before,
+.action-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(30% 140% at 8% 50%, rgba(var(--hdr-accent-rgb), 0.14), transparent 70%),
+    radial-gradient(24% 120% at 55% 100%, rgba(210, 220, 215, 0.07), transparent 70%),
+    radial-gradient(30% 140% at 94% 40%, rgba(150, 175, 160, 0.14), transparent 70%);
+  background-size: 130% 100%;
+  animation: wash-drift 22s ease-in-out infinite alternate;
+}
+
+@keyframes wash-drift {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 0%;
+  }
+}
+
+.app-bar :focus-visible,
+.action-bar :focus-visible {
+  outline: 2px solid var(--hdr-accent);
+  outline-offset: 2px;
+}
+
+/* The bars settle into place when the app loads */
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    translate: 0 -12px;
+  }
+}
+
+@keyframes bar-up {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -494,13 +670,9 @@ body.analysis-open #map {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 12px;
-  padding: 8px 12px;
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  padding: 10px 14px;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  animation: bar-in 0.6s var(--ease-out) backwards;
 }
 
 /* Left: brand, then the workflow (find a place, draw areas). Right: what the
@@ -509,7 +681,7 @@ body.analysis-open #map {
   flex: none;
   width: 1px;
   height: 24px;
-  background: var(--border);
+  background: var(--hdr-line);
 }
 
 .app-bar__break {
@@ -549,6 +721,84 @@ body.analysis-open #map {
   letter-spacing: 0.5px;
 }
 
+/* The logo on a dark surface: brand-green mark with a hover sheen, softly
+   tinted wordmark. Used by the app bar and the analysis header. */
+.logo--on-dark,
+.logo--on-dark:hover {
+  color: var(--hdr-text);
+}
+
+.logo--on-dark {
+  gap: 10px;
+}
+
+.logo--on-dark .logo__mark {
+  position: relative;
+  overflow: hidden;
+  color: var(--hdr-on-select);
+  background: var(--hdr-select);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    0 4px 14px rgba(var(--hdr-accent-rgb), 0.3);
+  transition: transform 0.35s var(--ease-spring);
+}
+
+.logo--on-dark .logo__mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+}
+
+.logo--on-dark:hover .logo__mark {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+.logo--on-dark:hover .logo__mark::after {
+  transform: translateX(120%);
+  transition: transform 0.6s ease;
+}
+
+/* The bolt strikes once as the page or panel appears */
+.logo--on-dark .logo__mark .fa {
+  animation: bolt-strike 0.9s var(--ease-out) 0.35s backwards;
+}
+
+@keyframes bolt-strike {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 8px #fff);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .logo--on-dark .logo__text {
+    background: linear-gradient(90deg, #fff 40%, #d3e3d9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* About */
+.app-bar .help-btn {
+  border: 1px solid var(--hdr-line);
+  background: var(--hdr-glass);
+}
+
 /* Search */
 .search {
   position: relative;
@@ -565,30 +815,45 @@ body.analysis-open #map {
 
 .search__icon {
   position: absolute;
-  left: 14px;
-  color: var(--text-muted);
+  left: 15px;
+  color: var(--hdr-muted);
   pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.search__field:focus-within .search__icon {
+  color: var(--hdr-accent);
 }
 
 .search__input {
   width: 100%;
-  height: 40px;
-  padding: 0 40px 0 38px;
+  height: var(--ctl);
+  padding: 0 40px 0 40px;
   font-size: 14px;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid transparent;
+  color: var(--hdr-text);
+  caret-color: var(--hdr-accent);
+  background: var(--hdr-glass);
+  border: 1px solid var(--hdr-line);
   border-radius: 999px;
   outline: none;
   text-overflow: ellipsis;
-  transition: border-color 0.15s ease, background-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.search__input::placeholder {
+  color: rgba(255, 255, 255, 0.64);
+  opacity: 1;
+}
+
+.search__input:hover {
+  background: var(--hdr-glass-hover);
 }
 
 .search__input:focus {
-  background: var(--surface);
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(31, 138, 76, 0.15);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--hdr-accent);
+  box-shadow: 0 0 0 3px rgba(var(--hdr-accent-rgb), 0.22);
 }
 
 .search__clear {
@@ -600,22 +865,23 @@ body.analysis-open #map {
   height: 28px;
   padding: 0;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--hdr-muted);
   background: none;
   border: none;
   border-radius: 50%;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .search__clear:hover {
-  color: var(--text);
-  background: var(--surface-2);
+  color: var(--hdr-text);
+  background: var(--hdr-glass-hover);
 }
 
-/* Suggestions dropdown */
+/* Suggestions dropdown: the same dark glass, so it reads as part of the bar */
 .search__menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   left: 0;
   z-index: var(--z-hint);
   width: max(100%, 380px);
@@ -624,20 +890,25 @@ body.analysis-open #map {
   padding: 6px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+  color: var(--hdr-text);
+  background: rgba(26, 31, 29, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  animation: message-in 0.15s ease;
+  box-shadow: 0 22px 52px rgba(5, 8, 7, 0.5);
+  animation: message-in 0.18s var(--ease-out);
 }
 
 .search__group {
   padding: 8px 10px 4px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .search__option {
@@ -647,10 +918,12 @@ body.analysis-open #map {
   padding: 7px 10px;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color 0.12s ease;
 }
 
+.search__option:hover,
 .search__option[aria-selected="true"] {
-  background: var(--brand-50);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .search__option-icon {
@@ -660,14 +933,14 @@ body.analysis-open #map {
   width: 32px;
   height: 32px;
   font-size: 14px;
-  color: var(--text-muted);
-  background: var(--surface-2);
+  color: var(--hdr-muted);
+  background: var(--hdr-glass);
   border-radius: var(--radius-sm);
 }
 
 .search__option[aria-selected="true"] .search__option-icon {
-  color: var(--brand-600);
-  background: var(--surface);
+  color: var(--hdr-accent);
+  background: rgba(var(--hdr-accent-rgb), 0.16);
 }
 
 /* Country code in place of an icon for city suggestions */
@@ -675,8 +948,8 @@ body.analysis-open #map {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: var(--brand-600);
-  background: var(--brand-50);
+  color: var(--hdr-accent);
+  background: rgba(var(--hdr-accent-rgb), 0.14);
 }
 
 .search__option-text {
@@ -695,19 +968,19 @@ body.analysis-open #map {
 .search__option-name {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--hdr-text);
 }
 
 .search__option-name mark {
   padding: 0;
   font-weight: 700;
-  color: var(--brand-600);
+  color: var(--hdr-accent);
   background: none;
 }
 
 .search__option-meta {
   font-size: 12px;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.64);
 }
 
 .search__status {
@@ -716,15 +989,15 @@ body.analysis-open #map {
   gap: 8px;
   padding: 10px;
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--hdr-muted);
 }
 
 .search__spinner {
   flex: none;
   width: 14px;
   height: 14px;
-  border: 2px solid var(--brand-100);
-  border-top-color: var(--brand);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-top-color: var(--hdr-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -733,8 +1006,8 @@ body.analysis-open #map {
   margin-top: 4px;
   padding: 6px 10px 2px;
   font-size: 11px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border);
+  color: rgba(255, 255, 255, 0.58);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Short-lived marker on the place that was picked */
@@ -758,49 +1031,56 @@ body.analysis-open #map {
   }
 }
 
-/* Layer toggles: one grouped control, as they set what the map shows */
+/* Layer toggles: one grouped control, as they set what the map shows. A
+   switched-on layer is a raised white pill, like the active analysis tab. */
 .layer-toggles {
   display: flex;
   align-items: center;
   flex: none;
   gap: 2px;
-  height: 40px;
+  height: var(--ctl);
   margin-left: auto;
-  padding: 3px 3px 3px 12px;
-  background: var(--surface-2);
+  padding: 3px 3px 3px 14px;
+  background: var(--hdr-glass);
+  border: 1px solid var(--hdr-line);
   border-radius: 999px;
 }
 
 .layer-toggles__label {
   margin-right: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--hdr-muted);
 }
 
 .chip-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: calc(var(--ctl) - 8px);
   margin: 0;
-  padding: 0 12px 0 8px;
+  padding: 0 14px 0 9px;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--hdr-muted);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 999px;
   cursor: pointer;
   user-select: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
-    color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.2s ease, color 0.2s ease,
+    box-shadow 0.2s ease, transform 0.15s ease;
 }
 
 .chip-toggle:hover {
-  color: var(--text);
+  color: var(--hdr-text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chip-toggle:active {
+  transform: scale(0.97);
 }
 
 .chip-toggle input {
@@ -812,25 +1092,26 @@ body.analysis-open #map {
 .chip-toggle__icon {
   width: 20px;
   height: 20px;
-  opacity: 0.45;
-  filter: grayscale(1);
-  transition: opacity 0.15s ease, filter 0.15s ease;
+  opacity: 0.7;
+  filter: grayscale(1) brightness(1.9);
+  transition: opacity 0.2s ease, filter 0.2s ease, transform 0.3s var(--ease-spring);
 }
 
-.chip-toggle:has(input:checked) {
-  color: var(--brand-600);
-  background: var(--surface);
-  border-color: var(--brand-100);
-  box-shadow: var(--shadow-sm);
+.chip-toggle:has(input:checked),
+.chip-toggle:has(input:checked):hover {
+  color: var(--hdr-ink);
+  background: linear-gradient(180deg, #ffffff, #eceeed);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
 .chip-toggle:has(input:checked) .chip-toggle__icon {
   opacity: 1;
   filter: none;
+  transform: scale(1.08);
 }
 
 .chip-toggle:has(input:focus-visible) {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--hdr-accent);
   outline-offset: 2px;
 }
 
@@ -840,7 +1121,7 @@ body.analysis-open .app-bar {
 }
 
 /* --------------------------------------------------------------------------
-   Draw tools (in the app bar)
+   Draw tools (in the bottom action bar)
    -------------------------------------------------------------------------- */
 
 .draw-tools {
@@ -852,10 +1133,10 @@ body.analysis-open .app-bar {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 40px;
-  padding: 3px 4px 3px 14px;
-  background: var(--brand-50);
-  border: 1px solid var(--brand-100);
+  height: 46px;
+  padding: 4px 6px 4px 14px;
+  background: var(--hdr-glass);
+  border: 1px solid var(--hdr-line);
   border-radius: 999px;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
@@ -865,12 +1146,12 @@ body.analysis-open .app-bar {
   align-items: center;
   gap: 6px;
   margin-right: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--brand-600);
+  color: var(--hdr-accent);
 }
 
 .draw-toolbar__label .fa {
@@ -879,12 +1160,12 @@ body.analysis-open .app-bar {
 
 .draw-toolbar__count {
   margin-right: 4px;
-  padding: 2px 7px;
+  padding: 2px 8px;
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--brand-600);
-  background: var(--surface);
+  color: var(--hdr-text);
+  background: rgba(0, 0, 0, 0.28);
   border-radius: 999px;
 }
 
@@ -892,51 +1173,56 @@ body.analysis-open .app-bar {
   width: 1px;
   height: 20px;
   margin: 0 3px;
-  background: var(--brand-100);
+  background: var(--hdr-line);
 }
 
 .draw-btn {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 32px;
+  width: 40px;
+  height: 36px;
   padding: 0;
-  color: var(--brand-600);
+  color: var(--hdr-text);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 999px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease,
-    border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.2s ease, color 0.2s ease,
+    box-shadow 0.2s ease, transform 0.15s ease;
 }
 
 .draw-btn:hover {
-  color: var(--brand-600);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  background: var(--hdr-glass-hover);
 }
 
-.draw-btn.active {
-  color: #fff;
-  background: var(--brand);
-  border-color: var(--brand);
-  box-shadow: 0 2px 6px rgba(31, 138, 76, 0.35);
+.draw-btn:active {
+  transform: scale(0.94);
+}
+
+/* The tool in use: the same green as the active KPI category */
+.draw-btn.active,
+.draw-btn.active:hover {
+  color: var(--hdr-on-select);
+  background: var(--hdr-select);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 4px 12px rgba(var(--hdr-accent-rgb), 0.28);
 }
 
 .draw-btn--danger {
-  color: var(--text-muted);
+  color: var(--hdr-muted);
 }
 
 .draw-btn--danger:hover {
-  color: var(--danger);
-  background: #fdecea;
+  color: #ff9a8f;
+  background: rgba(255, 107, 95, 0.16);
 }
 
-.draw-btn--danger.active {
+.draw-btn--danger.active,
+.draw-btn--danger.active:hover {
   color: #fff;
-  background: var(--danger);
-  border-color: var(--danger);
-  box-shadow: 0 2px 6px rgba(192, 57, 43, 0.35);
+  background: linear-gradient(135deg, #c0392b, #9b2c20);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 4px 14px rgba(192, 57, 43, 0.5);
 }
 
 .draw-btn .icon {
@@ -958,39 +1244,39 @@ body.analysis-open .app-bar {
 @keyframes draw-prompt {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(31, 138, 76, 0.4);
+    box-shadow: 0 0 0 0 rgba(var(--hdr-accent-rgb), 0.45);
   }
   50% {
-    box-shadow: 0 0 0 7px rgba(31, 138, 76, 0);
+    box-shadow: 0 0 0 8px rgba(var(--hdr-accent-rgb), 0);
   }
 }
 
 /* Analyse was pressed without an area: point firmly at the tools */
 .draw-tools--alert .draw-toolbar,
 .draw-tools--alert .draw-toolbar:not(:has(.draw-btn.active)) {
-  background: var(--attention-50);
-  border-color: var(--attention);
-  box-shadow: 0 0 0 3px rgba(229, 154, 11, 0.35);
+  background: rgba(229, 154, 11, 0.22);
+  border-color: #ffc247;
+  box-shadow: 0 0 0 3px rgba(255, 194, 71, 0.35);
   animation: draw-alert 0.6s ease 3;
 }
 
 .draw-tools--alert .draw-toolbar__label,
-.draw-tools--alert .draw-btn:not(.draw-btn--danger) {
-  color: #9a5b00;
+.draw-tools--alert .draw-btn:not(.draw-btn--danger):not(.active) {
+  color: #ffd98a;
 }
 
 @keyframes draw-alert {
   0%,
   100% {
     transform: none;
-    box-shadow: 0 0 0 3px rgba(229, 154, 11, 0.35);
+    box-shadow: 0 0 0 3px rgba(255, 194, 71, 0.35);
   }
   15% {
     transform: translateX(-4px);
   }
   30% {
     transform: translateX(4px);
-    box-shadow: 0 0 0 8px rgba(229, 154, 11, 0.2);
+    box-shadow: 0 0 0 8px rgba(255, 194, 71, 0.2);
   }
   45% {
     transform: translateX(-3px);
@@ -1000,24 +1286,27 @@ body.analysis-open .app-bar {
   }
 }
 
-/* Instructions drop down below the tools */
+/* Instructions float above the tools */
 .draw-hint {
   position: absolute;
-  bottom: calc(100% + 14px);
+  bottom: calc(100% + 16px);
   left: 50%;
   transform: translateX(-50%);
   width: max-content;
   max-width: min(340px, calc(100vw - var(--gap) * 4));
-  padding: 10px 12px;
+  padding: 10px 14px;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
   color: #f2f7f4;
-  background: rgba(20, 26, 23, 0.92);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
+  background: rgba(24, 29, 27, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  box-shadow: 0 14px 34px rgba(5, 8, 7, 0.45);
   z-index: var(--z-hint);
   pointer-events: none;
-  animation: message-in 0.2s ease;
+  animation: message-in 0.2s var(--ease-out);
 }
 
 .draw-hint::before {
@@ -1028,7 +1317,7 @@ body.analysis-open .app-bar {
   margin-left: -6px;
   border: 6px solid transparent;
   border-bottom: 0;
-  border-top-color: rgba(20, 26, 23, 0.92);
+  border-top-color: rgba(24, 29, 27, 0.95);
 }
 
 .draw-hint--alert {
@@ -1047,7 +1336,7 @@ body.analysis-open .app-bar {
 }
 
 /* --------------------------------------------------------------------------
-   Bottom action bar (status message + Analyse)
+   Bottom action bar (status message + draw tools + Analyse)
    -------------------------------------------------------------------------- */
 
 .action-bar {
@@ -1058,26 +1347,42 @@ body.analysis-open .app-bar {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   width: max-content;
   max-width: calc(100vw - var(--gap) * 2);
   padding: 8px 8px 8px 20px;
-  background: var(--surface-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   border-radius: 999px;
-  box-shadow: var(--shadow-lg);
+  animation: bar-up 0.6s var(--ease-out) 0.1s backwards;
 }
 
+/* Status message, with a dot: neutral until an area is ready to analyse */
 .action-bar__message {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
   font-size: 14px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--hdr-text);
+}
+
+.action-bar__message::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.action-bar:has(#calc-button.glow) .action-bar__message::before {
+  background: var(--hdr-accent);
+  box-shadow: 0 0 8px rgba(var(--hdr-accent-rgb), 0.45);
 }
 
 .action-bar__message.flash {
-  animation: message-in 0.35s ease;
+  animation: message-in 0.35s var(--ease-out);
 }
 
 @keyframes message-in {
@@ -1095,21 +1400,11 @@ body.analysis-open .app-bar {
   flex: none;
   width: 1px;
   height: 28px;
-  background: var(--border);
+  background: var(--hdr-line);
 }
 
-/* Draw tools sit in the same row as the status message and Analyse */
-.action-bar .draw-toolbar {
-  height: 44px;
-  padding: 4px 6px 4px 14px;
-  background: linear-gradient(180deg, #fff, var(--brand-50));
-  box-shadow: inset 0 0 0 1px var(--brand-100), 0 1px 2px rgba(20, 26, 23, 0.06);
-  border-color: transparent;
-}
-
-.action-bar .draw-btn {
-  width: 38px;
-  height: 36px;
+.action-bar .btn-primary-app {
+  min-height: 46px;
 }
 
 .action-bar__actions {
@@ -1139,52 +1434,173 @@ body.analysis-open .action-bar {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  animation: panel-in 0.25s ease;
+  animation: panel-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translate(-50%, 12px);
+    transform: translate(-50%, 14px) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1);
   }
 }
 
+/* Header: the same dark slate surface as the app bar (tokens in :root) so the
+   controls read as one instrument strip above the white results. Motion is transform/opacity
+   only and switched off for users who ask for reduced motion. */
 .panel__header {
+  position: relative;
+  isolation: isolate;
+  /* The colour wash is larger than the bar; it must not spill onto the results */
+  overflow: hidden;
   flex: none;
-}
-
-.panel__header {
   display: grid;
-  grid-template-columns: auto 1px auto minmax(0, 1fr) auto auto 36px;
-  grid-template-rows: minmax(42px, auto);
-  grid-template-areas: "brand divider title nav tools about close";
+  grid-template-columns: auto 1px auto minmax(0, 1fr) auto auto var(--ctl);
+  grid-template-rows: minmax(46px, auto) auto;
+  grid-template-areas:
+    "brand divider title nav tools about close"
+    ".     .       .     sub sub   sub   sub";
   align-items: center;
-  gap: 8px 8px;
-  padding: 10px 12px 10px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  column-gap: 8px;
+  padding: 12px 14px 12px 18px;
+  color: var(--hdr-text);
+  background: linear-gradient(135deg, var(--hdr-ink), var(--hdr-ink-2) 60%, #222826);
 }
 
+/* Slowly drifting colour wash behind the controls */
+.panel__header::before {
+  content: "";
+  position: absolute;
+  inset: -80% -12%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(34% 50% at 10% 48%, rgba(var(--hdr-accent-rgb), 0.17), transparent 70%),
+    radial-gradient(26% 44% at 50% 82%, rgba(210, 220, 215, 0.08), transparent 70%),
+    radial-gradient(32% 52% at 92% 36%, rgba(150, 175, 160, 0.16), transparent 70%);
+  animation: wash 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes wash {
+  from {
+    transform: translate3d(-5%, -4%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5%, 4%, 0) scale(1.1);
+  }
+}
+
+/* Bottom edge: a quiet gradient hairline that becomes a progress sweep while
+   results are being calculated (status visibility without extra markup) */
+.panel__header::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(var(--hdr-accent-rgb), 0.6),
+    rgba(141, 166, 196, 0.5),
+    transparent
+  );
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.panel:has(.loading-container) .panel__header::after,
+.panel:has(.group-card--busy) .panel__header::after {
+  background: linear-gradient(
+      90deg,
+      transparent,
+      var(--hdr-accent),
+      var(--hdr-steel),
+      transparent
+    )
+    no-repeat;
+  background-size: 38% 100%;
+  opacity: 1;
+  animation: header-sweep 1.2s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes header-sweep {
+  from {
+    background-position: -60% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
+/* The header assembles piece by piece when the panel opens */
+.panel__header > * {
+  animation: header-in 0.55s var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 50ms + 80ms);
+}
+
+.panel__brand {
+  --i: 0;
+}
+
+.panel__divider,
+.panel__title {
+  --i: 1;
+}
+
+.panel__nav,
+.panel__sub {
+  --i: 2;
+}
+
+.panel__tools {
+  --i: 3;
+}
+
+.panel__help {
+  --i: 4;
+}
+
+#minimize-btn {
+  --i: 5;
+}
+
+@keyframes header-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.panel__header :focus-visible {
+  outline: 2px solid var(--hdr-accent);
+  outline-offset: 1px;
+}
+
+/* Brand */
 .panel__brand {
   grid-area: brand;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: none;
 }
+
+/* (the logo itself is styled by .logo--on-dark, shared with the app bar) */
 
 .panel__divider {
   grid-area: divider;
   flex: none;
   width: 1px;
   height: 24px;
-  background: var(--border);
+  background: var(--hdr-line);
 }
 
+/* Title, with a status dot: steady while results are shown, pulsing while
+   they are being calculated, amber when the selection has nothing to show */
 .panel__title {
   grid-area: title;
   display: flex;
@@ -1193,16 +1609,64 @@ body.analysis-open .action-bar {
 }
 
 .panel__title h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   margin: 0;
   font-size: 17px;
   font-weight: 600;
-  color: var(--text);
+  letter-spacing: -0.01em;
+  color: var(--hdr-text);
+}
+
+.panel__title h2::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--hdr-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(var(--hdr-accent-rgb), 0.45);
+}
+
+.panel:has(.loading-container) .panel__title h2::before,
+.panel:has(.group-card--busy) .panel__title h2::before {
+  animation: status-pulse 1s ease-in-out infinite;
+}
+
+.panel:has(.graph-message) .panel__title h2::before {
+  background: #ffc247;
+  box-shadow: 0 0 10px rgba(255, 194, 71, 0.7);
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.5);
+  }
+}
+
+/* About and close */
+.panel__header .help-btn {
+  height: var(--ctl);
+  color: var(--hdr-muted);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.panel__header .help-btn:hover {
+  color: var(--hdr-text);
+  background: var(--hdr-glass-hover);
 }
 
 /* Icon only: the tooltip says what it opens */
 .panel__help {
   grid-area: about;
-  width: 36px;
+  width: var(--ctl);
   padding: 0;
   justify-content: center;
 }
@@ -1211,7 +1675,36 @@ body.analysis-open .action-bar {
   display: none;
 }
 
-/* Session source and report export: small, pill-shaped, always in reach */
+#minimize-btn {
+  grid-area: close;
+}
+
+.panel__header .icon-btn {
+  width: var(--ctl);
+  height: var(--ctl);
+  color: var(--hdr-muted);
+  background: var(--hdr-glass);
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.panel__header .icon-btn:hover {
+  color: var(--hdr-text);
+  background: var(--hdr-glass-hover);
+}
+
+.panel__header .icon-btn:active {
+  transform: scale(0.92);
+}
+
+.panel__header .icon-btn .fa {
+  transition: transform 0.3s var(--ease-spring);
+}
+
+.panel__header .icon-btn:hover .fa {
+  transform: rotate(90deg);
+}
+
+/* Session source and report export: glass pills, always in reach */
 .panel__tools {
   grid-area: tools;
   display: flex;
@@ -1223,44 +1716,46 @@ body.analysis-open .action-bar {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 0 10px 0 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  height: var(--ctl);
+  padding: 0 12px 0 14px;
+  background: var(--hdr-glass);
+  border: 1px solid var(--hdr-line);
   border-radius: 999px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .source-pill:hover {
-  border-color: var(--brand-100);
+  background: var(--hdr-glass-hover);
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 .source-pill:focus-within {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--brand-50);
+  border-color: var(--hdr-accent);
+  box-shadow: 0 0 0 3px rgba(var(--hdr-accent-rgb), 0.25);
 }
 
 .source-pill > .fa {
   font-size: 14px;
-  color: var(--brand);
+  color: var(--hdr-accent);
 }
 
 .source-pill__label {
   margin: 0;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--hdr-muted);
 }
 
 .source-pill select {
-  height: 32px;
-  padding: 0 18px 0 0;
+  height: calc(var(--ctl) - 4px);
+  padding: 0 20px 0 0;
   font: 600 14px/1 var(--font);
-  color: var(--text);
+  color: var(--hdr-text);
   background: transparent
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235b6a61' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
     no-repeat right 1px center;
   border: none;
   outline: none;
@@ -1269,8 +1764,10 @@ body.analysis-open .action-bar {
   -webkit-appearance: none;
 }
 
-.source-pill .info-dot {
-  font-size: 15px;
+/* The open list is drawn by the browser on a light surface */
+.source-pill select option {
+  color: var(--text);
+  background: #fff;
 }
 
 /* Icon only: the tooltip says what it does */
@@ -1278,36 +1775,57 @@ body.analysis-open .action-bar {
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: var(--ctl);
+  height: var(--ctl);
   padding: 0;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
-  color: var(--brand-600);
-  background: var(--surface);
-  border: 1px solid var(--brand-100);
+  color: var(--hdr-text);
+  background: var(--hdr-glass);
+  border: 1px solid var(--hdr-line);
   border-radius: 999px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    transform 0.15s ease;
 }
 
 .tool-btn:hover:not(:disabled) {
-  background: var(--brand-50);
-  border-color: var(--brand);
+  background: var(--hdr-glass-hover);
+  border-color: var(--hdr-accent);
 }
 
-.tool-btn:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
+.tool-btn:hover:not(:disabled) .fa {
+  animation: nudge-down 0.5s ease;
 }
 
+.tool-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+/* Exporting: the arrow turns into a spinner until the file is built */
 .tool-btn:disabled {
-  opacity: 0.6;
   cursor: progress;
 }
 
-#minimize-btn {
-  grid-area: close;
+.tool-btn:disabled .fa::before {
+  content: "\f110";
+}
+
+.tool-btn:disabled .fa {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes nudge-down {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(3px);
+  }
+  70% {
+    transform: translateY(-1px);
+  }
 }
 
 .info-dot {
@@ -1322,26 +1840,56 @@ body.analysis-open .action-bar {
   color: var(--brand);
 }
 
-/* Tabs and, on the KPI tab, the category bar right of them. The tabs stay
-   put when the categories appear; the bar wraps below them if space runs out. */
+/* Tabs. The glider (the group's ::before) slides under the active item; script
+   sets --glider-x/y/w/h and the `has-glider` / `is-ready` classes. Without it
+   the active item paints its own pill, so the nav works either way. */
 .panel__nav {
   grid-area: nav;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 10px;
   min-width: 0;
   padding-left: 12px;
 }
 
-/* Main tabs (segmented) */
+.tabs,
+.kpi-options {
+  position: relative;
+}
+
+.tabs::before,
+.kpi-options::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--glider-w, 0px);
+  height: var(--glider-h, 0px);
+  transform: translate(var(--glider-x, 0px), var(--glider-y, 0px));
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tabs.has-glider::before,
+.kpi-options.has-glider::before {
+  opacity: 1;
+}
+
+.tabs.is-ready::before,
+.kpi-options.is-ready::before {
+  transition: transform 0.42s cubic-bezier(0.3, 1.25, 0.5, 1),
+    width 0.42s cubic-bezier(0.3, 1.25, 0.5, 1), height 0.3s ease;
+}
+
+/* Main tabs (segmented, frosted) */
 .tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   max-width: 100%;
   padding: 4px;
-  background: var(--surface-2);
+  background: var(--hdr-glass);
+  border: 1px solid var(--hdr-line);
   border-radius: 999px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1351,86 +1899,267 @@ body.analysis-open .action-bar {
   display: none;
 }
 
+.tabs::before {
+  background: linear-gradient(180deg, #ffffff, #eceeed);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
 .tab {
+  position: relative;
+  z-index: 1;
   flex: none;
-  height: 34px;
-  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--seg);
+  padding: 0 16px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--hdr-muted);
   background: transparent;
   border: none;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+}
+
+.tab .fa {
+  font-size: 15px;
+  transition: transform 0.3s var(--ease-spring), color 0.2s ease;
 }
 
 .tab:hover {
-  color: var(--text);
+  color: var(--hdr-text);
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.tab.active {
-  color: var(--brand-600);
-  background: var(--surface);
+.tab:hover .fa {
+  transform: translateY(-1px) scale(1.15);
+}
+
+.tab:active {
+  transform: scale(0.97);
+}
+
+.tab.active,
+.tab.active:hover {
+  color: var(--hdr-ink);
+  background: transparent;
+}
+
+.tab.active .fa {
+  color: #4c8563;
+}
+
+.tabs:not(.has-glider) .tab.active {
+  background: #fff;
   box-shadow: var(--shadow-sm);
 }
 
-/* KPI categories: a brand-tinted bar so they read as the KPI tab's own choices */
+/* KPI categories: their own row under the tabs. The row opens by animating
+   its grid track from 0fr to 1fr, so the header grows instead of jumping. */
+.panel__sub {
+  grid-area: sub;
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 0;
+  padding-left: 12px;
+  transition: grid-template-rows 0.32s var(--ease-out);
+}
+
+.panel__sub:has(> .panel__sub-inner > .kpi-options:not([hidden])) {
+  grid-template-rows: 1fr;
+}
+
+.panel__sub-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .kpi-options {
-  position: relative;
-  display: flex;
+  --kpi-display: flex;
+  display: var(--kpi-display);
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  width: fit-content;
   max-width: 100%;
+  margin-top: 10px;
   padding: 4px;
-  background: var(--brand-50);
-  border: 1px solid var(--brand-100);
+  background: rgba(var(--hdr-accent-rgb), 0.1);
+  border: 1px solid rgba(var(--hdr-accent-rgb), 0.3);
   border-radius: 999px;
+  transition: opacity 0.25s ease, transform 0.32s var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+/* `hidden` stays in the markup and in script.js, but the bar keeps its layout
+   (and fades) while the row closes; visibility takes it out of the tab order */
+.panel__sub .kpi-options[hidden] {
+  display: var(--kpi-display) !important;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition-delay: 0s, 0s, 0.32s;
+}
+
+.kpi-options::before {
+  background: var(--hdr-select);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 4px 12px rgba(var(--hdr-accent-rgb), 0.28);
 }
 
 .kpi-option {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 34px;
-  padding: 0 10px;
+  height: var(--seg);
+  padding: 0 14px;
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  color: var(--brand-600);
+  color: #e6ebe8;
   background: transparent;
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
 }
 
 .kpi-option .fa {
   width: 14px;
   font-size: 14px;
+  text-align: center;
+  transition: transform 0.3s var(--ease-spring);
 }
 
 .kpi-option:hover {
-  background: var(--surface);
+  color: var(--hdr-text);
+  background: rgba(var(--hdr-accent-rgb), 0.16);
 }
 
-.kpi-option.active {
-  color: #fff;
-  background: var(--brand);
-  box-shadow: var(--shadow-sm);
+.kpi-option:hover .fa {
+  transform: scale(1.2);
+}
+
+.kpi-option:active {
+  transform: scale(0.97);
+}
+
+.kpi-option.active,
+.kpi-option.active:hover {
+  color: var(--hdr-on-select);
+  background: transparent;
+}
+
+.kpi-options:not(.has-glider) .kpi-option.active {
+  background: var(--hdr-select);
 }
 
 .session-source-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
   padding: 8px 20px;
   font-size: 12px;
+  line-height: 1.45;
   color: var(--text-muted);
+  background: linear-gradient(90deg, #f0f2f1, var(--surface) 60%);
   border-bottom: 1px solid var(--border);
+}
+
+/* Flask icon: these results come from synthetic scenarios */
+.session-source-note::before {
+  content: "\f0c3";
+  flex: none;
+  font: normal 12px/1.45 FontAwesome;
+  color: var(--text-muted);
+}
+
+/* Larger hit areas on touch screens */
+@media (pointer: coarse) {
+  :root {
+    --ctl: 44px;
+    --seg: 40px;
+  }
+}
+
+@media (max-width: 980px) {
+  .panel__header {
+    grid-template-columns: auto minmax(0, 1fr) auto var(--ctl);
+    grid-template-rows: minmax(var(--ctl), auto) auto auto auto;
+    grid-template-areas:
+      "brand title about close"
+      "nav   nav   nav   nav"
+      "tools tools tools tools"
+      "sub   sub   sub   sub";
+  }
+
+  .panel__divider {
+    display: none;
+  }
+
+  .panel__nav {
+    margin-top: 10px;
+    padding-left: 0;
+  }
+
+  .tabs {
+    flex: 1 1 100%;
+  }
+
+  .tab {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .panel__tools {
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+
+  .source-pill,
+  .source-pill select {
+    flex: 1 1 auto;
+  }
+
+  .panel__sub {
+    padding-left: 0;
+  }
+
+  .kpi-options {
+    width: 100%;
+  }
+
+  .kpi-option {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel__header > *,
+  .app-bar,
+  .action-bar,
+  .app-bar::before,
+  .action-bar::before,
+  .logo--on-dark .logo__mark .fa {
+    animation: none;
+  }
+
+  /* No sweep: show the bar as a steady line instead */
+  .panel:has(.loading-container) .panel__header::after,
+  .panel:has(.group-card--busy) .panel__header::after {
+    animation: none;
+    background-size: 100% 100%;
+    background-position: 0 0;
+  }
 }
 
 .environment-summary {
@@ -1563,11 +2292,6 @@ body.analysis-open .action-bar {
 
 .field__head .info-dot {
   font-size: 14px;
-}
-
-.kpi-options .info-dot {
-  padding: 0 10px 0 6px;
-  color: var(--brand-600);
 }
 
 .field--action {
@@ -2042,8 +2766,13 @@ select.control {
   bottom: var(--safe-bottom);
   z-index: var(--z-map-ui);
   padding: 5px 12px;
-  background: rgba(255, 255, 255, 0.85);
-  border-top-right-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(27, 32, 30, 0.08);
+  border-right: 1px solid rgba(27, 32, 30, 0.08);
+  border-top-right-radius: var(--radius);
+  box-shadow: 0 -4px 16px rgba(8, 12, 10, 0.1);
 }
 
 .custom-attribution a {
@@ -2098,52 +2827,6 @@ select.control {
   }
 }
 
-@media (max-width: 900px) {
-  .panel__header {
-    grid-template-columns: auto minmax(0, 1fr) auto 36px;
-    grid-template-rows: 42px auto auto;
-    grid-template-areas:
-      "brand title about close"
-      "nav nav nav nav"
-      "tools tools tools tools";
-  }
-
-  .panel__tools {
-    justify-content: space-between;
-  }
-
-  .source-pill {
-    flex: 1 1 auto;
-  }
-
-  .source-pill select {
-    flex: 1 1 auto;
-  }
-
-  .panel__nav {
-    padding-left: 0;
-  }
-
-  .panel__divider {
-    display: none;
-  }
-
-  .tabs,
-  .kpi-options {
-    flex: 1 1 100%;
-  }
-
-  .kpi-option {
-    flex: 1 1 auto;
-  }
-
-  .tabs > .tab {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-}
-
 /* Phones */
 @media (max-width: 640px) {
   :root {
@@ -2192,7 +2875,7 @@ select.control {
   }
 
   .help-btn {
-    width: 36px;
+    width: var(--ctl);
     padding: 0;
     justify-content: center;
   }
@@ -2248,9 +2931,10 @@ select.control {
     width: 100%;
     transform: none;
     border-radius: 0;
-    padding-top: var(--safe-top);
+    /* The header's dark background runs under the status bar instead */
+    padding-top: 0;
     padding-bottom: var(--safe-bottom);
-    animation: sheet-in 0.25s ease;
+    animation: sheet-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   @keyframes sheet-in {
@@ -2265,9 +2949,7 @@ select.control {
   }
 
   .panel__header {
-    grid-template-rows: 36px auto auto;
-    gap: 8px 10px;
-    padding: 8px 8px 8px 12px;
+    padding: calc(10px + var(--safe-top)) 10px 12px 14px;
   }
 
   .panel__brand .logo__mark {
@@ -2284,21 +2966,32 @@ select.control {
     flex: 1;
   }
 
+  /* Labels alone: three tabs share the sheet's width */
   .tab {
-    padding: 0 8px;
+    padding: 0 6px;
     font-size: 13px;
   }
 
+  .tab .fa {
+    display: none;
+  }
+
+  /* Five categories: three on the first row, two wider ones under them */
   .kpi-options {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-radius: 16px;
+    --kpi-display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    border-radius: 22px;
   }
 
   .kpi-option {
+    grid-column: span 2;
     min-width: 0;
     padding: 0 6px;
     font-size: 13px;
+  }
+
+  .kpi-option:nth-child(n + 4) {
+    grid-column: span 3;
   }
 
   .kpi-option .fa {

@@ -49,15 +49,15 @@ The analysis panel on the **Load profiles** tab.
 
 | # | Control | What it does |
 |---|---|---|
-| 1 | **Analysis** ⓘ | Panel title; the info icon explains that values are model predictions. |
-| 2 | **Tabs** | *Load profiles*, *Flexibility* and *KPIs*. The KPI tab adds a row of sub-tabs: *User, Grid, Environment, Mobility, City*. |
+| 1 | **Analysis** | Panel title. The dot beside it pulses while results are being calculated and turns amber when the selection has nothing to show. The line under the header states that the values are synthetic scenarios, not measured charging. |
+| 2 | **Tabs** | *Load profiles*, *Flexibility* and *KPIs*. The KPI tab opens a row of sub-tabs under them: *User, Grid, Environment, Mobility, City*. With the keyboard, {kbd}`←` {kbd}`→` move between tabs and {kbd}`Enter` opens one. |
 | 3 | **Close** | Hides the panel ({kbd}`Esc` or a click on the visible map does the same). |
-| 4 | **Source** ⓘ | Where the synthetic sessions come from: *Simple*, *Spatial* or *CPFT*. It applies to every area; the ⓘ explains the options. |
+| 4 | **Source** | Where the synthetic sessions come from: *Simple*, *Spatial* or *CPFT*. It applies to every area. Hover the control for a one-line description of the selected source. |
 | 5 | **Export** (download icon) | Exports the current results to `DRIVE2X_EPIOT_report.xlsx`. |
 | 6 | **Area cards** | One card per area with its own charging strategy, date and demand scenario (see below). |
 | 7 | **Chart toolbar** | Plotly controls: save the chart as PNG (`epiot_chart.png`, 2× resolution), zoom, pan and reset axes. |
 
-The ⓘ beside the KPI category bar lists what each category (*User, Grid, Environment, Mobility, City*) covers.
+Hover a KPI category (*User, Grid, Environment, Mobility, City*) to see what it covers.
 
 Which controls appear depends on the active tab:
 

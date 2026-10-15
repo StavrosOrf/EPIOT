@@ -42,18 +42,24 @@ can be checked against the code and removed from this page when fixed.
 * - Limitation
   - Effect
   - Source
-* - **Durations wrap at 24 h**
-  - Connection time uses the time-of-day part of `end − start`, so stays longer than a day are counted modulo 24 hours.
-  - `kpi/user.py`
-* - **Daily energy histogram is per session**
-  - `daily_consumption_dist` groups by (date, session energy) rather than by (date, charger), so it is effectively a histogram of session energies on a 0–200 kWh scale.
-  - `kpi/user.py`
-* - **Weekday/weekend split of availability is shifted**
-  - The day-type of each folded day is computed from `weekday() + 1`, which classifies Fridays as weekend and Sundays as weekday in the City availability charts.
-  - `utils.find_charger_availability`
-* - **Availability is a relative index**
-  - `weekday_availability` / `weekend_availability` are $1.1\max O - O$ over summed occupancy counts, not probabilities, despite the *Probability* axis label.
-  - `kpi/user.py`
+* - **The last bin is open-ended**
+  - Stays and idle times beyond 24 h, session energy beyond 100 kWh and daily energy beyond 200 kWh are counted in the last bin. The charts label it "24+", "100+" and "200+" and the card counts them (`overflow`). The bins are fixed so areas stay comparable, so chargers of very different power saturate the daily scale at different loads.
+  - `kpi/statistics.py`
+* - **Idle time assumes rated power**
+  - Idle time while plugged in is the stay minus the time to deliver the energy at the charger's rated power. A vehicle that charges slower than the rated power needs more of its stay, so the reported idle time is an upper bound.
+  - `kpi/statistics.py`
+* - **Occupancy counts connected time**
+  - A vehicle that has finished charging still occupies its charger, so occupancy and *free chargers* describe connections, not charging. Utilisation reports energy against rated power.
+  - `kpi/statistics.py`
+* - **Blocking probability needs 1–2000 chargers**
+  - "All chargers busy" is `null` for an empty selection and for more than 2000 charging points.
+  - `kpi/statistics.py`
+* - **Idle gaps are cut by the range**
+  - The gap between two sessions is only seen between sessions inside the range, so a charger unused for the whole range has no gap and long gaps are truncated.
+  - `kpi/statistics.py`
+* - **Holidays are weekdays**
+  - Day type is Monday–Friday against Saturday–Sunday; public holidays are not recognised.
+  - `kpi/statistics.py`
 * - **Environment KPI units**
   - `co2_intensities_*` are sums of intensity × energy (gCO₂eq) per hour of day across the range; the chart axis reads gCO₂eq/kWh.
   - `kpi/user.py`, `plotter.js`
