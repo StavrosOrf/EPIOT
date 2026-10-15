@@ -521,7 +521,38 @@
             <button type="button" class="kpi-option" data-kpi="city_kpi" aria-pressed="false">
               <i class="fa fa-building-o" aria-hidden="true"></i><span>City</span>
             </button>
+            <span class="info-dot" data-toggle="tooltip" data-placement="bottom" tabindex="0"
+              title="KPI categories. User: arrival, duration and departure times. Grid: energy per session and per day. Environment: carbon intensity and renewable share per strategy. Mobility: sessions per charger and weekday. City: charger availability and occupancy."
+              ><i class="fa fa-info-circle" aria-hidden="true"></i
+              ><span class="sr-only">About the KPI categories</span></span
+            >
           </div>
+        </div>
+
+        <div class="panel__tools">
+          <div class="source-pill">
+            <i class="fa fa-flask" aria-hidden="true"></i>
+            <label for="session-source" class="source-pill__label">Source</label>
+            <select id="session-source" aria-describedby="session-source-note" title="Session source">
+              <option value="simple">Simple</option>
+              <option value="spatial">Spatial</option>
+              <option value="cpft">CPFT</option>
+            </select>
+            <span class="info-dot" data-toggle="tooltip" data-placement="bottom" tabindex="0"
+              title="Where the charging sessions come from. Simple: generic arrival, duration and energy distributions. Spatial: the same, adapted to the neighbourhood around each charger. CPFT: sessions from the CPFT neural-network library. All are synthetic scenarios, not measured charging."
+              ><i class="fa fa-info-circle" aria-hidden="true"></i
+              ><span class="sr-only">About the session source</span></span
+            >
+          </div>
+          <button
+            type="button"
+            id="download-btn"
+            class="tool-btn"
+            title="Download report (.xlsx)"
+            aria-label="Download report"
+          >
+            <i class="fa fa-download" aria-hidden="true"></i>
+          </button>
         </div>
 
         <button
@@ -543,62 +574,6 @@
           <i class="fa fa-times" aria-hidden="true"></i>
         </button>
       </header>
-
-      <div class="panel__controls">
-        <div class="field" id="session-source-field">
-          <label for="session-source" class="field__label">Session source</label>
-          <select id="session-source" class="control" aria-describedby="session-source-note">
-            <option value="simple">Simple session sampler</option>
-            <option value="spatial">Spatial session sampler</option>
-            <option value="cpft">CPFT tool — synthetic history</option>
-          </select>
-        </div>
-        <div class="field" id="demand-assumption-field">
-          <label for="demand-assumption" class="field__label">Demand scenario</label>
-          <select id="demand-assumption" class="control">
-            <option value="low">Low demand</option>
-            <option value="base" selected>Base demand</option>
-            <option value="high">High demand</option>
-          </select>
-        </div>
-        <div id="toggle-div" class="field field--segmented">
-          <span class="field__label">View</span>
-          <input type="checkbox" id="toggle" class="toggle-checkbox" />
-          <label for="toggle" class="segmented" role="switch" aria-label="Switch between charger and grid view">
-            <span class="segmented__opt">Chargers</span>
-            <span class="segmented__opt">Grid</span>
-          </label>
-        </div>
-
-        <div class="field" id="str-dropdown">
-          <label for="strategy" class="field__label">Charging strategy</label>
-          <select id="strategy" class="control">
-            <option value="afap">As Fast As Possible</option>
-            <option value="alap">As Late As Possible</option>
-            <option value="avg">Average Power</option>
-            <option value="mincarbon">Min. Carbon Footprint</option>
-            <option value="ocost">Min. Charging Cost</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label id="date_label" for="datepicker" class="field__label">Target date</label>
-          <input
-            type="text"
-            id="datepicker"
-            class="control control--date"
-            placeholder="Select date"
-            readonly
-          />
-        </div>
-
-        <div class="field field--action">
-          <button id="download-btn" class="btn btn-outline-app">
-            <i class="fa fa-download" aria-hidden="true"></i>
-            <span>Download report</span>
-          </button>
-        </div>
-      </div>
 
       <p id="session-source-note" class="session-source-note" role="status">Synthetic scenarios with assumed demand, not verified local charging forecasts.</p>
       <div class="panel__body">

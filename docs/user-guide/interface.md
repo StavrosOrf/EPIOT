@@ -52,25 +52,63 @@ The analysis panel on the **Load profiles** tab.
 | 1 | **Analysis** ⓘ | Panel title; the info icon explains that values are model predictions. |
 | 2 | **Tabs** | *Load profiles*, *Flexibility* and *KPIs*. The KPI tab adds a row of sub-tabs: *User, Grid, Environment, Mobility, City*. |
 | 3 | **Close** | Hides the panel ({kbd}`Esc` or a click on the visible map does the same). |
-| 4 | **View** | *Chargers* aggregates the charging points inside each area; *Grid* aggregates the chargers behind the MV/LV transformers in each area. Load profiles only. |
-| 5 | **Charging strategy** | *As Fast As Possible*, *As Late As Possible*, *Average Power*, *Min. Charging Cost*. Hidden on the KPI tab. |
-| 6 | **Date** / **Date range** | A single day for load and flexibility; a range for KPIs. Selectable from 1 September 2025 up to today. |
-| 7 | **Download report** | Exports the current results to `DRIVE2X_EPIOT_report.xlsx`. |
-| 8 | **Chart toolbar** | Plotly controls: save the chart as PNG (`epiot_chart.png`, 2× resolution), zoom, pan and reset axes. |
+| 4 | **Source** ⓘ | Where the synthetic sessions come from: *Simple*, *Spatial* or *CPFT*. It applies to every area; the ⓘ explains the options. |
+| 5 | **Export** (download icon) | Exports the current results to `DRIVE2X_EPIOT_report.xlsx`. |
+| 6 | **Area cards** | One card per area with its own charging strategy, date and demand scenario (see below). |
+| 7 | **Chart toolbar** | Plotly controls: save the chart as PNG (`epiot_chart.png`, 2× resolution), zoom, pan and reset axes. |
+
+The ⓘ beside the KPI category bar lists what each category (*User, Grid, Environment, Mobility, City*) covers.
 
 Which controls appear depends on the active tab:
 
 | Control | Load profiles | Flexibility | KPIs |
 |---|:---:|:---:|:---:|
-| View (Chargers / Grid) | ✓ | | |
-| Charging strategy | ✓ | ✓ | |
-| Date (single day) | ✓ | ✓ | |
-| Date range | | | ✓ |
+| Source | ✓ | ✓ | ✓ |
+| Export | ✓ | ✓ | ✓ |
 | KPI sub-tabs | | | ✓ |
-| Download report | ✓ | ✓ | ✓ |
+| Charging strategy (per area card) | ✓ | ✓ | |
+| Target date (per area card) | ✓ | ✓ | |
+| Date range (per area card) | | | ✓ |
+| Demand scenario (per area card) | ✓ | ✓ | ✓ |
 
-Every change to a control re-runs the analysis for the active tab. While the backend computes, the
+Changing the session source re-runs the analysis for every area. While the backend computes, the
 chart area shows a spinner and an elapsed-seconds counter.
+
+## Area cards
+
+Every area gets its own card in the results. The cards share the height of the panel, so up to three
+areas fit without scrolling on a normal screen; on a phone the rail sits above the plot.
+The rail on the left of each card names the area (the stripe has the colour of its outline on the map),
+gives its size, holds the area's own settings and four actions.
+
+**Settings.** Each area is analysed under its own settings, so one area can be compared with itself
+(or with another) under a different strategy, day or demand:
+
+| Tab | Setting on the card | Notes |
+|---|---|---|
+| Load profiles, Flexibility | **Charging strategy** | *As Fast As Possible* (default), *As Late As Possible*, *Average Power*, *Min. Carbon Footprint*, *Min. Charging Cost*. |
+| Load profiles, Flexibility | **Target date** | Any day; the chart covers that day and the day before. The field shows the weekday (`Sat 2026-10-17`); hover it for the day's calendar and weather effects. |
+| KPIs | **Date range** | Applied once both dates are picked, shown with weekdays (`Fri 9 Oct – Thu 15 Oct`). New areas start with the last seven days. |
+| All tabs | **Demand scenario** | *Low*, *Base* (default) or *High* demand: a sensitivity assumption for how many sessions start (half, 1×, 1.5×), not a confidence interval. |
+
+Changing a setting recalculates **that area only**; its card dims while the request runs and the other
+areas stay as they are. Settings are not shared between areas: a copy starts from its original's
+settings and then changes independently.
+
+**Name.** The pencil next to the name (or a double click on it) renames the area: press {kbd}`Enter`
+to save, {kbd}`Esc` to cancel. Names must be unique and at most 40 characters. The new name is used
+on the map label, in the cards and in the downloaded report.
+
+**Actions.**
+
+| Action | What it does |
+|---|---|
+| **Move up** / **Move down** | Reorders the areas. The map selection, the cards and the order of the downloaded report all follow. |
+| **Duplicate below** | Adds a copy of the area (`Area 1 (copy)`) right below it, drawn on the map with a dashed outline. Unavailable at the limit of three areas. |
+| **Remove** | Deletes the area from the map and from the results. |
+
+Moving, copying, renaming and removing change the selection only: nothing is recalculated, and the
+results already on screen are rearranged. Closing the panel shows the updated areas on the map.
 
 ## Panel state machine
 

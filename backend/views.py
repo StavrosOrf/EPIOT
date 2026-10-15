@@ -27,6 +27,7 @@ from flask import current_app, Blueprint
 from backend.session_sources import SOURCE_LABELS, session_service
 from backend.cpft_runtime import CPFTUnavailable
 from backend.scenario_profiles import grid
+from backend.flex_polytope import build_polytope, contains, envelopes
 from backend.scenario_sampling import point_power
 from backend.cpft import day_window
 from pathlib import Path
@@ -275,8 +276,12 @@ def get_aggregate_load():
                         metadata["grid_uses_historical_reference"] = any(hour.carbon_is_stale for hour in hours)
                         metadata["scheduling_note"] = "Minimum-carbon scenario using historical/reference grid information; not demonstrated avoided emissions."
                 metadata["flexibility_note"] = "Indicative differences between charging schedules; not a firm flexibility commitment."
+                polytope = build_polytope(charger_data, sessions, start, end)
+                flex_polytope = envelopes(polytope)
+                flex_polytope["schedule_feasible"] = contains(polytope, load_profile)
                 return jsonify(x=list(range(len(timestamps))), timestamps=[timestamp.isoformat() for timestamp in timestamps],
-                    past_steps=past_steps, y=list(load_profile), up_flex=list(up_flex), down_flex=list(down_flex), source=metadata)
+                    past_steps=past_steps, y=list(load_profile), up_flex=list(up_flex), down_flex=list(down_flex),
+                    flex_polytope=flex_polytope, source=metadata)
             except CarbonScheduleUnavailable as exc:
                 return jsonify(error=str(exc)), 422
             except (ValueError, KeyError, TypeError) as exc:

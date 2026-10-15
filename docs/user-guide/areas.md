@@ -79,27 +79,19 @@ flowchart TD
 
 ## What an area selects
 
-When you click **Analyse**, each area polygon is sent to the backend as GeoJSON. What it selects
-depends on the **View** setting of the load-profile tab:
+When you click **Analyse**, each area polygon is sent to the backend as GeoJSON. It selects the
+charging points whose location lies *inside* the polygon, for load profiles, flexibility and KPIs alike:
 
 ```{mermaid}
 flowchart LR
     P[Area polygon] -->|ST_Within| CP[Charging points<br/>inside the area]
-    P -->|ST_Within, type = Middle| TR[MV/LV transformers<br/>inside the area]
-    TR -->|grid_connections| GCP[Charging points served<br/>by those transformers]
-    CP --> V1([Chargers view,<br/>Flexibility, KPIs])
-    GCP --> V2([Grid view])
+    CP --> V([Load profiles,<br/>Flexibility, KPIs])
 ```
-
-- **Chargers view, Flexibility, KPIs**: the charging points whose location lies *inside* the polygon.
-- **Grid view**: the charging points *connected to* the MV/LV transformers inside the polygon. These
-  can lie partly outside the polygon, because each charging location is linked to its nearest
-  MV/LV transformer (see {doc}`../operations/database`).
 
 The selection is a spatial `ST_Within` query against point geometries in SpatiaLite; the exact
 boundary of the drawn shape is used.
 
 :::{tip}
 Compare like with like. Areas of similar size and charger density give more meaningful side-by-side
-charts; the chart titles show how many chargers (or transformers) each area contains.
+charts; each card shows how many chargers its area contains.
 :::

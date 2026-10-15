@@ -2,17 +2,22 @@
 import { fetch_markers, calculateFlexibility, fetchDensity, bubbleIcon, chargerSites, DETAIL_ZOOM } from "./loaders.js";
 import {
   createGraph,
-  createFlexGraph,
+  createPolytopeGraph,
   createUserKPIGraph,
   createGridKPIGraph,
   createMobilityKPIGraph,
   createCityKPIGraph,
   createEnvironmentKPIGraph,
+  focusCardField,
+  setCardBusy,
+  setGroupControls,
+  showCardMessage,
   showGraphMessage,
 } from "./plotter.js";
-import { animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
+import { MAX_AREAS, moved, removed, copied, copyName, escapeHtml, freeColor, validName } from "./group_actions.js";
+import { DEMANDS, STRATEGIES, animateSelectMessage, generateAndDownloadExcel } from "./utils.js";
 import { get_KPIs, get_LoadProfiles, get_EnvironmentKPIs } from "./data_fetch.js";
-import { pickerOptions } from "./date_selection.js";
+import { calendarDate, pickerOptions } from "./date_selection.js";
 import { calendarNote } from "./calendar_note.js";
 import { renderEnvironmentSummary } from "./environment_summary.js";
 import { initLocationSearch } from "./location_search.js";
@@ -130,17 +135,8 @@ let load_profile_data = [];
 let kpi_data_list = [];
 
 var active_tab = "Load Profiles";
-// get today's date
-var today = new Date();
 // No live data: any calendar date is a valid scenario context
 const starting_date = null;
-let pickerRangeMode = false;
-let selectedTargetDate = today;
-let selectedKpiRange = null;
-// Initialize Flatpickr on the input field
-let datepicker = flatpickr("#datepicker", pickerOptions(false, starting_date, today, [today], onDateSelectionChange));
-
-let dateInput = document.getElementById("datepicker");
 let active_kpi = "user_kpi";
 
 animateSelectMessage("Draw an area on the map to start");
@@ -717,16 +713,6 @@ var analysisButton = document.getElementById("calc-button");
 ///////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 
-const toggle = document.getElementById("toggle");
-toggle.addEventListener("change", function () {
-  clear_graph();
-  if (this.checked) {
-    calculateLoadProfiles();
-  } else {
-    calculateLoadProfiles();
-  }
-});
-
 // const flex_toggle = document.getElementById("toggle-flex");
 // flex_toggle.addEventListener("change", function () {
 //   if (this.checked) {
@@ -746,72 +732,65 @@ toggle.addEventListener("change", function () {
 ////////////////////////////////////////////////////////////
 
 let profileRequestVersion = 0;
+
+// The day effects when every area shares them, a pointer to the per-area date
+// tooltips when they differ
+function calendarSummary(sources) {
+  const notes = [...new Set(sources.map(source => calendarNote(source)).filter(Boolean))];
+  if (notes.length > 1) return "Day effects differ per area; hover an area's date for details.";
+  return notes[0] || "";
+}
+
+// The line under the controls: source, demand assumption and day effects
+function sourceNote(sources, extra = "") {
+  const metadata = sources[0];
+  if (!metadata) return "No charging points in this selection.";
+  return `${metadata.label}. ${metadata.note} ${calendarSummary(sources)}${extra}`;
+}
+
+// One area's chart data from its response and the settings it was requested with
+function profileFromGroup(group, settings) {
+  const response = group.response, split = response.past_steps ?? 144;
+  return {
+    groupName: group.groupName,
+    pastData: response.y.slice(0, split), futureData: response.y.slice(split),
+    past_up_flex: response.up_flex.slice(0, split), future_up_flex: response.up_flex.slice(split),
+    past_down_flex: response.down_flex.slice(0, split), future_down_flex: response.down_flex.slice(split),
+    pastTimes: response.timestamps?.slice(0, split), futureTimes: response.timestamps?.slice(split),
+    source: response.source, targetDate: calendarDate(settings.date), strategy: settings.strategy,
+    polytope: response.flex_polytope,
+    number_of_chargers: group.chargerIds.length, number_of_transformers: group.transformerIds.length,
+  };
+}
+
 async function calculateLoadProfiles() {
   const requestVersion = ++profileRequestVersion;
-  const selectedDate = dateInput.value;
-  const gridView = toggle.checked && active_tab === "Load Profiles";
+  // Every area is analysed under its own strategy, target date and demand scenario
+  const settings = selected_area_names.map(name => ({ ...settingsOf(name) }));
   load_profile_data = [];
   try {
     const groups = await get_LoadProfiles(structuredClone(selected_polygons), selected_area_names.slice(),
-      selectedDate, {
+      settings.map(item => calendarDate(item.date)), {
         sessionSource: document.getElementById("session-source").value,
-        demandAssumption: document.getElementById("demand-assumption").value,
-        strategy: document.getElementById("strategy").value, gridView,
+        demandAssumption: settings.map(item => item.demand),
+        strategy: settings.map(item => item.strategy),
       });
     if (requestVersion !== profileRequestVersion) return;
     charger_ids_list = groups.map(group => group.chargerIds);
     transformer_ids_list = groups.map(group => group.transformerIds);
-    load_profile_data = groups.map(group => {
-      const response = group.response, split = response.past_steps ?? 144;
-      return {
-        groupName: group.groupName,
-        pastData: response.y.slice(0, split), futureData: response.y.slice(split),
-        past_up_flex: response.up_flex.slice(0, split), future_up_flex: response.up_flex.slice(split),
-        past_down_flex: response.down_flex.slice(0, split), future_down_flex: response.down_flex.slice(split),
-        pastTimes: response.timestamps?.slice(0, split), futureTimes: response.timestamps?.slice(split),
-        source: response.source, targetDate: selectedDate,
-        number_of_chargers: group.chargerIds.length, number_of_transformers: group.transformerIds.length,
-      };
-    });
-    const metadata = groups[0]?.response.source;
-    document.getElementById("session-source-note").textContent = metadata
-      ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}. ${calendarNote(metadata)}` +
-        (metadata.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : "")
-      : "No charging points in this selection.";
-    if (active_tab === "Load Profiles") createGraph(load_profile_data, !gridView, selectedDate);
-    else if (active_tab === "Flexibility") createFlexGraph(load_profile_data, false, selectedDate);
+    load_profile_data = groups.map((group, index) => profileFromGroup(group, settings[index]));
+    const sources = groups.map(group => group.response.source);
+    document.getElementById("session-source-note").textContent = sourceNote(sources,
+      sources[0]?.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : "");
+    if (active_tab === "Load Profiles") createGraph(load_profile_data);
+    else if (active_tab === "Flexibility") createPolytopeGraph(load_profile_data);
   } catch (error) {
     if (requestVersion !== profileRequestVersion) return;
     showGraphMessage("Load profiles are not available for this selection", error.message);
   }
 }
 
-// add event listener to the strategy-dropdown to recalculate the load profiles
-document.getElementById("strategy").addEventListener("change", function () {
-  if (active_tab == "Load Profiles") {
-    clear_graph();
-    calculateLoadProfiles();
-  } else if (active_tab == "Flexibility") {
-    clear_graph();
-    calculateLoadProfiles();
-  }
-});
-
-for (const id of ["session-source", "demand-assumption"]) {
-  document.getElementById(id).addEventListener("change", () => runActiveAnalysis());
-}
-
-function onDateSelectionChange(dates) {
-  if (pickerRangeMode && dates.length !== 2) {
-    ++profileRequestVersion;
-    kpi_data_list = [];
-    showGraphMessage("Select a KPI date range", "Choose both a start date and an end date.");
-    return;
-  }
-  if (pickerRangeMode) selectedKpiRange = dates.slice();
-  else if (dates.length) selectedTargetDate = dates[0];
-  runActiveAnalysis();
-}
+document.getElementById("session-source").addEventListener("change", () => runActiveAnalysis());
 
 
 const analysisPanel = document.getElementById("graph-container");
@@ -838,25 +817,19 @@ async function runActiveAnalysis() {
     const requestVersion = ++profileRequestVersion;
     kpi_data_list = [];
     load_profile_data = [];
-    if (datepicker.selectedDates.length !== 2) {
-      showGraphMessage("Select a KPI date range", "Choose both a start date and an end date.");
-      return;
-    }
     clear_graph();
     try {
+      // Every area has its own date range and demand scenario
       const result = await get_KPIs(selected_polygons.slice(), selected_area_names.slice(),
-        datepicker.selectedDates.slice(), {
+        selected_area_names.map(name => settingsOf(name).range.slice()), {
           sessionSource: document.getElementById("session-source").value,
-          demandAssumption: document.getElementById("demand-assumption").value,
+          demandAssumption: selected_area_names.map(name => settingsOf(name).demand),
         });
       if (requestVersion !== profileRequestVersion) return;
       kpi_data_list = result;
       charger_ids_list = result.map(group => group.chargerIds);
       transformer_ids_list = result.map(group => group.transformerIds);
-      const metadata = result[0]?.source;
-      document.getElementById("session-source-note").textContent = metadata
-        ? `${metadata.label}. ${metadata.note} Demand: ${metadata.assumption}. ${calendarNote(metadata)}`
-        : "No charging points in this selection.";
+      document.getElementById("session-source-note").textContent = sourceNote(result.map(group => group.source));
       renderActiveKpi();
     } catch (error) {
       if (requestVersion !== profileRequestVersion) return;
@@ -927,9 +900,6 @@ transformerCheckbox.addEventListener("change", toggleTransformerLayer); // Attac
 // ---------------------------------------------------------------------------
 
 const kpiSubnav = document.getElementById("kpi-subnav");
-const strategyField = document.getElementById("str-dropdown");
-const viewToggleField = document.getElementById("toggle-div");
-const dateLabel = document.getElementById("date_label");
 
 function setActiveTab(activeId) {
   document.querySelectorAll(".tabs .tab").forEach((tab) => {
@@ -937,23 +907,6 @@ function setActiveTab(activeId) {
     tab.classList.toggle("active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
   });
-}
-
-// Single-day picker for load/flexibility, date range for KPIs
-function resetDatepicker(rangeMode) {
-  if (pickerRangeMode && datepicker.selectedDates.length === 2) selectedKpiRange = datepicker.selectedDates.slice();
-  if (!pickerRangeMode && datepicker.selectedDates.length) selectedTargetDate = datepicker.selectedDates[0];
-  datepicker.destroy();
-  pickerRangeMode = rangeMode;
-  today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(weekStart.getDate() - 6);
-  datepicker = flatpickr("#datepicker", pickerOptions(rangeMode, starting_date, today,
-    rangeMode ? (selectedKpiRange || [weekStart, today]) : [selectedTargetDate], onDateSelectionChange));
-  dateInput = document.getElementById("datepicker");
-  dateLabel.textContent = rangeMode ? "Date range" : "Target date";
-  // A range needs the full row on phones
-  dateInput.closest(".field").classList.toggle("field--wide", rangeMode);
 }
 
 function showTab(tabId) {
@@ -964,15 +917,9 @@ function showTab(tabId) {
   const isKpi = active_tab === "KPIs";
   $(".tabs [data-toggle='tooltip']").tooltip("hide");
   setActiveTab(tabId);
-  resetDatepicker(isKpi);
 
   kpiSubnav.hidden = !isKpi;
-  strategyField.hidden = isKpi;
-  document.getElementById("session-source-field").hidden = false;
-  document.getElementById("demand-assumption-field").hidden = false;
   document.getElementById("session-source-note").textContent = "Synthetic scenarios with assumed demand, not verified local charging forecasts.";
-  // The charger/grid view only applies to load profiles
-  viewToggleField.hidden = active_tab !== "Load Profiles";
 
   runActiveAnalysis();
 }
@@ -1078,6 +1025,7 @@ document.addEventListener("keydown", function (event) {
 let loadingTimer = null;
 
 function clear_graph() {
+  destroyCardPickers();
   const summary = document.getElementById("environment-summary");
   if (summary) {
     summary.hidden = true;
@@ -1107,3 +1055,317 @@ function clear_graph() {
     timerElement.textContent = `${secondsPassed} s`;
   }, 1000);
 }
+
+// ---------------------------------------------------------------------------
+// Per-area settings. Each area is analysed under its own charging strategy and
+// target date (load profiles, flexibility) or date range (KPIs). They are kept
+// by area name, which is unique, so they follow an area through moves, renames
+// and copies; the cards edit them and refresh only the area that changed.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_STRATEGY = "afap";
+const DEFAULT_DEMAND = "base";
+const areaSettings = new Map();
+
+function settingsOf(name) {
+  let settings = areaSettings.get(name);
+  if (!settings) {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - 6);
+    settings = { strategy: DEFAULT_STRATEGY, demand: DEFAULT_DEMAND, date: now, range: [weekStart, now] };
+    areaSettings.set(name, settings);
+  }
+  return settings;
+}
+
+let cardPickers = [];
+
+// The cards are rebuilt on every redraw; flatpickr calendars live on <body>
+function destroyCardPickers() {
+  cardPickers.forEach(picker => picker.destroy());
+  cardPickers = [];
+}
+
+function settingField(icon, control) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "group-field";
+  const glyph = document.createElement("i");
+  glyph.className = `fa ${icon}`;
+  glyph.setAttribute("aria-hidden", "true");
+  wrapper.append(glyph, control);
+  return wrapper;
+}
+
+// A labelled-by-icon select for one of the card's settings
+function optionField(icon, field, title, options, current, onChange) {
+  const select = document.createElement("select");
+  select.className = "group-field__control";
+  select.dataset.field = field;
+  select.title = title;
+  select.setAttribute("aria-label", title);
+  options.forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  });
+  select.value = current;
+  select.addEventListener("change", () => onChange(select.value));
+  return settingField(icon, select);
+}
+
+// Fill a card's settings slot: strategy and target date (or the KPI date range)
+// and the demand scenario
+function decorateCard(slot, group) {
+  const name = group.groupName;
+  const settings = settingsOf(name);
+  const date = document.createElement("input");
+  date.type = "text";
+  date.readOnly = true;
+  date.className = "group-field__control";
+  const demand = optionField("fa-bar-chart", "demand", `Demand scenario for ${name}`, DEMANDS, settings.demand,
+    value => {
+      settings.demand = value;
+      refreshArea(name, "demand");
+    });
+  if (active_tab === "KPIs") {
+    date.className += " group-field__control--range";
+    date.dataset.field = "range";
+    date.title = calendarNote(group.source) || "Date range";
+    date.setAttribute("aria-label", `Date range for ${name}`);
+    cardPickers.push(flatpickr(date, pickerOptions(true, starting_date, new Date(), settings.range, dates => {
+      if (dates.length !== 2) return; // wait for the end date
+      settings.range = dates.slice();
+      refreshArea(name, "range");
+    })));
+    slot.append(settingField("fa-calendar", date), demand);
+    return;
+  }
+  const strategy = optionField("fa-sliders", "strategy", `Charging strategy for ${name}`, STRATEGIES,
+    settings.strategy, value => {
+      settings.strategy = value;
+      refreshArea(name, "strategy");
+    });
+  date.dataset.field = "date";
+  date.title = calendarNote(group.source) || "Target date";
+  date.setAttribute("aria-label", `Target date for ${name}`);
+  cardPickers.push(flatpickr(date, pickerOptions(false, starting_date, new Date(), [settings.date], dates => {
+    if (!dates.length) return;
+    settings.date = dates[0];
+    refreshArea(name, "date");
+  })));
+  slot.append(strategy, settingField("fa-calendar", date), demand);
+}
+
+const areaRequests = new Map(); // area name -> latest request, so late answers are dropped
+const pendingAreas = new Set();
+
+// A card's setting changed: request that area alone and redraw. The other
+// areas keep their results, and a full analysis in between wins over this one.
+async function refreshArea(name, field) {
+  const index = selected_area_names.indexOf(name);
+  if (index < 0) return;
+  const token = (areaRequests.get(name) || 0) + 1;
+  const analysis = profileRequestVersion;
+  areaRequests.set(name, token);
+  pendingAreas.add(name);
+  setCardBusy(index, true);
+  const superseded = () => areaRequests.get(name) !== token || analysis !== profileRequestVersion;
+  const settings = { ...settingsOf(name) };
+  const options = {
+    sessionSource: document.getElementById("session-source").value,
+    demandAssumption: settings.demand,
+  };
+  try {
+    let group;
+    if (active_tab === "KPIs") {
+      [group] = await get_KPIs([selected_polygons[index]], [name], [settings.range.slice()], options);
+    } else {
+      [group] = await get_LoadProfiles([structuredClone(selected_polygons[index])], [name],
+        calendarDate(settings.date), { ...options, strategy: settings.strategy });
+    }
+    if (superseded()) return;
+    pendingAreas.delete(name);
+    // The area may have moved, or gone, while the request ran
+    const at = selected_area_names.indexOf(name);
+    if (at < 0) return;
+    charger_ids_list[at] = group.chargerIds;
+    transformer_ids_list[at] = group.transformerIds;
+    if (active_tab === "KPIs") kpi_data_list[at] = group;
+    else load_profile_data[at] = profileFromGroup(group, settings);
+    renderGroupResults();
+    focusCardField(at, field);
+  } catch (error) {
+    if (superseded()) return;
+    pendingAreas.delete(name);
+    const at = selected_area_names.indexOf(name);
+    if (at >= 0) showCardMessage(at, error.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Result cards: move, copy, rename and remove areas from the analysis panel.
+// The drawn areas are the source of truth for the selection, so every edit
+// rebuilds them in the new order and edits the result arrays to match, without
+// a new request.
+// ---------------------------------------------------------------------------
+
+// Each drawn area is a polygon layer plus a label marker sharing its name
+function drawnAreas() {
+  const labels = new Map();
+  const areas = [];
+  drawnItems.eachLayer((layer) => {
+    const properties = layer.feature && layer.feature.properties;
+    if (!properties) return;
+    if (properties.type === "marker") labels.set(properties.name, layer);
+    else areas.push(layer);
+  });
+  return areas.map((layer) => {
+    const name = layer.feature.properties.name;
+    return { layer, name, label: labels.get(name) };
+  });
+}
+
+function areaSpecs() {
+  return drawnAreas().map(({ layer, name, label }) => {
+    const { color, weight, fillOpacity, dashArray } = layer.options;
+    return {
+      name,
+      latLngs: layer.getLatLngs(),
+      style: { color, weight, fillOpacity, dashArray },
+      labelAt: label ? label.getLatLng() : layer.getBounds().getCenter(),
+    };
+  });
+}
+
+// Leaflet keeps layers in creation order, so rebuilding them is what reorders
+function rebuildAreas(specs) {
+  drawnItems.clearLayers();
+  specs.forEach(({ name, latLngs, style, labelAt }) => {
+    const area = L.polygon(latLngs, style);
+    area.feature = { properties: { name, type: "area" } };
+    drawnItems.addLayer(area);
+    const label = L.marker(labelAt, {
+      icon: L.divIcon({ className: "shape-label", html: `<span>${escapeHtml(name)}</span>`, iconSize: [0, 0] }),
+      interactive: false,
+    });
+    label.feature = { properties: { name, type: "marker" } };
+    drawnItems.addLayer(label);
+  });
+}
+
+function syncSelectionFromAreas() {
+  selected_polygons = [];
+  selected_area_names = [];
+  drawnAreas().forEach(({ layer, name }) => {
+    const ring = layer.getLatLngs()[0].map((point) => [point.lng, point.lat]);
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) ring.push(first);
+    selected_polygons.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] } });
+    selected_area_names.push(name);
+  });
+  syncDrawPrompt();
+}
+
+function renderGroupResults() {
+  if (active_tab === "KPIs") renderActiveKpi();
+  else if (!selected_polygons.length) showGraphMessage("No areas selected", "Draw an area on the map, then press Analyse.");
+  else if (active_tab === "Flexibility") createPolytopeGraph(load_profile_data);
+  else createGraph(load_profile_data);
+}
+
+// Apply one edit to the map areas and to every result array parallel to them
+function applyGroupEdit(specs, editResults) {
+  const count = selected_area_names.length;
+  const edit = (items) => (items.length === count ? editResults(items) : items);
+  rebuildAreas(specs);
+  syncSelectionFromAreas();
+  charger_ids_list = edit(charger_ids_list);
+  transformer_ids_list = edit(transformer_ids_list);
+  load_profile_data = edit(load_profile_data);
+  kpi_data_list = edit(kpi_data_list);
+  renderGroupResults();
+}
+
+const selectionStatus = () => `${selected_polygons.length} of ${MAX_AREAS} areas selected. Ready to analyse`;
+
+function moveGroup(index, delta) {
+  const target = index + delta;
+  const specs = areaSpecs();
+  if (target < 0 || target >= specs.length) return null;
+  applyGroupEdit(moved(specs, index, target), (items) => moved(items, index, target));
+  animateSelectMessage(selectionStatus());
+  return target;
+}
+
+function duplicateGroup(index) {
+  const specs = areaSpecs();
+  if (specs.length >= MAX_AREAS) {
+    animateSelectMessage(`You can compare up to ${MAX_AREAS} areas. Remove one to add a copy`);
+    return null;
+  }
+  const source = specs[index];
+  const name = copyName(source.name, specs.map((spec) => spec.name));
+  // The copy starts from the same strategy and dates, to be changed on its card
+  const sourceSettings = settingsOf(source.name);
+  areaSettings.set(name, { ...sourceSettings, range: sourceSettings.range.slice() });
+  const lats = source.latLngs[0].map((point) => point.lat);
+  const spread = Math.max(...lats) - Math.min(...lats);
+  const copy = {
+    ...source,
+    name,
+    // Dashed over the original, so both outlines and labels stay visible
+    style: { ...source.style, color: freeColor(colors, specs.map((spec) => spec.style.color)), dashArray: "10 8" },
+    labelAt: L.latLng(source.labelAt.lat - spread * 0.14, source.labelAt.lng),
+  };
+  applyGroupEdit(copied(specs, index, () => copy), (items) =>
+    copied(items, index, (item) => (Array.isArray(item) ? item.slice() : { ...item, groupName: name })));
+  // A request still running for the original would otherwise leave the copy stale
+  if (pendingAreas.has(source.name)) refreshArea(name);
+  animateSelectMessage(selectionStatus());
+  return index + 1;
+}
+
+function renameGroup(index, requested) {
+  const specs = areaSpecs();
+  const current = specs[index].name;
+  const check = validName(requested, specs.filter((_, at) => at !== index).map((spec) => spec.name));
+  if (check.error) return check.error;
+  const name = check.name;
+  if (name === current) return null;
+  areaSettings.set(name, settingsOf(current));
+  areaSettings.delete(current);
+  specs[index] = { ...specs[index], name };
+  applyGroupEdit(specs, (items) =>
+    items.map((item, at) => (at === index && !Array.isArray(item) ? { ...item, groupName: name } : item)));
+  // An answer still on its way is addressed to the old name
+  if (pendingAreas.delete(current)) refreshArea(name);
+  return index;
+}
+
+function removeGroup(index) {
+  const all = areaSpecs();
+  areaSettings.delete(all[index].name);
+  const specs = removed(all, index);
+  applyGroupEdit(specs, (items) => removed(items, index));
+  animateSelectMessage(specs.length
+    ? `Area removed. ${specs.length} of ${MAX_AREAS} selected`
+    : "Draw an area on the map to start");
+  return specs.length ? Math.min(index, specs.length - 1) : null;
+}
+
+setGroupControls({
+  colorOf: (group) => {
+    const area = drawnAreas().find(({ name }) => name === group.groupName);
+    return area ? area.layer.options.color : null;
+  },
+  canDuplicate: () => selected_polygons.length < MAX_AREAS,
+  decorate: decorateCard,
+  release: destroyCardPickers,
+  move: moveGroup,
+  duplicate: duplicateGroup,
+  remove: removeGroup,
+  rename: renameGroup,
+});

@@ -227,6 +227,15 @@ print(f"Energy on D: {today.sum() / 6:.1f} kWh, peak {today.max():.1f} kW")
 | `up_flex` | 288 | kW | Upward flexibility (≥ 0) |
 | `down_flex` | 288 | kW | Downward flexibility (≤ 0) |
 
+Scenario sources (`session_source` other than `database`) also return `flex_polytope`:
+
+| Field | Length | Unit | Description |
+|---|---|---|---|
+| `flex_polytope.cumulative_min_kwh` / `cumulative_max_kwh` | 288 | kWh | Least / most cumulative energy deliverable by step $t$ |
+| `flex_polytope.power_min_kw` / `power_max_kw` | 288 | kW | Least / most power in step $t$ |
+| `flex_polytope.total_min_kwh` / `total_max_kwh` | scalar | kWh | Energy range inside the window |
+| `flex_polytope.schedule_feasible` | scalar | bool | Selected schedule lies inside the polytope |
+
 When `selected_markers` is `undefined` or empty, the response has 144 zero values in each field.
 
 :::{note}

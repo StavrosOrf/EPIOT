@@ -7,52 +7,34 @@ the selected day and the day before. It is the default tab when the analysis pan
 :class: screenshot
 :alt: Load profiles for two areas with yesterday in green and today in blue
 
-Load profiles for 15 October 2025 under *As Fast As Possible*. One subplot per area.
+Load profiles for 15 October 2025 under *As Fast As Possible*. One card per area; the screenshot predates the card layout.
 ```
 
 ## Reading the chart
 
 | Element | Meaning |
 |---|---|
-| **Subplot title** | `Aggregated EV Charging Load for: Area N (k chargers)` in Chargers view, or `… at MVLV Transformer for: Area N (k tr.)` in Grid view. |
-| **Green line, grey background** | *Yesterday*: the day before the selected date (steps 0–143). |
-| **Blue line** | *Today*: the selected date (steps 144–287). |
-| **y-axis** | Aggregated charging power in kW. All subplots share the same y-range, so areas are directly comparable. |
-| **x-axis** | Time at 10-minute resolution. Values are drawn as steps: each value holds for its 10-minute interval. |
-| **Hover** | A unified tooltip shows the values of all traces at the hovered time. |
+| **Area card** | One card per area. Its left rail names the area, gives its size (`k chargers`) and holds the area's strategy, date and demand scenario. It also renames, moves, copies and removes the area ({doc}`interface`). |
+| **Orange line and band** | *Previous day*: the day before the selected date (steps 0–143), labelled with its weekday and date. |
+| **Blue line and band** | *Target day*: the selected date (steps 144–287), labelled with its weekday and date. Weekend days (Sat, Sun) are in bold. |
+| **y-axis** | Aggregated charging power in kW. All cards share the same y-range, so areas are directly comparable. |
+| **x-axis** | Time in UTC at 10-minute resolution. Values are drawn as steps: each value holds for its 10-minute interval. |
+| **Hover** | A unified tooltip shows the values of all traces at the hovered time, with the weekday. |
 
 The total energy in a profile is the sum of all values divided by six (kW × 1/6 h per step). See
 {doc}`../concepts/time-model` for the exact time grid.
 
 ## Controls
 
-### View: Chargers or Grid
-
-::::{grid} 1 1 2 2
-:gutter: 3
-
-:::{grid-item-card} Chargers view
-Aggregates the **charging points located inside** each area. Use it to understand demand at a site,
-street or neighbourhood level.
-:::
-
-:::{grid-item-card} Grid view
-Finds the **MV/LV transformers inside** each area and aggregates the charging points **connected to
-those transformers**. Use it to see what the EV fleet adds to specific grid assets.
-:::
-::::
-
-```{figure} ../_static/screenshots/load-profiles-grid.jpg
-:class: screenshot
-:alt: Load profiles in grid view, titled per MV/LV transformer
-
-Grid view of the same areas: the titles now count transformers ("34 tr.") rather than chargers.
-```
+Each profile aggregates the **charging points located inside** its area, so it describes demand at
+a site, street or neighbourhood level.
 
 ### Charging strategy
 
-The strategy decides *when* within each plug-in window the energy is delivered. The same sessions,
-and therefore the same total energy demand, produce very different load shapes:
+Each area card has its own **Charging strategy** menu (default *As Fast As Possible*). The strategy
+decides *when* within each plug-in window the energy is delivered. The same sessions, and therefore
+the same total energy demand, produce very different load shapes, so duplicating an area and giving
+the copy another strategy is the quickest way to compare two:
 
 | Strategy | Option label | Behaviour | Runs |
 |---|---|---|---|
@@ -79,8 +61,9 @@ The algorithms are specified in {doc}`../concepts/charging-strategies`.
 
 ### Date
 
-Pick any day from **1 September 2025** up to today. The chart covers that day and the previous one.
-Days without stored sessions produce flat zero profiles.
+Each area card has its own **Target date**; pick any day. The chart covers that day and the previous
+one. Areas can therefore show different days side by side, and hovering the date shows the calendar
+and weather effects applied to it.
 
 ## What happens when you click Analyse
 
@@ -90,18 +73,10 @@ sequenceDiagram
     actor U as User
     participant FE as Browser (script.js)
     participant ST as /stations/*
-    participant FT as /features/*
     U->>FE: Analyse / change a control
     par for every area
         FE->>ST: POST /stations/within
         ST-->>FE: charging points inside
-    and
-        FE->>FT: POST /features/transformers/within
-        FT-->>FE: transformers inside
-    end
-    opt Grid view
-        FE->>ST: POST …/charging-points-by-transformers
-        ST-->>FE: connected charging points
     end
     loop for every area
         FE->>ST: GET /stations/aggregate_load

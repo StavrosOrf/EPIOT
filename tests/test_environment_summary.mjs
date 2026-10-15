@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import test from "node:test";
+import {loadPlotter} from "./plotter_harness.mjs";
 
 const read = file => readFileSync(new URL(`../static/scripts/${file}`,import.meta.url),"utf8").replace(/^export /gm,"");
 const render = new Function(read("environment_summary.js")+";return renderEnvironmentSummary;")();
@@ -43,17 +44,14 @@ test("partial and unavailable schedules are labelled and area names are escaped"
 });
 
 test("minimum-carbon chart adds aligned traces alongside all three baselines", () => {
-  let captured;
-  const container = {clientWidth:1000,parentElement:{clientHeight:600},dataset:{},innerHTML:""};
-  const chart = new Function("window","document","Plotly","structuredClone",read("plotter.js")+";return createEnvironmentKPIGraph;")(
-    {innerWidth:1200,addEventListener(){}},{getElementById:()=>container},
-    {newPlot:(_container,data)=>captured=data},structuredClone);
+  const {api,plots} = loadPlotter();
   const kpi = {};
   for (const label of ["uncontrolled","delayed","avg","mincarbon"]) {
     kpi[`co2_intensities_${label}`] = Array(24).fill(100);
     kpi[`renewable_energy_shared_${label}`] = 50;
   }
-  chart([{groupName:"Area",kpi}]);
+  api.createEnvironmentKPIGraph([{groupName:"Area",kpi}]);
+  const captured = plots[0].data;
   assert.equal(captured.length,8);
   assert.equal(captured.filter(trace=>trace.name==="Minimum Carbon").length,2);
   for (const trace of captured) assert.equal(trace.x.length,trace.y.length);

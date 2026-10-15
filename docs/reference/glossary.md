@@ -33,6 +33,9 @@ MV/LV transformer
 Occupancy ratio
 : Share of time a charging point has a vehicle connected over the selected range.
 
+Polytope flexibility
+: The set of all charging schedules in which every session gets its energy within its plug-in window and power limit; for EVs it is a generalized polymatroid with a closed-form aggregate.
+
 Power mix
 : The composition of electricity consumption by source, with its carbon intensity and renewable share.
 

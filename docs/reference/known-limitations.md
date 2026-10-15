@@ -26,7 +26,7 @@ can be checked against the code and removed from this page when fixed.
   - At half power, sessions whose window is shorter than twice the full-power duration are truncated at departure.
   - `simulate_avg_charging_profiles_from_sessions`
 * - **Flexibility is a power envelope**
-  - Up/down flexibility does not account for the energy consequences of activating it.
+  - Up/down flexibility does not account for the energy consequences of activating it. The polytope view does, but only for scenario session sources and without V2G or state-of-charge limits.
   - {doc}`../concepts/flexibility`
 * - **Unknown rated power defaults to 11 kW**
   - Charging points without a rated power are simulated as 11 kW.

@@ -5,7 +5,7 @@ images of individual charts.
 
 ## Excel report
 
-Click **Download report** in the analysis panel. The browser builds the workbook locally with
+Click the **Export** (download) icon in the analysis panel's header. The browser builds the workbook locally with
 [SheetJS](https://sheetjs.com/) from the results already on screen (no extra server request) and
 saves it as **`DRIVE2X_EPIOT_report.xlsx`**.
 
@@ -41,6 +41,7 @@ One row per area and 10-minute step (288 rows per area).
 | `EV Load (kWh)` | kW | Aggregated charging power for the step |
 | `Upward Flexibility (kW)` | kW | Upward flexibility for the step |
 | `Downward Flexibility (kW)` | kW | Downward flexibility (negative) |
+| `Charging strategy` | | The strategy the area card was set to |
 
 :::{admonition} Units and timestamps
 :class: warning
@@ -55,8 +56,7 @@ align rows with the chart. This is tracked in {doc}`../reference/known-limitatio
 
 ### Sheet `Charger IDs`
 
-One row per charging point and area: `Area Name`, `Charger IDs`. In Grid view, these are the charging
-points connected to the transformers in the area.
+One row per charging point and area: `Area Name`, `Charger IDs`.
 
 ### Sheets `Area N_KPIs`
 

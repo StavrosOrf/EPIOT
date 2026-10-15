@@ -112,17 +112,19 @@ test("environment is lazy, cached separately and merged without losing basic sta
 
 test("late load results and errors cannot overwrite a newer selection", async () => {
   const script = read("script.js");
-  const start = script.indexOf("async function calculateLoadProfiles(");
-  const body = script.slice(start, script.indexOf("// add event listener to the strategy-dropdown",start));
-  const pending = [], rendered = [], errors = [];
-  const run = new Function("get_LoadProfiles","document","createGraph","showGraphMessage",`
+  const start = script.indexOf("function calendarSummary(");
+  const body = script.slice(start, script.indexOf('document.getElementById("session-source").addEventListener(',start));
+  const pending = [], rendered = [], errors = [], requests = [];
+  const run = new Function("get_LoadProfiles","document","createGraph","showGraphMessage","calendarDate",`
     let profileRequestVersion=0,load_profile_data=[],charger_ids_list=[],transformer_ids_list=[];
-    const dateInput={value:"2025-10-14"},toggle={checked:false},active_tab="Load Profiles";
-    const selected_polygons=[],selected_area_names=[];
+    const active_tab="Load Profiles";
+    const selected_polygons=[{}],selected_area_names=["New"];
+    const settingsOf=()=>({strategy:"alap",demand:"high",date:new Date(2025,9,14)});
+    const calendarNote=()=>"",createPolytopeGraph=()=>{};
     ${body}
     return calculateLoadProfiles;
-  `)(()=>new Promise((resolve,reject)=>pending.push({resolve,reject})),
-    {getElementById:()=>({value:"simple"})},data=>rendered.push(data),(...args)=>errors.push(args));
+  `)((...args)=>new Promise((resolve,reject)=>{requests.push(args);pending.push({resolve,reject});}),
+    {getElementById:()=>({value:"simple"})},data=>rendered.push(data),(...args)=>errors.push(args),calendarDate);
   const old = run(), current = run();
   pending[1].resolve([{chargerIds:[2],transformerIds:[],groupName:"New",
     response:{y:[1,2],up_flex:[0,1],down_flex:[-1,0],past_steps:1}}]);
@@ -131,7 +133,45 @@ test("late load results and errors cannot overwrite a newer selection", async ()
   await old;
   assert.equal(rendered.length,1);
   assert.equal(rendered[0][0].groupName,"New");
+  assert.equal(rendered[0][0].strategy,"alap");
+  assert.equal(rendered[0][0].targetDate,"2025-10-14");
+  // every area is requested with its own date and strategy
+  assert.deepEqual(requests[0][2],["2025-10-14"]);
+  assert.deepEqual(requests[0][3].strategy,["alap"]);
+  assert.deepEqual(requests[0][3].demandAssumption,["high"]);
+  assert.equal(requests[0][3].gridView,undefined);
   assert.deepEqual(errors,[]);
+});
+
+test("each area is requested with its own date and strategy", async () => {
+  const f = fixture();
+  await f.api.get_LoadProfiles([polygon,polygon],["A","B"],["2025-10-14","2025-10-20"],{strategy:["afap","alap"]});
+  const bodies = f.calls.filter(call=>call.url.endsWith("aggregate_load")).map(call=>call.body);
+  assert.deepEqual(bodies.map(body=>[body.date,body.strategy]).sort(),[["2025-10-14","afap"],["2025-10-20","alap"]]);
+  assert.equal(f.count("/stations/within"),1);
+});
+
+test("each area is requested with its own demand scenario", async () => {
+  const f = fixture();
+  await f.api.get_LoadProfiles([polygon,polygon],["A","B"],"2025-10-14",{demandAssumption:["low","high"]});
+  const load = f.calls.filter(call=>call.url.endsWith("aggregate_load")).map(call=>call.body.demand_assumption);
+  assert.deepEqual(load.sort(),["high","low"]);
+  await f.api.get_KPIs([polygon,polygon],["A","B"],dates,{demandAssumption:["high","base"]});
+  const kpi = f.calls.filter(call=>call.url==="/kpi/user").map(call=>call.body.demand_assumption);
+  assert.deepEqual(kpi.sort(),["base","high"]);
+  // a single value still applies to every area
+  const g = fixture();
+  await g.api.get_KPIs([polygon,polygon],["A","B"],dates,{demandAssumption:"low"});
+  assert.deepEqual(g.calls.filter(call=>call.url==="/kpi/user").map(call=>call.body.demand_assumption),["low","low"]);
+});
+
+test("each area is requested with its own KPI date range", async () => {
+  const f = fixture();
+  await f.api.get_KPIs([polygon,polygon],["A","B"],[[new Date(2025,9,1),new Date(2025,9,3)],dates]);
+  const bodies = f.calls.filter(call=>call.url==="/kpi/user").map(call=>[call.body.start_date,call.body.end_date]);
+  assert.deepEqual(bodies.sort(),[["2025-10-01","2025-10-03"],["2025-10-13","2025-10-14"]]);
+  await assert.rejects(f.api.get_KPIs([polygon,polygon],["A","B"],[dates]),/both dates/);
+  await assert.rejects(f.api.get_KPIs([polygon,polygon],["A","B"],[dates,[new Date()]]),/both dates/);
 });
 
 test("late environmental results cannot replace a newer KPI request", async () => {

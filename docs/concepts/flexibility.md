@@ -83,6 +83,42 @@ returned by ReFlex. Any power between zero and the rated power is feasible while
 Flexibility signals of a single 22 kWh session on an 11 kW charger, plugged in from 08:00 to 17:00.
 ```
 
+## Polytope flexibility
+
+The per-step signals above ignore energy: using flexibility at one step changes what is left to
+charge later. The **polytope** view keeps that coupling. Each connection $i$ may charge any
+schedule $x_i$ with
+
+$$
+0 \le x_{i,t} \le u_{i,t}, \qquad \underline{E}_i \le \sum_t x_{i,t} \le \overline{E}_i ,
+$$
+
+where $u_{i,t}$ is the energy the plug can deliver in step $t$ while connected. A connection that
+crosses the window edge only has to deliver the energy that does not fit outside the window, so
+$\underline{E}_i = \max(0, E_i - \text{capacity outside})$ and
+$\overline{E}_i = \min(E_i, \text{capacity inside})$. The area's flexibility is the Minkowski sum
+of these sets.
+
+Each set is a generalized polymatroid (Mukhi & Abate, 2023; Mukhi, Loho & Abate, 2025), so the sum is
+exact and cheap: for any set of steps $A$, the fleet can deliver at most
+$b(A)=\sum_i \min(\overline{E}_i, u_i(A))$ and at least
+$p(A)=\sum_i \max(0, \underline{E}_i - u_i(\bar A))$. Evaluating a query is $O(N)$ in numpy; no
+optimisation is needed.
+
+EPIOT reports, for the selected schedule:
+
+| Output | Meaning |
+|---|---|
+| `cumulative_min_kwh`, `cumulative_max_kwh` | Band of cumulative energy the fleet can have delivered by step $t$ ($p([0,t])$, $b([0,t])$) |
+| `power_min_kw`, `power_max_kw` | Least power that must run, and most that can run, in step $t$ |
+| `total_min_kwh`, `total_max_kwh` | Energy range delivered inside the window |
+| `schedule_feasible` | Whether the selected schedule lies inside the polytope (prefix, per-step and total bounds) |
+
+The module `backend/flex_polytope.py` also provides window queries: the energy a window can absorb
+above, or shed below, a schedule (`window_flexibility`), and the largest uniform power reduction
+sustained over a window (`max_sustained_reduction`, one exact LP). Vehicle-to-grid and minimum
+state-of-charge limits are not modelled.
+
 ## Interpreting aggregated flexibility
 
 At area level, the signals answer practical questions:
@@ -94,7 +130,8 @@ At area level, the signals answer practical questions:
 | Which strategy keeps the most headroom in both directions? | Compare tabs under *Average Power* versus the full-power strategies |
 
 :::{note}
-Flexibility in EPIOT is a **power** envelope per step. It does not track the energy consequences of
+The up/down signals are a **power** envelope per step. They do not track the energy consequences of
 using it: activating upward flexibility at one step reduces what remains to be charged later. Treat
-the signals as an indicator of instantaneous headroom, not as a dispatchable schedule.
+them as an indicator of instantaneous headroom, not as a dispatchable schedule. The
+[polytope view](#polytope-flexibility) is the energy-consistent alternative.
 :::

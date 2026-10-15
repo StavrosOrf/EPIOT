@@ -1,3 +1,19 @@
+// Charging strategies an area can be analysed under: [value, label]
+export const STRATEGIES = [
+  ["afap", "As Fast As Possible"],
+  ["alap", "As Late As Possible"],
+  ["avg", "Average Power"],
+  ["mincarbon", "Min. Carbon Footprint"],
+  ["ocost", "Min. Charging Cost"],
+];
+// Demand scenarios: [value, label]
+export const DEMANDS = [
+  ["low", "Low demand"],
+  ["base", "Base demand"],
+  ["high", "High demand"],
+];
+const strategyLabel = value => (STRATEGIES.find(([key]) => key === value) || [, value || ""])[1];
+
 // Show a status message in the bottom action bar
 export function animateSelectMessage(newMessage) {
   const message = document.getElementById("select-message");
@@ -20,7 +36,7 @@ function generateLoadDataSheet(profile_data) {
       "EV Load (kW)",
       "Upward Flexibility (kW)",
       "Downward Flexibility (kW)",
-      "Session source", "Demand assumption", "Synthetic",
+      "Session source", "Demand assumption", "Synthetic", "Charging strategy",
     ],
   ];
 
@@ -67,7 +83,8 @@ function generateLoadDataSheet(profile_data) {
         .substring(0, 19);
 
       wsData.push([groupName, formattedTimestamp, evLoad, upFlex, downFlex,
-        group.source?.label || "Stored sessions", group.source?.assumption || "", group.source?.synthetic ?? ""]);
+        group.source?.label || "Stored sessions", group.source?.assumption || "", group.source?.synthetic ?? "",
+        strategyLabel(group.strategy)]);
     }
   }
 
@@ -173,6 +190,17 @@ function generateKPIsSheet(kpi_data_list) {
   return ws;
 }
 
+// Excel sheet names are at most 31 characters, exclude \ / ? * [ ] : and must be
+// unique, whatever the areas are called
+function sheetName(area, suffix, used) {
+  const cleaned = String(area).replace(/[\\/?*\[\]:]/g, " ").trim() || "Area";
+  const fit = (tag = "") => cleaned.slice(0, 31 - suffix.length - tag.length).trim() + tag + suffix;
+  let name = fit();
+  for (let number = 2; used.has(name.toLowerCase()); number++) name = fit(`_${number}`);
+  used.add(name.toLowerCase());
+  return name;
+}
+
 export function generateAndDownloadExcel(selectedChargerIds, profile_data, kpi_data_list) {
   // First Sheet: Load Data
   const loadDataSheet = generateLoadDataSheet(profile_data);
@@ -190,12 +218,10 @@ export function generateAndDownloadExcel(selectedChargerIds, profile_data, kpi_d
   if (profile_data.length) XLSX.utils.book_append_sheet(wb, loadDataSheet, "Load Data");
   XLSX.utils.book_append_sheet(wb, chargerIdSheet, "Charger IDs");
 
+  const usedSheetNames = new Set(["load data", "charger ids"]);
   for (let i = 0; i < kpi_data_list.length; i++) {
-    // find area name from the selected_area_names
-    let area_name = kpi_data_list[i].groupName;
     var kpisSheet = generateKPIsSheet(kpi_data_list[i]);
-    var name = area_name + "_KPIs";
-    XLSX.utils.book_append_sheet(wb, kpisSheet, name);
+    XLSX.utils.book_append_sheet(wb, kpisSheet, sheetName(kpi_data_list[i].groupName, "_KPIs", usedSheetNames));
   }
 
   // Generate XLSX file and trigger download

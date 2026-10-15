@@ -10,7 +10,10 @@ export function pickerOptions(rangeMode, minDate, today, selectedDates, onChange
   const dates = valid.length ? valid : [today];
   return {
     mode: rangeMode ? "range" : "single", minDate: minDate || null, maxDate: null,
-    dateFormat: "Y-m-d", defaultDate: rangeMode ? [dates[0], dates.at(-1)] : dates.at(-1),
+    // The weekday tells weekends apart; a range drops the year to fit its field
+    dateFormat: rangeMode ? "D j M" : "D Y-m-d",
+    locale: { rangeSeparator: " – " },
+    defaultDate: rangeMode ? [dates[0], dates.at(-1)] : dates.at(-1),
     disableMobile: true, onChange,
   };
 }

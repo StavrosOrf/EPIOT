@@ -34,14 +34,15 @@ Charger availability and occupancy.
 
 ## Using the KPI tab
 
-1. Open the analysis panel and click **KPIs**. The date control becomes a **Date range** picker,
-   pre-filled from 1 September 2025 to today, and the KPIs are computed immediately.
-2. Choose a start and an end date. The KPIs refresh once both dates are picked.
+1. Open the analysis panel and click **KPIs**. Each area card has its own **Date range** picker,
+   pre-filled with the last seven days, and the KPIs are computed immediately.
+2. Choose a start and an end date on a card. That area's KPIs refresh once both dates are picked;
+   the other areas keep their own ranges.
 3. Switch between the **User · Grid · Environment · Mobility · City** sub-tabs. Switching sub-tabs is
    instant: all five dashboards come from the same response, so only the chart is redrawn.
 
-Each dashboard has one row per area, so up to three areas are compared directly. The strategy
-drop-down is hidden here: behavioural KPIs do not depend on it, and the environment KPIs compute all
+Each dashboard has one card per area, so up to three areas are compared directly, each over its own
+date range. There is no strategy setting here: behavioural KPIs do not depend on it, and the environment KPIs compute all
 three local strategies at once.
 
 :::{note}
@@ -55,7 +56,7 @@ after** the start date and **end before** the end date are counted.
 :class: screenshot
 :alt: User KPI dashboard with arrival, duration and departure distributions
 
-User KPIs: arrival, duration and departure distributions, weekdays (blue) against weekends (red).
+User KPIs: arrival, duration and departure distributions, weekdays (blue) against weekends (orange).
 ```
 
 | Chart | x-axis | y-axis | Question it answers |

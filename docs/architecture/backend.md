@@ -36,6 +36,7 @@ The database handle is shared with blueprints through `app.config["station_data.
 | `backend/bootstrap_data.py` | Exports and restores the `seed_data/` country snapshots (`database_init.py`) |
 | `backend/loaders.py` | Grid-connection helper: nearest MV/LV transformer per column |
 | `backend/charge_sessions.py` | Session generators (Monte Carlo, gamma, ML placeholder) and plotting helpers |
+| `backend/flex_polytope.py` | Polytope (g-polymatroid) flexibility: energy envelopes, window queries, sustained-reduction LP |
 | `backend/api_calls/prices.py` | Day-ahead prices from Energy-Charts |
 | `backend/api_calls/reflex.py` | Builds the ReFlex optimisation query |
 | `backend/api_calls/env_data_api.py` | Power-mix import from Electricity Maps |

@@ -1,9 +1,9 @@
 # Selectable session scenarios
 
-The **Session source** control applies to Load profiles, Flexibility and KPIs. The three
-options are **Simple session sampler**, **Spatial session sampler**, and **CPFT
-tool — synthetic history**. Low/base/high demand are sensitivity assumptions,
-not confidence intervals. KPIs use the selected source over an inclusive local
+The **Source** control in the panel header applies to Load profiles, Flexibility and KPIs. The
+three options are **Simple** (session sampler), **Spatial** (session sampler), and **CPFT**
+(tool — synthetic history). Low/base/high demand is chosen per area on its card; these are
+sensitivity assumptions, not confidence intervals. KPIs use the selected source over an inclusive local
 calendar-date range. No verified local charging data are assumed.
 All five KPI categories appear as a button bar in the panel header, right of the analysis tabs.
 The logo, About and close controls retain fixed positions when categories are
@@ -117,7 +117,8 @@ its external service contract is fixed to 288 steps. Other strategies cover DST.
 The UI uses `POST /stations/aggregate_load` with the same named fields in JSON,
 and `selected_markers` as an ID array, to support regions with long point lists
 without exceeding server URL limits. The target date defaults to today, and the
-date pickers accept any date, past or future.
+date pickers accept any date, past or future. The page sends one request per area
+with that area's own date and strategy (KPIs: its own date range).
 
 API calls omitting `session_source` retain the existing database-backed path for
 backward compatibility. The web selector explicitly chooses one of the three
@@ -173,11 +174,11 @@ for provenance and importing grid data.
 
 ```bash
 uv run --extra cpft pytest -q
-node --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs
+node --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs tests/test_group_actions.mjs
 ```
 
 On restricted Windows/OneDrive checkouts where Node cannot resolve parent-folder
-symlinks, use `node --preserve-symlinks --preserve-symlinks-main --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs`.
+symlinks, use `node --preserve-symlinks --preserve-symlinks-main --test tests/test_scenario_charts.mjs tests/test_kpi_ui.mjs tests/test_environment_summary.mjs tests/test_group_actions.mjs`.
 
 Tests cover geographic assignment, missing-data fallback, source isolation,
 window independence (a day alone equals the same day in longer windows, across

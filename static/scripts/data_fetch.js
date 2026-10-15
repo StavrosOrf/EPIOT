@@ -41,9 +41,11 @@ async function versions() {
 }
 
 const sortedIds = ids => [...new Set(ids)].sort((a, b) => a - b);
-const sourceOptions = options => ({
+// A setting is either shared by every area or given once per area
+const forArea = (value, index) => (Array.isArray(value) ? value[index] : value);
+const sourceOptions = (options, index = 0) => ({
   session_source: options.sessionSource || "simple",
-  demand_assumption: options.demandAssumption || "base", seed: options.seed ?? 42,
+  demand_assumption: forArea(options.demandAssumption, index) || "base", seed: options.seed ?? 42,
 });
 
 async function areaSelection(polygon, revision, gridView = false) {
@@ -64,12 +66,14 @@ async function areaSelection(polygon, revision, gridView = false) {
   });
 }
 
+// `date`, `options.strategy` and `options.demandAssumption` are one value for all areas or an
+// array with one per area
 export async function get_LoadProfiles(polygons, names, date, options = {}) {
   const revision = await versions();
   return Promise.all(polygons.map(async (polygon, index) => {
     const selection = await areaSelection(polygon, revision.infrastructure, Boolean(options.gridView));
-    const query = { selected_markers: selection.chargerIds, date,
-      strategy: options.strategy || "avg", ...sourceOptions(options) };
+    const query = { selected_markers: selection.chargerIds, date: forArea(date, index),
+      strategy: forArea(options.strategy, index) || "avg", ...sourceOptions(options, index) };
     const response = await cached(profiles, JSON.stringify([revision.analysis, query]),
       () => jsonFetch("/stations/aggregate_load", query));
     return { ...selection, groupName: names[index], response };
@@ -77,14 +81,20 @@ export async function get_LoadProfiles(polygons, names, date, options = {}) {
 }
 
 // Return basic KPIs first. Environmental scheduling is requested independently.
+// `selectedDates` is one [start, end] for all areas or an array of them, one per area
 export async function get_KPIs(polygons, names, selectedDates, options = {}) {
-  if (selectedDates.length !== 2) throw new Error("Select both dates for the KPI range.");
+  const shared = !Array.isArray(selectedDates[0]);
+  const ranges = shared ? polygons.map(() => selectedDates) : selectedDates;
+  if ((shared && selectedDates.length !== 2) || ranges.length !== polygons.length ||
+      ranges.some(range => range.length !== 2)) {
+    throw new Error("Select both dates for the KPI range.");
+  }
   const revision = await versions();
-  const startDate = calendarDate(selectedDates[0]), endDate = calendarDate(selectedDates[1]);
   return Promise.all(polygons.map(async (polygon, index) => {
+    const startDate = calendarDate(ranges[index][0]), endDate = calendarDate(ranges[index][1]);
     const selection = await areaSelection(polygon, revision.infrastructure);
     const query = { selected_markers: selection.chargerIds, start_date: startDate, end_date: endDate,
-      ...sourceOptions(options) };
+      ...sourceOptions(options, index) };
     const kpi = await jsonFetch("/kpi/user", { ...query, section: "basic" });
     return { ...selection, groupName: names[index], kpi, source: kpi.source,
       number_of_chargers: selection.chargerIds.length, number_of_transformers: 0,

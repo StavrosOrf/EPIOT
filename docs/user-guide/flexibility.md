@@ -1,40 +1,36 @@
 # Flexibility
 
-The **Flexibility** tab shows how much the EV fleet in each area could change its charging power at
-any moment, given the charging strategy it follows. It uses the same sessions, date and strategy as
-the load profiles.
-
-- **Upward flexibility** (blue, positive): extra power the vehicles could draw on top of the
-  scheduled load.
-- **Downward flexibility** (red, negative): power by which the vehicles could reduce their load.
+The **Flexibility** tab shows what the EV fleet in each area can do **while every vehicle still
+receives its energy**: the energy-feasible envelope (a *polytope*) around the schedule produced by
+the area's charging strategy. It uses the same sessions, date and strategy as the load profiles.
 
 Flexibility is what a charge point operator or aggregator can offer to the grid, for example for
-congestion management or balancing.
-
-```{figure} ../_static/screenshots/flexibility-avg.jpg
-:class: screenshot
-:alt: Flexibility chart with blue upward and red downward areas
-
-Flexibility under *Average Power* for 15 October 2025. Because each vehicle charges at half its rated power, it can go up or down by the same amount.
-```
+congestion management or balancing: the schedule can move anywhere inside the envelope without
+leaving any vehicle short of energy.
 
 ## Reading the chart
 
+Each area card shows two panels side by side:
+
 | Element | Meaning |
 |---|---|
-| **Subplot title** | `Aggregated EV Charging Flexibility: Area N (k chargers)` |
-| **Blue area above zero** | Upward flexibility in kW |
-| **Red area below zero** | Downward flexibility in kW (shown as negative values) |
-| **Left half, grey** | Day before the selected date |
-| **Right half** | Selected date |
+| **Power (kW)** | The minimum and maximum feasible power per step (blue band, dotted lower edge) around the scheduled load (black line). |
+| **Cumulative energy (kWh)** | The minimum and maximum cumulative energy that can have been delivered by each step, around the scheduled cumulative energy. |
+| **Orange and blue bands** | The previous day and the target day, each labelled with its weekday and date; weekend days are in bold. |
+| **Area card** | One card per area; the left rail names it, gives its size and holds its strategy, date and demand scenario. |
 
-The y-range is shared across areas and padded by 10 %.
+The distance from the schedule to the upper edge is how much extra energy could have been delivered
+by then; to the lower edge, how much could be postponed. The power axis is shared across areas, so
+envelopes can be compared. The view needs a scenario session source (simple, spatial or CPFT).
+Details: {doc}`../concepts/flexibility`.
 
-## Flexibility depends on the strategy
+## Upward and downward flexibility
 
-The shape of the flexibility envelope follows directly from the charging strategy. The figure below
-shows the signals EPIOT returns for a single 22 kWh session on an 11 kW charger, plugged in from
-08:00 to 17:00:
+Besides the envelope, EPIOT computes the *headroom* of the schedule at every step: how much power the
+vehicles could add (upward) or shed (downward). These two series are not plotted any more, but they
+are exported in the Excel report ({doc}`reports`). They follow directly from the charging strategy.
+The figure below shows them for a single 22 kWh session on an 11 kW charger, plugged in from 08:00
+to 17:00:
 
 ```{figure} ../_static/figures/strategy-flexibility.svg
 :class: chart
@@ -50,16 +46,9 @@ Flexibility signals for one session. The dashed line is the scheduled load; the 
 | **Average Power** | Half the rated power, for as long as the vehicle charges. | Half the rated power, for as long as the vehicle charges. |
 | **Min. Charging Cost** | Rated power × plugged-in indicator − scheduled load. | Minus the scheduled load. |
 
-```{figure} ../_static/screenshots/flexibility.jpg
-:class: screenshot
-:alt: Flexibility under As Fast As Possible showing only downward flexibility
-
-Under *As Fast As Possible* there is no upward flexibility: every vehicle already charges at its maximum.
-```
-
 The precise definitions are in {doc}`../concepts/flexibility`.
 
 :::{tip}
-To compare strategies, keep the tab open and switch the **Charging strategy** drop-down; the chart
-refreshes for the same areas and date.
+To compare strategies, duplicate an area and give the copy another **Charging strategy** on its card;
+only that card recalculates. The strategy and target date are set per area card.
 :::
