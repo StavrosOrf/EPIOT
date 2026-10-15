@@ -1,183 +1,88 @@
 ---
 myst:
   html_meta:
-    description: "EPIOT — the Electromobility Prediction Tool of DRIVE2X. Quantify EV charging load and flexibility for any area on the map."
+    description: "EPIOT, the Electromobility Prediction Tool of DRIVE2X: EV charging load, flexibility and KPIs for any area on the map."
 ---
 
-# EPIOT documentation
+# EPIOT
 
-```{raw} html
-<div class="hero">
-  <span class="hero-kicker">DRIVE2X · Work Package 5</span>
-  <div class="hero-title">Electromobility Prediction Tool</div>
-  <p>EPIOT quantifies electric-vehicle charging demand and flexibility for any area you draw on a map.
-  Pick a day and a charging strategy, compare up to three districts side by side, explore KPI
-  dashboards for users, the grid, the environment, mobility and the city, and export everything to Excel.</p>
-</div>
-```
+**Electromobility Prediction Tool** · DRIVE2X Work Package 5
 
-```{figure} _static/screenshots/areas-drawn.jpg
-:class: screenshot
-:alt: The EPIOT map with three analysis areas drawn over central Amsterdam
-:width: 100%
+EPIOT quantifies electric-vehicle charging load and flexibility for areas drawn on a map. Choose a
+date, a charging strategy and a session source, compare up to three areas side by side, review five
+KPI dashboards, and export the results to Excel.
 
-Three areas drawn over central Amsterdam, ready to analyse. Every icon is a public charging point from the EPIOT database.
-```
-
-## Where to start
+:::{note}
+EPIOT receives no live charging data. All results are synthetic scenarios with assumed demand, not
+verified forecasts of local charging.
+:::
 
 ::::{grid} 1 2 2 3
 :gutter: 3
 
-:::{grid-item-card} {octicon}`rocket;1.2em` Getting started
-:link: getting-started/introduction
+:::{grid-item-card} Getting started
+:link: getting-started
 :link-type: doc
-:class-card: sd-card-hover
 
-What EPIOT does, who it is for, and how to install and run it locally.
+Install, run an analysis, data coverage, configuration and endpoints.
 :::
 
-:::{grid-item-card} {octicon}`device-desktop;1.2em` User guide
-:link: user-guide/interface
+:::{grid-item-card} Session sources
+:link: session-sources
 :link-type: doc
-:class-card: sd-card-hover
 
-A tour of every screen: the map, area selection, load profiles, flexibility, KPIs and reports.
+Simple, Spatial and CPFT scenarios, demand levels and day effects.
 :::
 
-:::{grid-item-card} {octicon}`light-bulb;1.2em` Concepts & methods
-:link: concepts/charging-strategies
+:::{grid-item-card} Load profiles
+:link: load-profiles
 :link-type: doc
-:class-card: sd-card-hover
 
-How load and flexibility are computed, where session data comes from, and how every KPI is defined.
+Aggregated charging power and the five charging strategies.
 :::
 
-:::{grid-item-card} {octicon}`stack;1.2em` Architecture
-:link: architecture/overview
+:::{grid-item-card} Flexibility
+:link: flexibility
 :link-type: doc
-:class-card: sd-card-hover
 
-System components, the data model, the backend and frontend modules, and the external services.
+The feasible envelope and upward and downward headroom.
 :::
 
-:::{grid-item-card} {octicon}`plug;1.2em` REST API
-:link: api/rest-api
+:::{grid-item-card} KPIs
+:link: kpis
 :link-type: doc
-:class-card: sd-card-hover
 
-Every HTTP endpoint with parameters, response schemas and copy-paste examples.
-:::
-
-:::{grid-item-card} {octicon}`server;1.2em` Operations
-:link: operations/database
-:link-type: doc
-:class-card: sd-card-hover
-
-Building the database, scheduled data updates, and deploying behind a reverse proxy.
+User, Grid, Environment, Mobility and City indicators.
 :::
 ::::
 
-## Feature overview
+## At a glance
 
-| Feature | What you get | Read more |
-|---|---|---|
-| Interactive map | Charging points and MV/LV transformers on OpenStreetMap, location search, marker pop-ups | {doc}`user-guide/map` |
-| Area selection | Up to three polygons or rectangles, compared side by side | {doc}`user-guide/areas` |
-| Load profiles | Aggregated EV load over a 48-hour window at 10-minute resolution, per area | {doc}`user-guide/load-profiles` |
-| Grid view | The same load seen from the medium-voltage/low-voltage transformers that serve the area | {doc}`user-guide/load-profiles` |
-| Charging strategies | As fast as possible, as late as possible, average power, and cost-optimal (ReFlex) | {doc}`concepts/charging-strategies` |
-| Flexibility | Upward and downward power flexibility of the EV fleet | {doc}`user-guide/flexibility` |
-| KPI dashboards | User, grid, environment, mobility and city indicators over any date range | {doc}`user-guide/kpis` |
-| Excel reports | One-click `.xlsx` export of profiles, charger lists and KPIs | {doc}`user-guide/reports` |
+| | |
+|---|---|
+| **Areas** | Up to three polygons or rectangles, compared side by side |
+| **Time** | Any past or future date; 10-minute resolution; local days in Europe/Amsterdam |
+| **Sessions** | Synthetic scenarios from Simple, Spatial or CPFT sources, at low, base or high demand |
+| **Strategies** | As Fast As Possible, As Late As Possible, Average Power, Min. Carbon Footprint, Min. Charging Cost |
+| **Outputs** | Load profiles, flexibility envelopes, five KPI dashboards, Excel report |
+| **Coverage** | About 590,000 charging points in the Netherlands, Germany, France, Switzerland, Finland and seven further cities; transformers and the spatial atlas for Amsterdam |
 
-```{toctree}
-:hidden:
-:caption: Getting started
+## Citation and contact
 
-getting-started/introduction
-getting-started/installation
-getting-started/quickstart
-```
+> Ravanbach, B., Turhan, E., Wulff, N., Orfanoudakis, S., Vergara, P. P., Vahidinasab, V., Dias, L.,
+> & Mendes, G. (2024). *A dynamic prediction tool for vehicle-to-grid operation and planning.* In
+> *2024 IEEE 22nd Mediterranean Electrotechnical Conference (MELECON)*.
 
-```{toctree}
-:hidden:
-:caption: User guide
-
-user-guide/interface
-user-guide/map
-user-guide/areas
-user-guide/load-profiles
-user-guide/flexibility
-user-guide/kpis
-user-guide/reports
-```
+Contact: Babak Ravanbach (DLR, <babak.ravanbach@dlr.de>) and Stavros Orfanoudakis (TU Delft,
+<s.orfanoudakis@tudelft.nl>). EPIOT is developed in [DRIVE2X](https://drive2x.eu/), funded by the
+European Union and UK Research and Innovation, and released under the BSD-3-Clause licence.
 
 ```{toctree}
 :hidden:
-:caption: Concepts & methods
 
-concepts/time-model
-concepts/charging-strategies
-concepts/flexibility
-concepts/session-data
-concepts/on-request-scenarios
-concepts/calendar-effects
-concepts/kpi-methodology
-```
-
-```{toctree}
-:hidden:
-:caption: Architecture
-
-architecture/overview
-architecture/data-model
-architecture/backend
-architecture/frontend
-architecture/external-services
-```
-
-```{toctree}
-:hidden:
-:caption: API reference
-
-api/rest-api
-```
-
-```{toctree}
-:hidden:
-:caption: Operations
-
-operations/database
-operations/scheduled-updates
-operations/deployment
-operations/configuration
-```
-
-```{toctree}
-:hidden:
-:caption: Development
-
-development/project-structure
-development/testing
-map_performance
-development/documentation
-```
-
-```{toctree}
-:hidden:
-:caption: Related tools
-
-related-tools/cpft
-related-tools/reflex
-```
-
-```{toctree}
-:hidden:
-:caption: Reference
-
-reference/known-limitations
-reference/troubleshooting
-reference/glossary
-reference/citing
+getting-started
+session-sources
+load-profiles
+flexibility
+kpis
 ```

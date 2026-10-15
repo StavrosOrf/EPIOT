@@ -5,7 +5,7 @@ Each source is parsed into the same `Site`/`Point` records, which
 charging_points tables. Nothing here touches the database.
 
 Raw files live under instance/chargers/raw/<source>/ and are described in
-instance/chargers/manifest.json; see docs/charger_sources.md.
+instance/chargers/manifest.json; see docs/getting-started.md (Data coverage).
 """
 
 from dataclasses import dataclass, field

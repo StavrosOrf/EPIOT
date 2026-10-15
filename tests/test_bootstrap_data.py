@@ -2,7 +2,9 @@
 from contextlib import closing
 import gzip
 import json
+import re
 import sqlite3
+from pathlib import Path
 
 import geopandas as gpd
 import pytest
@@ -12,6 +14,20 @@ from backend.bootstrap_data import (ATLAS_NAME, COUNTRY_TABLES, SHARED_TABLES, P
                                     bootstrap, export_snapshots, fields, read_only)
 from backend.spatialite import configure_spatialite
 from scripts.update_charger_data import engine_for
+
+
+def migration_head():
+    """The revision no other migration builds on, so a new migration needs no edit here."""
+    revisions = {}
+    for path in (Path(__file__).resolve().parents[1]/"migrations").glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        revision = re.search(r'^revision = "(\w+)"', text, re.M)
+        parent = re.search(r'^down_revision = (?:"(\w+)"|None)', text, re.M)
+        if revision:
+            revisions[revision.group(1)] = parent.group(1) if parent else None
+    heads = set(revisions) - set(revisions.values())
+    assert len(heads) == 1, heads
+    return heads.pop()
 
 
 @pytest.fixture
@@ -87,7 +103,7 @@ def test_offline_bootstrap_preserves_ids_sessions_grid_and_geometry(snapshots, t
             assert before.execute(f'SELECT {selected} FROM "{table}" ORDER BY 1').fetchall() == after.execute(
                 f'SELECT {selected} FROM "{table}" ORDER BY 1').fetchall()
         assert after.execute("PRAGMA foreign_key_check").fetchall() == []
-        assert after.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "1792022400"
+        assert after.execute("SELECT version_num FROM alembic_version").fetchone()[0] == migration_head()
     engine = engine_for(target)
     try:
         with engine.connect() as connection:

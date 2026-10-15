@@ -1,0 +1,17 @@
+# The repository stores LF. Working trees get LF too (also on Windows), so
+# tests that slice source files and shell scripts behave the same everywhere.
+* text=auto eol=lf
+
+# Never convert binary data
+*.png binary
+*.jpg binary
+*.ico binary
+*.gif binary
+*.pdf binary
+*.xlsx binary
+*.npz binary
+*.gz binary
+*.gpkg binary
+*.keras binary
+*.sqlite binary
+*.7z binary

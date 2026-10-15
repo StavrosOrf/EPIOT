@@ -2,7 +2,22 @@
 
 from datetime import date, datetime, timedelta
 
+import pytest
+
 from backend.cpft import UTC
+
+def require_tensorflow(reason="Install the cpft extra for checkpoint inference"):
+    """Skip unless TensorFlow imports.
+
+    An installed but unusable build (for example one compiled against NumPy 1,
+    which raises AttributeError, not ImportError) cannot run the checkpoints
+    any more than a missing one.
+    """
+    try:
+        import tensorflow  # noqa: F401
+    except Exception as error:
+        pytest.skip(f"{reason} (TensorFlow unavailable: {type(error).__name__}: {error})")
+
 
 TARGET = date(2026, 10, 14)
 ISSUED = datetime(2026, 10, 13, 16, tzinfo=UTC)

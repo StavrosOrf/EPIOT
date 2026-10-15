@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    name: Python tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SpatiaLite
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-mod-spatialite
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # --locked fails when pyproject.toml and uv.lock disagree
+      - run: uv sync --locked
+      # The cpft extra (TensorFlow) is not installed: the checkpoint tests skip
+      - run: uv run pytest -q
+
+  javascript:
+    name: JavaScript tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/*.mjs

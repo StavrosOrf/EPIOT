@@ -2,15 +2,30 @@
 This is the main file for the Flask server. It contains the endpoints for the data that is displayed on the map.
 """
 
-DEBUG = True
-
 import gzip
+import mimetypes
 import os
 import threading
 
 from flask import Flask, render_template, jsonify, request, url_for, send_from_directory
 from flask_alembic import Alembic
 from flask_sqlalchemy_lite import SQLAlchemy
+from sqlalchemy import text
+
+
+def env_flag(name, default):
+    value = os.environ.get(name)
+    return default if value is None else value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+# The Werkzeug debugger and reloader run only when the file is started directly
+# (`python app.py`). A WSGI server importing `app:app` is production, with
+# ProxyFix, unless EPIOT_DEBUG=1; EPIOT_DEBUG=0 turns debug off for `python app.py`.
+DEBUG = env_flag("EPIOT_DEBUG", default=__name__ == "__main__")
+
+# The vendored icon and text fonts (static/vendor) are not in every platform's MIME table
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
 
 if not DEBUG:
     # Use ProxyFix only in production when behind a proxy
@@ -18,14 +33,12 @@ if not DEBUG:
 
 from sqlalchemy import event
 from geoalchemy2 import load_spatialite
+from backend.api_errors import register_json_errors
 from backend.models import Model
 from backend.spatialite import configure_spatialite
 from backend.views import station_data
 from backend.features import features_data
 from backend.kpi.user import kpi_data
-
-from pathlib import Path
-import yaml
 
 configure_spatialite()
 
@@ -75,11 +88,6 @@ def compress_json(response):
     return response
 
 
-fp_config = Path("./backend/config.yaml")
-with open(fp_config) as ipf:
-    cfg = yaml.load(ipf, Loader=yaml.SafeLoader)
-
-app.config["aggregator_config"] = cfg
 app.register_blueprint(station_data, url_prefix="/stations")
 app.register_blueprint(features_data, url_prefix="/features")
 app.register_blueprint(kpi_data, url_prefix="/kpi")
@@ -98,9 +106,28 @@ if not DEBUG:
     # Use ProxyFix only in production when behind a proxy
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+register_json_errors(app, {"station_data", "features_data", "kpi"})
+
+
+@app.route("/healthz")
+def healthz():
+    """Liveness for a reverse proxy: the database answers and SpatiaLite is loaded."""
+    try:
+        version = db.session.execute(text("SELECT spatialite_version()")).scalar()
+    except Exception:
+        app.logger.exception("Health check failed")
+        return jsonify(status="error"), 503
+    response = jsonify(status="ok", spatialite=version)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/static/<path:filename>")
 def serve_static(filename):
-    return send_from_directory("static", filename, mimetype="application/javascript")
+    # Some Windows registries map .js to text/plain, which browsers refuse for
+    # ES modules, so scripts get an explicit type; everything else is guessed.
+    mimetype = "application/javascript" if filename.endswith((".js", ".mjs")) else None
+    return send_from_directory("static", filename, mimetype=mimetype)
 
 
 @app.route("/")

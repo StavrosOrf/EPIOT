@@ -5,7 +5,7 @@
     uv run python scripts/update_charger_data.py --sources ndw osm
 
 Raw files go to instance/chargers/raw/, provenance to instance/chargers/manifest.json.
-Run `uv run flask --app app db upgrade` once first. See docs/charger_sources.md.
+Run `uv run flask --app app db upgrade` once first. See docs/getting-started.md (Data coverage).
 """
 
 import argparse

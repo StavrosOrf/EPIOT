@@ -73,7 +73,8 @@ export async function get_LoadProfiles(polygons, names, date, options = {}) {
   return Promise.all(polygons.map(async (polygon, index) => {
     const selection = await areaSelection(polygon, revision.infrastructure, Boolean(options.gridView));
     const query = { selected_markers: selection.chargerIds, date: forArea(date, index),
-      strategy: forArea(options.strategy, index) || "avg", ...sourceOptions(options, index) };
+      strategy: forArea(options.strategy, index) || "avg", ...sourceOptions(options, index),
+      ...(options.ensemble > 1 ? { ensemble: options.ensemble } : {}) };
     const response = await cached(profiles, JSON.stringify([revision.analysis, query]),
       () => jsonFetch("/stations/aggregate_load", query));
     return { ...selection, groupName: names[index], response };

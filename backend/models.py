@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Date, DateTime, String, Float, Integer, Boolean
+from sqlalchemy import ForeignKey, Date, DateTime, Index, String, Float, Integer, Boolean
 from geoalchemy2 import Geometry
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.orm import relationship
@@ -99,6 +99,11 @@ class PowerMix(Model):
 
 class Session(Model):
     __tablename__ = "sessions"
+    # The day, range and KPI queries select by charging point and time window
+    __table_args__ = (
+        Index("ix_sessions_cp_id_start", "cp_id", "start"),
+        Index("ix_sessions_cp_id_end", "cp_id", "end"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     cp_id: Mapped[int] = mapped_column(ForeignKey("charging_points.id"))
     start: Mapped[str] = mapped_column(DateTime, nullable=True)

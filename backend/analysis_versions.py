@@ -35,6 +35,6 @@ def analysis_versions(app):
     model_dir = ROOT/"others/CPFT-main/CPFT-tool/CPFT_VS_Code_Python/outputs"
     paths += [model_dir/name for name in ("best_availability.keras", "best_kwh.keras")]
     configuration = {key: app.config.get(key) for key in (
-        "SESSION_SCENARIO_TIMEZONE", "SESSION_DAILY_ARRIVALS", "SESSION_CALENDAR_EFFECTS", "GRID_ALLOW_STALE", "aggregator_config")}
+        "SESSION_SCENARIO_TIMEZONE", "SESSION_DAILY_ARRIVALS", "SESSION_CALENDAR_EFFECTS", "GRID_ALLOW_STALE")}
     return dict(infrastructure=digest(infrastructure),
                 analysis=digest([infrastructure, configuration, [file_stamp(path) for path in paths]]))

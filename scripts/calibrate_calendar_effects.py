@@ -1,7 +1,7 @@
 """Calibrate the calendar, weather and demand effects of the synthetic scenarios.
 
 Estimates, from public data, the day-level effects that make synthetic days
-differ (see docs/concepts/calendar-effects.md):
+differ (see docs/session-sources.md):
 
 - ElaadNL open data (10,000 random public charging transactions, 2019):
   seasonal and day-of-week demand, public-holiday demand, the persistent
@@ -16,7 +16,7 @@ reports/calendar_effects_calibration.{md,json}. Inputs are downloaded once into
 --data-dir and checked against their recorded SHA-256 where fixed.
 
     uv run python scripts/calibrate_calendar_effects.py
-    uv run --with matplotlib python scripts/calibrate_calendar_effects.py --figures docs/_static/figures
+    uv run --with matplotlib python scripts/calibrate_calendar_effects.py --figures reports/figures
 """
 
 import argparse
@@ -371,7 +371,7 @@ def report_markdown(result):
     ci = lambda pair: f"[{pct(pair[0])}, {pct(pair[1])}]"
     lines = ["# Calendar, weather and demand effects: calibration", "",
              f"Generated {result['generated_at']} by `scripts/calibrate_calendar_effects.py`. "
-             "Method and use: `docs/concepts/calendar-effects.md`.", "",
+             "Method and use: `docs/session-sources.md`.", "",
              "## Data", "",
              f"- ElaadNL open data: {d['sessions']:,} public charging transactions on {d['days']} days of 2019 "
              f"(SHA-256 `{result['sources']['elaadnl']['sha256'][:16]}`).",

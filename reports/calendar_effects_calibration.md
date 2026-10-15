@@ -1,6 +1,6 @@
 # Calendar, weather and demand effects: calibration
 
-Generated 2026-10-14T20:15:45+00:00 by `scripts/calibrate_calendar_effects.py`. Method and use: `docs/concepts/calendar-effects.md`.
+Generated 2026-10-14T20:15:45+00:00 by `scripts/calibrate_calendar_effects.py`. Method and use: `docs/session-sources.md`.
 
 ## Data
 

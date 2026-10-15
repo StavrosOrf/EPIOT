@@ -3,7 +3,7 @@ from flask import abort, jsonify, request
 import geojson as gj
 from shapely.geometry import box, shape
 from shapely.errors import GeometryTypeError
-from backend.models import ChargingPoint, Column, Location, Operator, Session, GridConnection
+from backend.models import ChargingPoint, Column, Location, Operator, GridConnection
 from backend.charger_sources import COUNTRY_NAMES, LEGACY_SOURCE, MANIFEST, REGIONS, SOURCES, load_manifest
 from backend.charger_import import cell_degrees
 from backend.station_cache import StationCache
@@ -14,26 +14,20 @@ import datetime
 
 import numpy as np
 
-from sqlalchemy import select, func, extract
-
-from backend.aggregators import (
-    simulate_cost_optimal_operation,
-    simulate_delayed_profiles_from_sessions,
-    simulate_uncontrolled_profiles_from_sessions,
-    simulate_avg_charging_profiles_from_sessions
-)
+from sqlalchemy import select, func
 
 from flask import current_app, Blueprint
 from backend.session_sources import SOURCE_LABELS, session_service
+from backend.request_args import (RequestTooLarge, check_point_days, demand_assumption, ensemble_size,
+                                  request_arguments, scenario_seed, session_source)
 from backend.cpft_runtime import CPFTUnavailable
-from backend.scenario_profiles import grid
-from backend.flex_polytope import build_polytope, contains, envelopes
-from backend.scenario_sampling import point_power
-from backend.cpft import day_window
+from backend.day_profile import UnsupportedWindow, day_profile, empty_profile, ensemble_summary
+from backend.session_frame import SessionFrame
+from backend.stored_sessions import STORED_LABEL, STORED_NOTE, stored_records
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from backend.grid_data import app_grid_hours
-from backend.carbon_charging import CarbonScheduleUnavailable, daily_profiles
+from backend.carbon_charging import CarbonScheduleUnavailable
 from backend.analysis_versions import analysis_versions
 
 
@@ -177,22 +171,28 @@ def get_density():
 
 @station_data.route("/aggregate_load", methods=["GET", "POST"])
 def get_aggregate_load():
-    """
-    This endpoint is called when the user selects one or more chargers on the map.
-    It returns the aggregated load profile for the selected chargers.
+    """The load profile of the selected charging points for one local day.
 
-    Input:
-    - selected_markers: Comma-separated list of charger IDs
+    Input (JSON body for POST, query string for GET):
+    - selected_markers: charging-point IDs, a list or a comma-separated string
+    - strategy: afap, alap, avg, ocost or mincarbon
+    - date: the target day, YYYY-MM-DD
+    - session_source: database (stored sessions), simple, spatial or cpft
+    - demand_assumption, seed: scenario sources only
+    - ensemble: number of seeded session draws (default 1). With more than one,
+      source.ensemble holds the 10th/50th/90th percentile load over seeds
+      seed, seed+1, ...; y stays the requested seed's own draw.
 
-    Returns:
-    - x: The time axis (15-minute intervals)
-    - y: The aggregated load profile for the selected chargers
+    Returns the 10-minute profile of the previous and the target day: x,
+    timestamps, past_steps, y (load, kW), up_flex, down_flex, flex_polytope and
+    the provenance of the sessions in source. Stored and generated sessions are
+    scheduled by the same engine.
     """
     db = current_app.config["station_data.db"]
-    cfg = current_app.config["aggregator_config"]
-    arguments = request.get_json(silent=True) if request.method == "POST" else request.args
-    if arguments is None or not hasattr(arguments, "get"):
-        return jsonify(error="Expected a JSON object"), 400
+    try:
+        arguments = request_arguments(request)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
     selected_markers = arguments.get("selected_markers", "")
     if isinstance(selected_markers, list):
         selected_markers = ",".join(str(value) for value in selected_markers)
@@ -201,239 +201,113 @@ def get_aggregate_load():
     if selected_markers == "undefined":
         return jsonify({"x": np.arange(144).tolist(),
                         "y": np.zeros(144).tolist(),
-                       "up_flex": np.zeros(144).tolist(),
+                        "up_flex": np.zeros(144).tolist(),
                         "down_flex": np.zeros(144).tolist()})
 
-    method = arguments.get(
-        "strategy", ""
-    )
-    method = str(method).strip()
-    source = str(arguments.get("session_source", "database")).strip()
-    if source not in {"database", *SOURCE_LABELS}:
-        return jsonify(error="Unknown session source"), 400
+    method = str(arguments.get("strategy", "")).strip()
+    try:
+        source = session_source(arguments)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
     if method not in {"afap", "alap", "avg", "ocost", "mincarbon"}:
         return jsonify(error="Unknown charging strategy"), 400
     if method == "mincarbon" and source == "database":
         return jsonify(error="Select a simple, spatial or CPFT session source for minimum-carbon charging."), 400
-    if source != "database" and arguments.get("demand_assumption", "base") not in {"low", "base", "high"}:
-        return jsonify(error="Unknown demand assumption"), 400
+    assumption = "base"
+    draws = 1
+    if source != "database":
+        try:
+            assumption = demand_assumption(arguments)
+            draws = ensemble_size(arguments, current_app.config)
+        except ValueError as exc:
+            return jsonify(error=str(exc)), 400
+    elif arguments.get("ensemble") not in (None, "", 1, "1"):
+        return jsonify(error="Several draws need a generated session source; stored sessions have no sampling to vary."), 400
+    if draws > 1 and method == "ocost":
+        return jsonify(error="Several draws are not available for cost optimisation; choose another strategy."), 400
 
-    selected_markers = selected_markers.split(
-        ",") if selected_markers != "" else []
-    if len(selected_markers) > 0:
-        selected_markers = tuple(selected_markers)
-        statement = (
-            select(
-                ChargingPoint.id,
-                ChargingPoint.power,
-                ChargingPoint.type,
-                Operator.name,
-                Location.latitude,
-                Location.longitude,
-                Location.street,
-                Location.country,
-            )
-            .join(ChargingPoint.column)
-            .join(Location)
-            .join(Operator)
-        ).filter(ChargingPoint.id.in_(selected_markers))
-        query_result = db.session.execute(statement)
-        # make diuctionary from query_result with id as key and power as value
-        point_rows = list(query_result)
-        chargers = {row[0]: row[1] for row in point_rows}
+    target_day = None
+    # An empty selection of stored sessions without a date has no day to look up
+    if source != "database" or selected_markers != "" or arguments.get("date"):
+        try:
+            target_day = datetime.date.fromisoformat(str(arguments.get("date", "")))
+        except ValueError:
+            return jsonify(error="date must be a calendar date, YYYY-MM-DD"), 400
+    timezone_name = current_app.config.get("SESSION_SCENARIO_TIMEZONE", "Europe/Amsterdam")
 
-        if source != "database":
-            try:
-                target = datetime.date.fromisoformat(arguments.get("date", ""))
-                seed = int(arguments.get("seed", "42"))
-                timezone_name = current_app.config.get("SESSION_SCENARIO_TIMEZONE", "Europe/Amsterdam")
-                charger_data = [dict(id=row[0], power=row[1], type=row[2], latitude=row[4], longitude=row[5], country=row[7])
-                                for row in point_rows]
-                if len(charger_data) != len(set(selected_markers)):
-                    return jsonify(error="One or more selected charging points are unavailable"), 400
-                # Computed on request for any date: no live data, so nothing is prepared or cached
-                sessions, metadata = session_service(current_app).get(charger_data, target, source=source,
-                    assumption=arguments.get("demand_assumption", "base"), seed=seed, timezone_name=timezone_name)
-                start, target_start = day_window(target-datetime.timedelta(days=1), timezone_name)
-                _, end = day_window(target, timezone_name)
-                timestamps, past_steps = grid(start, end, target_start)
-                if method == "ocost":
-                    if len(timestamps) != 288:
-                        return jsonify(error="Cost optimisation currently supports two 24-hour days. Choose another strategy for a daylight-saving transition."), 422
-                    zone = ZoneInfo(timezone_name)
-                    rows = [(session.cp_id, session.start.astimezone(zone).replace(tzinfo=None),
-                             session.end.astimezone(zone).replace(tzinfo=None), session.energy_kwh) for session in sessions.records()]
-                    load_profile, up_flex, down_flex = simulate_cost_optimal_operation(
-                        {int(charger["id"]): point_power(charger) for charger in charger_data}, rows,
-                        start_date=str(target-datetime.timedelta(days=1)))
-                else:
-                    hours = app_grid_hours(start, end, db.session,
-                        cache_path=current_app.config.get("GRID_DATA_CACHE", Path(current_app.instance_path)/"grid_data.sqlite"),
-                        allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name) if method == "mincarbon" else []
-                    load_profile, up_flex, down_flex = daily_profiles(charger_data, sessions, start, end, method, timezone_name, hours)
-                    metadata["energy_budget_note"] = "Each connection charges from its real arrival to its real departure; the window only crops the profile. Connections crossing the window edge can therefore put different energy inside the window under different strategies."
-                    if method == "mincarbon":
-                        metadata["grid_uses_historical_reference"] = any(hour.carbon_is_stale for hour in hours)
-                        metadata["scheduling_note"] = "Minimum-carbon scenario using historical/reference grid information; not demonstrated avoided emissions."
-                metadata["flexibility_note"] = "Indicative differences between charging schedules; not a firm flexibility commitment."
-                polytope = build_polytope(charger_data, sessions, start, end)
-                flex_polytope = envelopes(polytope)
-                flex_polytope["schedule_feasible"] = contains(polytope, load_profile)
-                return jsonify(x=list(range(len(timestamps))), timestamps=[timestamp.isoformat() for timestamp in timestamps],
-                    past_steps=past_steps, y=list(load_profile), up_flex=list(up_flex), down_flex=list(down_flex),
-                    flex_polytope=flex_polytope, source=metadata)
-            except CarbonScheduleUnavailable as exc:
-                return jsonify(error=str(exc)), 422
-            except (ValueError, KeyError, TypeError) as exc:
-                return jsonify(error=str(exc)), 400
-            except CPFTUnavailable as exc:
-                return jsonify(error=str(exc)), 503
-            except (OSError, RuntimeError) as exc:
-                current_app.logger.exception("Session source failed")
-                return jsonify(error=f"{SOURCE_LABELS[source]} is unavailable: {exc}"), 503
+    try:
+        ids = sorted({int(value) for value in selected_markers.split(",") if value.strip()})
+    except ValueError:
+        return jsonify(error="Selected markers must be integer charging-point IDs"), 400
+    try:
+        check_point_days(current_app.config, len(ids), 2*draws)  # the previous and the target day, per draw
+    except RequestTooLarge as exc:
+        return jsonify(error=str(exc)), 422
+    stored = source == "database"
+    if not ids:
+        if target_day is None:
+            return jsonify({"x": np.arange(144).tolist(),
+                            "y": np.zeros(144).tolist(),
+                            "up_flex": np.zeros(144).tolist(),
+                            "down_flex": np.zeros(144).tolist()})
+        metadata = dict(source=source, label=STORED_LABEL if stored else SOURCE_LABELS[source], synthetic=not stored,
+                        point_count=0, spatial_matched_points=0, note="No charging points in this selection.")
+        if not stored:
+            metadata["assumption"] = assumption
+        return jsonify(empty_profile(target_day, timezone_name, metadata))
 
-        date = arguments.get("date", "")
-        year = int(date.split("-")[0])
-        month = int(date.split("-")[1])
-        day = int(date.split("-")[2])
+    rows = db.session.execute(
+        select(ChargingPoint.id, ChargingPoint.power, ChargingPoint.type, Location.latitude, Location.longitude,
+               Location.country)
+        .join(ChargingPoint.column).join(Location).filter(ChargingPoint.id.in_(ids))).all()
+    charger_data = [dict(id=row[0], power=row[1], type=row[2], latitude=row[3], longitude=row[4], country=row[5])
+                    for row in rows]
+    if len(charger_data) != len(ids):
+        return jsonify(error="One or more selected charging points are unavailable"), 400
 
-        start_date = get_day_before(date)
-        start_year = int(start_date.split("-")[0])
-        start_month = int(start_date.split("-")[1])
-        start_day = int(start_date.split("-")[2])
+    def grid_hours(start, end):
+        return app_grid_hours(start, end, db.session,
+                              cache_path=current_app.config.get("GRID_DATA_CACHE", Path(current_app.instance_path)/"grid_data.sqlite"),
+                              allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name)
 
-        statement = (
-            select(
-                Session.cp_id,
-                Session.start,
-                Session.end,
-                Session.consumption
-            )
-        ).filter(
-            (
-                Session.cp_id.in_(selected_markers) &
-                (extract('year', Session.start) == int(year)) &
-                (extract('month', Session.start) == int(month)) &
-                (extract('day', Session.start) == int(day))
-            ) |
-            (
-                Session.cp_id.in_(selected_markers) &
-                (extract('year', Session.end) == int(start_year)) &
-                (extract('month', Session.end) == int(start_month)) &
-                (extract('day', Session.end) == int(start_day))
-            )
-        )
-
-        charging_sessions = db.session.execute(statement)
-        charging_sessions = [s for s in charging_sessions]
-
-        # print(f'charging_sessions: {charging_sessions}')
-        # print(f'query_result: {charging_sessions}')
-        print(f'Analyzing {len(charging_sessions)}  charging sessions' +
-              f' for date {date} using the {method} method .')
-
-        if method == "afap":
-            load_profile, up_flex, down_flex = simulate_uncontrolled_profiles_from_sessions(
-                chargers,
-                charging_sessions,
-                start_date=start_date)
-        elif method == "alap":
-            load_profile, up_flex, down_flex = simulate_delayed_profiles_from_sessions(
-                chargers,
-                charging_sessions,
-                start_date=start_date)
-        elif method == "avg":
-            load_profile, up_flex, down_flex = simulate_avg_charging_profiles_from_sessions(
-                chargers,
-                charging_sessions,
-                start_date=start_date)
-        elif method == "ocost":
-            load_profile, up_flex, down_flex = simulate_cost_optimal_operation(
-                chargers,
-                charging_sessions,
-                start_date=start_date)
+    try:
+        if stored:
+            zone = ZoneInfo(timezone_name)
+            left = datetime.datetime.combine(target_day-datetime.timedelta(days=1), datetime.time.min)
+            right = datetime.datetime.combine(target_day+datetime.timedelta(days=1), datetime.time.min)
+            sessions = SessionFrame.from_records(stored_records(db.session, ids, left, right, zone))
+            metadata = dict(source="database", label=STORED_LABEL, synthetic=False, verified_observations=False,
+                            point_count=len(charger_data), session_count=len(sessions), timezone=timezone_name,
+                            target_date=str(target_day), note=STORED_NOTE)
+            current_app.logger.info("Analysing %d stored sessions for %s with the %s method",
+                                    len(sessions), target_day, method)
         else:
-            print(f'Unknown method: {method}')
+            # Computed on request for any date: no live data, so nothing is prepared or cached
+            seed = scenario_seed(arguments)
+            service = session_service(current_app)
+            sessions, metadata = service.get(charger_data, target_day, source=source, assumption=assumption,
+                                             seed=seed, timezone_name=timezone_name)
+        profile = day_profile(charger_data, sessions, metadata, target_day, method, timezone_name, grid_hours)
+        if draws > 1:
+            seeds = [(seed+offset) % 2**32 for offset in range(draws)]
+            more = (service.get(charger_data, target_day, source=source, assumption=assumption, seed=other,
+                                timezone_name=timezone_name)[0] for other in seeds[1:])
+            profile["source"]["ensemble"] = ensemble_summary(
+                charger_data, [sessions, *more], seeds, target_day, method, timezone_name, grid_hours)
+        return jsonify(profile)
+    except UnsupportedWindow as exc:
+        return jsonify(error=str(exc)), 422
+    except CarbonScheduleUnavailable as exc:
+        return jsonify(error=str(exc)), 422
+    except (ValueError, KeyError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    except CPFTUnavailable as exc:
+        return jsonify(error=str(exc)), 503
+    except (OSError, RuntimeError) as exc:
+        current_app.logger.exception("Session source failed")
+        label = STORED_LABEL if stored else SOURCE_LABELS[source]
+        return jsonify(error=f"{label} are unavailable: {exc}" if stored else f"{label} is unavailable: {exc}"), 503
 
-        return jsonify({"x": list(range(len(load_profile))),
-                        "y": list(load_profile),
-                        "up_flex": list(up_flex),
-                        "down_flex": list(down_flex)})
-    else:
-        if source != "database":
-            try:
-                target = datetime.date.fromisoformat(arguments.get("date", ""))
-                zone = current_app.config.get("SESSION_SCENARIO_TIMEZONE", "Europe/Amsterdam")
-                start, target_start = day_window(target-datetime.timedelta(days=1), zone)
-                _, end = day_window(target, zone)
-                timestamps, split = grid(start, end, target_start)
-                zeros = [0.]*len(timestamps)
-                return jsonify(x=list(range(len(timestamps))), timestamps=[timestamp.isoformat() for timestamp in timestamps],
-                    past_steps=split, y=zeros, up_flex=zeros, down_flex=zeros,
-                    source=dict(source=source, label=SOURCE_LABELS[source], synthetic=True, assumption=arguments.get("demand_assumption", "base"),
-                                point_count=0, spatial_matched_points=0, note="No charging points in this selection."))
-            except ValueError as exc:
-                return jsonify(error=str(exc)), 400
-        return jsonify({"x": np.arange(144).tolist(),
-                        "y": np.zeros(144).tolist(),
-                       "up_flex": np.zeros(144).tolist(),
-                        "down_flex": np.zeros(144).tolist()})
-
-
-def get_day_before(date):
-    year = int(date.split("-")[0])
-    month = int(date.split("-")[1])
-    day = int(date.split("-")[2])
-
-    date = datetime.date(year, month, day)
-    date = date - datetime.timedelta(days=1)
-    return date.strftime("%Y-%m-%d")
-
-# @station_data.route("/chargers-by-transformers/grouped", methods=["POST"])
-# def get_chargers_by_transformers_grouped():
-#     db = current_app.config["station_data.db"]
-#     print("Received request for chargers by transformers (grouped)")
-#     try:
-#         payload = request.get_json(force=True, silent=False)
-#         transformer_ids = payload["transformer_ids"]
-#         print(f"Received transformer_ids: {transformer_ids}")
-#         if (not isinstance(transformer_ids, list)
-#             or not transformer_ids
-#             or not all(isinstance(tid, int) for tid in transformer_ids)):
-#             raise ValueError
-#     except Exception:
-#         abort(400, 'Expected JSON body: {"transformer_ids": [int, ...]}')
-
-#     stmt = (
-#         select(GridConnection.transformer_id, GridConnection.column_id)
-#         .where(GridConnection.transformer_id.in_(transformer_ids))
-#     )
-#     rows = db.session.execute(stmt).all()
-#     print(f"Query returned {len(rows)} rows")
-#     grouped = {}
-#     for tf_id, cp_id in rows:
-#         grouped.setdefault(tf_id, set()).add(cp_id)
-
-#     # convert sets to sorted lists for JSON
-#     grouped = {k: sorted(v) for k, v in grouped.items()}
-    
-#     #make a list of all unique charger ids
-#     unique_chargers = sorted({cp for s in grouped.values() for cp in s})
-    
-#     print (f"Grouped data: {unique_chargers}")
-    
-#     return jsonify({
-#         "transformer_ids": transformer_ids,
-#         "chargers_by_transformer": unique_chargers, 
-#         "count_total_unique_chargers": len(unique_chargers)
-#     })
-
-# routes/station_data.py
-# from flask import Blueprint, request, jsonify, abort, current_app
-# from sqlalchemy import select
-# from backend.models import GridConnection, Column, ChargingPoint
-
-# station_data = Blueprint("station_data", __name__)
 
 @station_data.route("/charging-points-by-transformers", methods=["POST"])
 def charging_points_by_transformers():

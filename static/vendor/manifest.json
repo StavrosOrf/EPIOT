@@ -1,0 +1,230 @@
+[
+  {
+    "path": "static/vendor/bootstrap/bootstrap.bundle.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js",
+    "bytes": 80927,
+    "sha256": "f67b782ec5a62c8fcedb89535bcf48cc02ae06a119e3b97fe2b875fad1ff358f"
+  },
+  {
+    "path": "static/vendor/bootstrap/bootstrap.min.css",
+    "url": "https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/css/bootstrap.min.css",
+    "bytes": 160302,
+    "sha256": "5b0fbe5b7ad705f6a937c4998ad02f73d8f0d976fe231b74aef0ec996990c93a"
+  },
+  {
+    "path": "static/vendor/flatpickr/flatpickr.min.css",
+    "url": "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css",
+    "bytes": 16166,
+    "sha256": "1b34a42552c96f10e4dfaaa4a367276b03868aacff63c1ac42ffe331352bc754"
+  },
+  {
+    "path": "static/vendor/flatpickr/flatpickr.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13",
+    "bytes": 50679,
+    "sha256": "1eeab1cb779471a0b0aaa93dd91c2eb1aa537d696f01ab05ea9dabc55e8525a1"
+  },
+  {
+    "path": "static/vendor/font-awesome/css/font-awesome.min.css",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css",
+    "bytes": 31000,
+    "sha256": "799aeb25cc0373fdee0e1b1db7ad6c2f6a0e058dfadaa3379689f583213190bd"
+  },
+  {
+    "path": "static/vendor/font-awesome/fonts/fontawesome-webfont.eot",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/fonts/fontawesome-webfont.eot",
+    "bytes": 165742,
+    "sha256": "7bfcab6db99d5cfbf1705ca0536ddc78585432cc5fa41bbd7ad0f009033b2979"
+  },
+  {
+    "path": "static/vendor/font-awesome/fonts/fontawesome-webfont.svg",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/fonts/fontawesome-webfont.svg",
+    "bytes": 444379,
+    "sha256": "ad6157926c1622ba4e1d03d478f1541368524bfc46f51e42fe0d945f7ef323e4"
+  },
+  {
+    "path": "static/vendor/font-awesome/fonts/fontawesome-webfont.ttf",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/fonts/fontawesome-webfont.ttf",
+    "bytes": 165548,
+    "sha256": "aa58f33f239a0fb02f5c7a6c45c043d7a9ac9a093335806694ecd6d4edc0d6a8"
+  },
+  {
+    "path": "static/vendor/font-awesome/fonts/fontawesome-webfont.woff",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/fonts/fontawesome-webfont.woff",
+    "bytes": 98024,
+    "sha256": "ba0c59deb5450f5cb41b3f93609ee2d0d995415877ddfa223e8a8a7533474f07"
+  },
+  {
+    "path": "static/vendor/font-awesome/fonts/fontawesome-webfont.woff2",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/fonts/fontawesome-webfont.woff2",
+    "bytes": 77160,
+    "sha256": "2adefcbc041e7d18fcf2d417879dc5a09997aa64d675b7a3c4b6ce33da13f3fe"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7SUc.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa0ZL7SUc.woff2",
+    "bytes": 18748,
+    "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2",
+    "bytes": 48256,
+    "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1pL7SUc.woff2",
+    "bytes": 18996,
+    "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7SUc.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa25L7SUc.woff2",
+    "bytes": 85068,
+    "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2JL7SUc.woff2",
+    "bytes": 25960,
+    "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7SUc.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2ZL7SUc.woff2",
+    "bytes": 11232,
+    "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190"
+  },
+  {
+    "path": "static/vendor/inter/files/s-inter-v20-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2pL7SUc.woff2",
+    "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa2pL7SUc.woff2",
+    "bytes": 10252,
+    "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2"
+  },
+  {
+    "path": "static/vendor/inter/inter.css",
+    "url": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    "bytes": 9324,
+    "sha256": "5db2fdf7c35a0e3588ebb0c1f2c4ee7eed4c112e23b6a1e6e8c36df571fe7a62"
+  },
+  {
+    "path": "static/vendor/jquery/jquery-3.5.1.slim.min.js",
+    "url": "https://code.jquery.com/jquery-3.5.1.slim.min.js",
+    "bytes": 72380,
+    "sha256": "e3e5f35d586c0e6a9a9d7187687be087580c40a5f8d0e52f0c4053bbc25c98db"
+  },
+  {
+    "path": "static/vendor/leaflet.draw/images/spritesheet-2x.png",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet-2x.png",
+    "bytes": 2103,
+    "sha256": "76ca9e16668b033117f69922befd93944781ed1a9ca150243d7726043fdb08b4"
+  },
+  {
+    "path": "static/vendor/leaflet.draw/images/spritesheet.png",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet.png",
+    "bytes": 1083,
+    "sha256": "7aefbb34fa5d9a38b37bcd2d297ae2148a365692c5eff9d4162be9d2609fcbbc"
+  },
+  {
+    "path": "static/vendor/leaflet.draw/images/spritesheet.svg",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/images/spritesheet.svg",
+    "bytes": 5551,
+    "sha256": "7077bae968047180921324df351d95fe2f021cdaefa01e20645162402f767da4"
+  },
+  {
+    "path": "static/vendor/leaflet.draw/leaflet.draw.css",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css",
+    "bytes": 5267,
+    "sha256": "5f30f74696873efee5cd7f6ab7eda7d63e5c5a3e3c3b6e0ab2068662928df31f"
+  },
+  {
+    "path": "static/vendor/leaflet.draw/leaflet.draw.js",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js",
+    "bytes": 67484,
+    "sha256": "b22a1f7385308e5adadd85a4c2d84e9fc523ebd70d37868cba0fe2387362460b"
+  },
+  {
+    "path": "static/vendor/leaflet.heat/leaflet-heat.js",
+    "url": "https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js",
+    "bytes": 5158,
+    "sha256": "eb952aae5806a1102729f291bab887dde783ace859819a354827a776e73e486a"
+  },
+  {
+    "path": "static/vendor/leaflet.markercluster/MarkerCluster.css",
+    "url": "https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css",
+    "bytes": 872,
+    "sha256": "614dea0a98ff3f4ead74f04918f6b1d1b9ba435c25b5fc23b21a394d1e3e4d87"
+  },
+  {
+    "path": "static/vendor/leaflet.markercluster/leaflet.markercluster.js",
+    "url": "https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js",
+    "bytes": 34136,
+    "sha256": "1e4e1d22972a3926f48598e0caf14e3fe7049835d428a344fed4f9e3665b3508"
+  },
+  {
+    "path": "static/vendor/leaflet/images/layers-2x.png",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/images/layers-2x.png",
+    "bytes": 1259,
+    "sha256": "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf"
+  },
+  {
+    "path": "static/vendor/leaflet/images/layers.png",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/images/layers.png",
+    "bytes": 696,
+    "sha256": "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6"
+  },
+  {
+    "path": "static/vendor/leaflet/images/marker-icon-2x.png",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+    "bytes": 2464,
+    "sha256": "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528"
+  },
+  {
+    "path": "static/vendor/leaflet/images/marker-icon.png",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    "bytes": 1466,
+    "sha256": "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437"
+  },
+  {
+    "path": "static/vendor/leaflet/images/marker-shadow.png",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    "bytes": 618,
+    "sha256": "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da"
+  },
+  {
+    "path": "static/vendor/leaflet/leaflet.css",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+    "bytes": 14806,
+    "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6"
+  },
+  {
+    "path": "static/vendor/leaflet/leaflet.js",
+    "url": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+    "bytes": 147552,
+    "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
+  },
+  {
+    "path": "static/vendor/martinez/martinez.umd.js",
+    "url": "https://cdn.jsdelivr.net/npm/martinez-polygon-clipping@0.7.4/dist/martinez.umd.js",
+    "bytes": 58579,
+    "sha256": "a0932fabfe4cff84512b117226cf5afade915523b38b438654406e2156b995f9"
+  },
+  {
+    "path": "static/vendor/plotly/plotly-2.35.2.min.js",
+    "url": "https://cdn.plot.ly/plotly-2.35.2.min.js",
+    "bytes": 4558696,
+    "sha256": "6d21266ce1bd7d9e5ab4e115989c70c20de0382fd973a8f26ab58619eba4d603"
+  },
+  {
+    "path": "static/vendor/turf/turf.min.js",
+    "url": "https://cdn.jsdelivr.net/npm/@turf/turf@7.1.0/turf.min.js",
+    "bytes": 543529,
+    "sha256": "c45af4551952fa41f0493cf48c3539b1800774f2abfc031ec6af72accf18be9f"
+  },
+  {
+    "path": "static/vendor/xlsx/xlsx.full.min.js",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
+    "bytes": 881727,
+    "sha256": "c9506197caf809a075b6dee1da0d36fb19da7158ffe8a88e7b0c96c5d8623c99"
+  }
+]

@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { loadPlotter } from "./plotter_harness.mjs";
 
-const read = file => readFileSync(new URL(`../static/scripts/${file}`, import.meta.url), "utf8");
-const datesCode = read("date_selection.js").replace(/^export /gm, "");
-const { calendarDate, pickerOptions } = new Function(datesCode+";return {calendarDate,pickerOptions};")();
-const script = read("script.js");
-const functionBody = (start, end) => script.slice(script.indexOf(start), script.indexOf(end, script.indexOf(start)));
+import { createAnalysis } from "../static/scripts/analysis.js";
+import { createState } from "../static/scripts/app_state.js";
+import { calendarDate, pickerOptions } from "../static/scripts/date_selection.js";
+import { createTabs } from "../static/scripts/tabs.js";
+
+const read = file => readFileSync(new URL(`../static/scripts/${file}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("local calendar dates survive UTC offsets and range endpoints stay inclusive", () => {
   const previousZone = process.env.TZ;
@@ -36,21 +37,26 @@ test("future dates are valid scenario dates and stay selected", () => {
 });
 
 test("only the KPI tab shows the KPI category bar", () => {
-  const elements = { "session-source-note": { textContent: "" } };
+  const notes = [], analyses = [], tooltips = [];
   const kpiSubnav = { hidden: true };
-  const showTab = new Function("document", "kpiSubnav", `
-    let active_tab;
-    const $ = () => ({tooltip() {}});
-    const setActiveTab = () => {}, runActiveAnalysis = () => {};
-    ${functionBody("function showTab(", 'document.getElementById("load-tab")')}
-    return showTab;
-  `)({ getElementById: id => elements[id] }, kpiSubnav);
+  const state = createState();
+  const { showTab } = createTabs({
+    state, kpiSubnav, setActiveTab: id => tooltips.push(id), hideTooltips() {},
+    setNote: text => notes.push(text), runActiveAnalysis: () => analyses.push(state.active_tab),
+  });
   showTab("stats-tab");
   assert.equal(kpiSubnav.hidden, false);
+  assert.equal(state.active_tab, "KPIs");
   showTab("flex-tab");
   assert.equal(kpiSubnav.hidden, true);
+  assert.equal(state.active_tab, "Flexibility");
   showTab("load-tab");
   assert.equal(kpiSubnav.hidden, true);
+  assert.equal(state.active_tab, "Load Profiles");
+  // every switch re-analyses for the new tab and resets the line under the controls
+  assert.deepEqual(analyses, ["KPIs", "Flexibility", "Load Profiles"]);
+  assert.equal(notes.length, 3);
+  assert.match(notes[0], /not verified local charging forecasts/);
 });
 
 test("pickers show the weekday, so weekends are visible in the field", () => {
@@ -105,20 +111,22 @@ test("an incomplete range makes no request and model errors remain visible", asy
 test("changing source ignores a late result from the previous KPI request", async () => {
   const requests = [], renders = [];
   let source = "spatial";
-  const execute = new Function("get_KPIs", "document", "render", `
-    let active_tab = "KPIs", profileRequestVersion = 0, kpi_data_list = [], load_profile_data = [], charger_ids_list, transformer_ids_list;
-    const selected_polygons = [{}], selected_area_names = ["Area"];
-    const settingsOf = () => ({range: [new Date(2025,9,13), new Date(2025,9,14)], demand: "high"});
-    const clear_graph = () => {}, showGraphMessage = () => {}, calculateLoadProfiles = () => {}, sourceNote = () => "";
-    const renderActiveKpi = () => render(kpi_data_list);
-    ${functionBody("async function runActiveAnalysis(", 'analysisButton.addEventListener("click"')}
-    return runActiveAnalysis;
-  `)((_polygons, _names, dates, options) => new Promise(resolve => requests.push({resolve, options, dates})),
-    {getElementById: id => ({value: id === "session-source" ? source : "base"})}, result => renders.push(result));
-  const oldRequest = execute();
+  const state = createState();
+  Object.assign(state, { active_tab: "KPIs", selected_polygons: [{}], selected_area_names: ["Area"] });
+  const { runActiveAnalysis } = createAnalysis({
+    state,
+    settingsOf: () => ({range: [new Date(2025,9,13), new Date(2025,9,14)], demand: "high"}),
+    api: { get_KPIs: (_polygons, _names, dates, options) => new Promise(resolve => requests.push({resolve, options, dates})) },
+    view: {
+      sessionSource: () => source, setNote() {}, clearGraph() {}, showGraphMessage() {},
+      environmentSummary: () => null, renderEnvironmentSummary() {},
+      kpiRenderers: { user_kpi: groups => renders.push(groups) },
+    },
+  });
+  const oldRequest = runActiveAnalysis();
   source = "cpft";
-  const newRequest = execute();
-  const group = value => [{source:{label:value,note:"Synthetic",assumption:"base"},chargerIds:[],transformerIds:[]}];
+  const newRequest = runActiveAnalysis();
+  const group = value => [{source:{label:value,note:"Synthetic",assumption:"base"},chargerIds:[],transformerIds:[],kpi:{}}];
   requests[1].resolve(group("cpft"));
   await newRequest;
   requests[0].resolve(group("spatial"));
@@ -130,6 +138,7 @@ test("changing source ignores a late result from the previous KPI request", asyn
   assert.deepEqual(requests[1].options.demandAssumption, ["high"]);
   assert.equal(renders.length, 1);
   assert.equal(renders[0][0].source.label, "cpft");
+  assert.equal(state.kpi_data_list[0].source.label, "cpft");
 });
 
 test("KPI export works without a load chart and records source and inclusive dates", () => {

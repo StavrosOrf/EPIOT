@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const read = file => readFileSync(new URL(`../static/scripts/${file}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
-const helpers = new Function(read("group_actions.js").replace(/^export /gm, "") +
-  ";return {MAX_AREAS, MAX_NAME_LENGTH, moved, removed, copied, copyName, validName, escapeHtml, freeColor};")();
+import { createAnalysis } from "../static/scripts/analysis.js";
+import { createAreaSettings } from "../static/scripts/area_settings.js";
+import { createAreas } from "../static/scripts/areas.js";
+import { createState } from "../static/scripts/app_state.js";
+import * as helpers from "../static/scripts/group_actions.js";
 
 test("moved, removed and copied return new arrays and leave the input alone", () => {
   const items = ["a", "b", "c"];
@@ -36,13 +37,10 @@ test("new names are tidied, filled in, short and not taken", () => {
   assert.equal(helpers.escapeHtml(`<img src=x onerror="a&b">`), "&lt;img src=x onerror=&quot;a&amp;b&quot;&gt;");
 });
 
-// The real card handlers from script.js, with a Leaflet stand-in whose feature
-// group visits layers in creation order, as Leaflet's does
+// The real card handlers (areas.js) and result renderer (analysis.js) over a
+// Leaflet stand-in whose feature group visits layers in creation order, as
+// Leaflet's does
 function page({ tab = "Load Profiles", names = ["Area 1", "Area 2", "Area 3"], results = "load" } = {}) {
-  const script = read("script.js");
-  const start = script.indexOf("const DEFAULT_STRATEGY");
-  const end = script.indexOf("setGroupControls({", start);
-  assert.ok(start > 0 && end > start, "card handlers are present in script.js");
   const calls = [], messages = [], busy = [], focused = [], cardMessages = [], fetches = [], kpiFetches = [];
   let stamp = 0;
   const L = {
@@ -70,52 +68,55 @@ function page({ tab = "Load Profiles", names = ["Area 1", "Area 2", "Area 3"], r
   });
   const group = (name, index) => ({ groupName: name, number_of_chargers: index + 1, kpi: {}, strategy: "afap",
     targetDate: "2026-10-15" });
-  const state = {
-    tab,
-    charger_ids_list: names.map((_, index) => [index + 1]),
-    transformer_ids_list: names.map(() => []),
-    load_profile_data: results === "load" ? names.map(group) : [],
-    kpi_data_list: results === "kpi" ? names.map(group) : [],
-  };
-  const stubs = {
-    calls, messages, busy, focused, cardMessages,
+  const state = createState();
+  state.active_tab = tab;
+  state.charger_ids_list = names.map((_, index) => [index + 1]);
+  state.transformer_ids_list = names.map(() => []);
+  state.load_profile_data = results === "load" ? names.map(group) : [];
+  state.kpi_data_list = results === "kpi" ? names.map(group) : [];
+
+  const api = {
     get_LoadProfiles: (_polygons, names, date, options) =>
       new Promise((resolve, reject) => fetches.push({ names, date, options, resolve, reject })),
     get_KPIs: (_polygons, names, ranges, options) =>
       new Promise((resolve, reject) => kpiFetches.push({ names, ranges, options, resolve, reject })),
   };
-  const api = new Function("L", "drawnItems", "colors", "helpers", "state", "stubs", `
-    const { MAX_AREAS, moved, removed, copied, copyName, validName, escapeHtml, freeColor } = helpers;
-    let selected_polygons = [], selected_area_names = [];
-    let charger_ids_list = state.charger_ids_list, transformer_ids_list = state.transformer_ids_list;
-    let load_profile_data = state.load_profile_data, kpi_data_list = state.kpi_data_list;
-    let profileRequestVersion = 0;
-    const active_tab = state.tab, starting_date = null;
-    const { get_LoadProfiles, get_KPIs } = stubs;
-    const document = { getElementById: () => ({ value: "simple" }) };
-    const STRATEGIES = [["afap", "As Fast As Possible"], ["alap", "As Late As Possible"]];
-    const DEMANDS = [["low", "Low demand"], ["base", "Base demand"], ["high", "High demand"]];
-    const calendarDate = date => date.toISOString().slice(0, 10);
-    const calendarNote = () => "", flatpickr = () => ({ destroy() {} }), pickerOptions = () => ({});
-    const profileFromGroup = (group, settings) => ({ groupName: group.groupName, strategy: settings.strategy,
-      targetDate: calendarDate(settings.date), marker: group.chargerIds[0] });
-    const setCardBusy = (index, value) => stubs.busy.push([index, value]);
-    const showCardMessage = (index, text) => stubs.cardMessages.push([index, text]);
-    const focusCardField = (index, field) => stubs.focused.push([index, field]);
-    const animateSelectMessage = text => stubs.messages.push(text), syncDrawPrompt = () => {};
-    const renderActiveKpi = () => stubs.calls.push(["kpi", kpi_data_list.map(item => item.groupName)]);
-    const createPolytopeGraph = data => stubs.calls.push(["flex", data.map(item => item.groupName)]);
-    const createGraph = data => stubs.calls.push(["load", data.map(item => item.groupName)]);
-    const showGraphMessage = title => stubs.calls.push(["message", title]);
-    ${script.slice(start, end)}
-    syncSelectionFromAreas();
-    return {
-      moveGroup, duplicateGroup, removeGroup, renameGroup, refreshArea, settingsOf, areaSettings,
-      state: () => ({ selected_polygons, selected_area_names, charger_ids_list, transformer_ids_list, load_profile_data, kpi_data_list }),
-    };
-  `)(L, drawnItems, colors, helpers, state, stubs);
-  return { ...api, calls, messages, busy, focused, cardMessages, fetches, kpiFetches, drawnItems };
+  const settings = createAreaSettings();
+  const groupNames = data => data.map(item => item.groupName);
+  const analysis = createAnalysis({
+    state, settingsOf: settings.settingsOf, api,
+    view: {
+      sessionSource: () => "simple", setNote() {}, clearGraph() {},
+      showGraphMessage: title => calls.push(["message", title]),
+      createGraph: data => calls.push(["load", groupNames(data)]),
+      createPolytopeGraph: data => calls.push(["flex", groupNames(data)]),
+      kpiRenderers: { user_kpi: data => calls.push(["kpi", groupNames(data)]) },
+      environmentSummary: () => null, renderEnvironmentSummary() {},
+    },
+  });
+  const areas = createAreas({
+    state, L, drawnItems, colors, settings, api, renderGroupResults: analysis.renderGroupResults,
+    view: {
+      sessionSource: () => "simple",
+      setCardBusy: (index, value) => busy.push([index, value]),
+      showCardMessage: (index, text) => cardMessages.push([index, text]),
+      focusCardField: (index, field) => focused.push([index, field]),
+      animateSelectMessage: text => messages.push(text),
+      syncDrawPrompt() {},
+      flatpickr: () => ({ destroy() {} }),
+      document: {},
+    },
+  });
+  areas.syncSelectionFromAreas();
+  return {
+    ...areas, settingsOf: settings.settingsOf, areaSettings: settings.areaSettings, state: () => state,
+    calls, messages, busy, focused, cardMessages, fetches, kpiFetches, drawnItems,
+  };
 }
+
+// An area's answer: one past step whose value tells the answers apart
+const answer = (name, marker, chargers = [marker]) => [{ groupName: name, chargerIds: chargers, transformerIds: [],
+  response: { y: [marker], up_flex: [0], down_flex: [0], past_steps: 1 } }];
 
 const layerNames = drawnItems => {
   const names = [];
@@ -264,14 +265,14 @@ test("map labels never carry markup from a typed name", () => {
 test("changing a card's setting requests that area alone and keeps the rest", async () => {
   const app = page();
   app.settingsOf("Area 2").strategy = "alap";
-  app.settingsOf("Area 2").date = new Date(Date.UTC(2026, 9, 20));
+  app.settingsOf("Area 2").date = new Date(2026, 9, 20);
   const done = app.refreshArea("Area 2", "strategy");
   assert.equal(app.fetches.length, 1);
   assert.deepEqual(app.fetches[0].names, ["Area 2"]);
   assert.equal(app.fetches[0].date, "2026-10-20");
   assert.equal(app.fetches[0].options.strategy, "alap");
   assert.deepEqual(app.busy.at(-1), [1, true]);
-  app.fetches[0].resolve([{ groupName: "Area 2", chargerIds: [7], transformerIds: [], response: {} }]);
+  app.fetches[0].resolve(answer("Area 2", 7));
   await done;
   const state = app.state();
   assert.deepEqual(state.load_profile_data.map(item => item.strategy), ["afap", "alap", "afap"]);
@@ -296,7 +297,7 @@ test("a card's demand scenario is requested for that area only", async () => {
   assert.deepEqual(app.fetches[0].names, ["Area 3"]);
   assert.equal(app.fetches[0].options.demandAssumption, "high");
   assert.equal(app.fetches[0].options.gridView, undefined);
-  app.fetches[0].resolve([{ groupName: "Area 3", chargerIds: [3], transformerIds: [], response: {} }]);
+  app.fetches[0].resolve(answer("Area 3", 3));
   await done;
   assert.deepEqual(app.focused.at(-1), [2, "demand"]);
 });
@@ -305,12 +306,11 @@ test("a late answer for an older setting does not overwrite a newer one", async 
   const app = page();
   const first = app.refreshArea("Area 1", "date");
   const second = app.refreshArea("Area 1", "date");
-  const answer = marker => [{ groupName: "Area 1", chargerIds: [marker], transformerIds: [], response: {} }];
-  app.fetches[1].resolve(answer(22));
+  app.fetches[1].resolve(answer("Area 1", 22));
   await second;
-  app.fetches[0].resolve(answer(11));
+  app.fetches[0].resolve(answer("Area 1", 11));
   await first;
-  assert.equal(app.state().load_profile_data[0].marker, 22);
+  assert.equal(app.state().load_profile_data[0].pastData[0], 22);
   assert.equal(app.state().charger_ids_list[0][0], 22);
 });
 
@@ -318,12 +318,12 @@ test("an area that moved while its request ran gets the answer where it is now",
   const app = page();
   const done = app.refreshArea("Area 1", "date");
   app.moveGroup(0, 2);
-  app.fetches[0].resolve([{ groupName: "Area 1", chargerIds: [5], transformerIds: [], response: {} }]);
+  app.fetches[0].resolve(answer("Area 1", 5));
   await done;
   const state = app.state();
   assert.deepEqual(state.selected_area_names, ["Area 2", "Area 3", "Area 1"]);
   assert.equal(state.load_profile_data[2].groupName, "Area 1");
-  assert.equal(state.load_profile_data[2].marker, 5);
+  assert.equal(state.load_profile_data[2].pastData[0], 5);
   assert.deepEqual(app.focused.at(-1), [2, "date"]);
 });
 

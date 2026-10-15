@@ -26,50 +26,16 @@ h1, h2, h3 { letter-spacing: -0.015em; }
 .sidebar-brand-text { font-size: 1.2rem; font-weight: 700; }
 h1 { font-weight: 700; }
 
-/* ---- Landing hero ------------------------------------------------------- */
-.hero {
-  padding: 2.25rem 2rem 1.75rem;
-  margin: 0 0 2rem;
-  border-radius: 18px;
-  color: #fff;
-  background:
-    radial-gradient(1200px 300px at 0% 0%, rgba(255, 255, 255, 0.14), transparent 60%),
-    linear-gradient(135deg, #1f7a3f 0%, #17603a 45%, #0f3f5c 100%);
-  box-shadow: var(--epiot-shadow);
-}
-.hero p { color: rgba(255, 255, 255, 0.9); font-size: 1.05rem; max-width: 46rem; }
-.hero .hero-title { font-size: 2.3rem; font-weight: 700; margin: 0 0 0.35rem; letter-spacing: -0.02em; line-height: 1.15; }
-.hero .hero-kicker {
-  display: inline-block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16); margin-bottom: 0.9rem;
-}
-.hero a.sd-btn { margin: 0.6rem 0.5rem 0 0; }
-
 /* ---- Figures & screenshots --------------------------------------------- */
 figure.screenshot img, img.screenshot {
   border-radius: var(--epiot-radius);
   box-shadow: var(--epiot-shadow);
   border: 1px solid var(--color-background-border);
 }
-figure.chart img {
-  border-radius: var(--epiot-radius);
-  border: 1px solid var(--color-background-border);
-}
 figure figcaption, .figure .caption {
   font-size: 0.88rem;
   color: var(--color-foreground-secondary);
   margin-top: 0.6rem;
-}
-figure figcaption .caption-number { font-weight: 600; color: var(--color-foreground-primary); }
-
-/* ---- Mermaid ------------------------------------------------------------- */
-pre.mermaid, div.mermaid {
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-background-border);
-  border-radius: var(--epiot-radius);
-  padding: 1rem;
-  text-align: center;
 }
 
 /* ---- Cards ------------------------------------------------------------- */
@@ -84,13 +50,6 @@ table.docutils th { background: var(--color-background-secondary); font-weight: 
 table.docutils td, table.docutils th { padding: 0.45rem 0.75rem; }
 
 /* ---- Small helpers ------------------------------------------------------- */
-.badge-endpoint {
-  font-family: var(--font-stack--monospace); font-weight: 600; font-size: 0.8rem;
-  padding: 0.12rem 0.5rem; border-radius: 6px; color: #fff; margin-right: 0.4rem;
-}
-.badge-get { background: #2a78d6; }
-.badge-post { background: #1f7a3f; }
-
 kbd {
   font-family: var(--font-stack--monospace); font-size: 0.8em; padding: 0.1rem 0.4rem;
   border-radius: 5px; border: 1px solid var(--color-background-border);

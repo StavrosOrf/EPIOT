@@ -77,7 +77,8 @@ test("each KPI category and each session source has its own tooltip", () => {
   const categories = [...header.matchAll(/<button[^>]*class="kpi-option[^>]*>/g)].map((match) => titleOf(match[0]));
   assert.equal(categories.length, 5);
   assert.equal(new Set(categories).size, 5);
-  const sources = [...header.matchAll(/<option\b[^>]*>/g)].map((match) => titleOf(match[0]));
+  const selector = /<select id="session-source"[\s\S]*?<\/select>/.exec(header)[0];
+  const sources = [...selector.matchAll(/<option\b[^>]*>/g)].map((match) => titleOf(match[0]));
   assert.equal(sources.length, 3);
   assert.equal(new Set(sources).size, 3);
   // The pill starts out describing the default (first) source

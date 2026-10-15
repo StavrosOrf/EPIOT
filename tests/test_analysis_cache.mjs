@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const read = file => readFileSync(new URL(`../static/scripts/${file}`, import.meta.url), "utf8");
+import { createAnalysis } from "../static/scripts/analysis.js";
+import { createState } from "../static/scripts/app_state.js";
+
+const read = file => readFileSync(new URL(`../static/scripts/${file}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const code = read("data_fetch.js").replace(/^import .*\n/gm, "").replace(/^export /gm, "");
 const calendarDate = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const polygon = { geometry: { type:"Polygon", coordinates:[[[4,52],[5,52],[5,53],[4,52]]] } };
@@ -111,21 +114,20 @@ test("environment is lazy, cached separately and merged without losing basic sta
 });
 
 test("late load results and errors cannot overwrite a newer selection", async () => {
-  const script = read("script.js");
-  const start = script.indexOf("function calendarSummary(");
-  const body = script.slice(start, script.indexOf('document.getElementById("session-source").addEventListener(',start));
   const pending = [], rendered = [], errors = [], requests = [];
-  const run = new Function("get_LoadProfiles","document","createGraph","showGraphMessage","calendarDate",`
-    let profileRequestVersion=0,load_profile_data=[],charger_ids_list=[],transformer_ids_list=[];
-    const active_tab="Load Profiles";
-    const selected_polygons=[{}],selected_area_names=["New"];
-    const settingsOf=()=>({strategy:"alap",demand:"high",date:new Date(2025,9,14)});
-    const calendarNote=()=>"",createPolytopeGraph=()=>{};
-    ${body}
-    return calculateLoadProfiles;
-  `)((...args)=>new Promise((resolve,reject)=>{requests.push(args);pending.push({resolve,reject});}),
-    {getElementById:()=>({value:"simple"})},data=>rendered.push(data),(...args)=>errors.push(args),calendarDate);
-  const old = run(), current = run();
+  const state = createState();
+  Object.assign(state, { selected_polygons: [{}], selected_area_names: ["New"] });
+  const { calculateLoadProfiles } = createAnalysis({
+    state,
+    settingsOf: () => ({strategy:"alap",demand:"high",date:new Date(2025,9,14)}),
+    api: { get_LoadProfiles: (...args)=>new Promise((resolve,reject)=>{requests.push(args);pending.push({resolve,reject});}) },
+    view: {
+      sessionSource: () => "simple", setNote() {}, clearGraph() {},
+      createGraph: data => rendered.push(data), createPolytopeGraph() {},
+      showGraphMessage: (...args) => errors.push(args),
+    },
+  });
+  const old = calculateLoadProfiles(), current = calculateLoadProfiles();
   pending[1].resolve([{chargerIds:[2],transformerIds:[],groupName:"New",
     response:{y:[1,2],up_flex:[0,1],down_flex:[-1,0],past_steps:1}}]);
   await current;
@@ -175,35 +177,31 @@ test("each area is requested with its own KPI date range", async () => {
 });
 
 test("late environmental results cannot replace a newer KPI request", async () => {
-  const script = read("script.js"), start = script.indexOf("async function ensureEnvironmentKpis(");
-  const body = script.slice(start,script.indexOf("async function renderActiveKpi(",start));
   let finish;
   const old = [{kpi:{},groupName:"old"}], current = [{kpi:{},groupName:"new"}];
-  const harness = new Function("get_EnvironmentKPIs",`
-    let kpi_data_list;
-    ${body}
-    return {load:ensureEnvironmentKpis,set:value=>{kpi_data_list=value;},get:()=>kpi_data_list};
-  `)(()=>new Promise(resolve=>{finish=resolve;}));
-  harness.set(old);
-  const pending = harness.load(old);
-  harness.set(current);
+  const state = createState();
+  const { ensureEnvironmentKpis } = createAnalysis({
+    state, settingsOf: () => ({}), view: {},
+    api: { get_EnvironmentKPIs: () => new Promise(resolve => { finish = resolve; }) },
+  });
+  state.kpi_data_list = old;
+  const pending = ensureEnvironmentKpis(old);
+  state.kpi_data_list = current;
   finish([{kpi:{environment:{}},groupName:"old"}]);
   await pending;
-  assert.equal(harness.get(),current);
+  assert.equal(state.kpi_data_list, current);
 });
 
 test("Excel download awaits the environmental section even when its tab was unopened", async () => {
-  const script = read("script.js"), start = script.indexOf('document.getElementById("download-btn").addEventListener');
-  const body = script.slice(start,script.indexOf("$(function",start));
-  let handler, finish;
-  const saved = [], groups = [{kpi:{}}], button = {disabled:false};
-  new Function("document","ensureEnvironmentKpis","generateAndDownloadExcel",`
-    const charger_ids_list=[[1]],load_profile_data=[],kpi_data_list=${JSON.stringify(groups)};
-    const animateSelectMessage=()=>{};
-    ${body}
-  `)({getElementById:()=>({addEventListener:(_event,fn)=>{handler=fn;}})},
-    ()=>new Promise(resolve=>{finish=resolve;}),(...args)=>saved.push(args));
-  const pending = handler.call(button);
+  let finish;
+  const saved = [], notified = [], groups = [{kpi:{}}], button = {disabled:false};
+  const state = createState();
+  Object.assign(state, { charger_ids_list: [[1]], load_profile_data: [], kpi_data_list: groups });
+  const { exportReport } = createAnalysis({
+    state, settingsOf: () => ({}), view: {},
+    api: { get_EnvironmentKPIs: () => new Promise(resolve => { finish = resolve; }) },
+  });
+  const pending = exportReport(button, { generate: (...args) => saved.push(args), notify: text => notified.push(text) });
   assert.equal(saved.length,0);
   assert.equal(button.disabled,true);
   const complete = [{kpi:{environment:{strategies:{}}}}];
@@ -211,4 +209,21 @@ test("Excel download awaits the environmental section even when its tab was unop
   await pending;
   assert.equal(saved[0][2],complete);
   assert.equal(button.disabled,false);
+  assert.deepEqual(notified,[]);
+});
+
+test("a failed export is reported and re-enables the button", async () => {
+  const notified = [], button = {disabled:false};
+  const state = createState();
+  state.kpi_data_list = [{kpi:{}}];
+  const { exportReport } = createAnalysis({
+    state, settingsOf: () => ({}), view: {},
+    api: { get_EnvironmentKPIs: async () => { throw new Error("grid data unavailable"); } },
+  });
+  await exportReport(button, { generate: () => { throw new Error("must not export"); }, notify: text => notified.push(text) });
+  assert.deepEqual(notified, ["grid data unavailable"]);
+  assert.equal(button.disabled, false);
+  // a click while an export runs does nothing
+  button.disabled = true;
+  await exportReport(button, { generate: () => { throw new Error("must not export"); }, notify: () => {} });
 });

@@ -1,6 +1,6 @@
 """Repair charger positions the open feeds get wrong, before import.
 
-Three faults occur in the feeds (see docs/charger_sources.md):
+Three faults occur in the feeds:
 
 * out of country: swapped latitude/longitude, typos (latitude 55 for 51) and
   placeholders such as (50, -15) in the Atlantic;

@@ -1,7 +1,6 @@
 """Spatial scenarios, source selection, on-request generation and the CPFT library."""
 
 from datetime import date, datetime, timedelta, timezone
-import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,7 +17,7 @@ from backend.scenario_profiles import grid, simulate_scenarios
 from backend.scenario_sampling import ScenarioSession, generate_sessions
 from backend.session_sources import SessionSourceService
 from backend.spatial_profiles import profile_from_attributes, SpatialAtlas
-from tests.cpft_helpers import write_test_library
+from tests.cpft_helpers import require_tensorflow, write_test_library
 
 UTC = timezone.utc
 TARGET = date(2026, 10, 15)
@@ -251,8 +250,7 @@ def test_minimum_carbon_api_matches_average_energy_and_fails_on_missing_grid(sce
 
 
 def test_real_saved_checkpoints_reproduce_export_with_runtime_scalers():
-    if importlib.util.find_spec("tensorflow") is None:
-        pytest.skip("Install the cpft extra for checkpoint validation")
+    require_tensorflow("Install the cpft extra for checkpoint validation")
     runtime = get_runtime()
     from scripts.evaluate_cpft_models import scale_availability, scale_energy, SOURCE
     sheets = pd.read_excel(SOURCE/"outputs/EV_forecasting_upgraded_results.xlsx", sheet_name=["hourly_input", "test_availability", "test_kwh"])
@@ -268,3 +266,54 @@ def test_real_saved_checkpoints_reproduce_export_with_runtime_scalers():
         if sheet == "test_kwh":
             predicted = max(0, np.expm1(predicted))
         assert predicted == pytest.approx(float(first[output]), abs=1e-5)
+
+def test_ensemble_returns_a_percentile_band_around_the_requested_draw(scenario_client):
+    client, _ = scenario_client
+    base = dict(selected_markers=[1], strategy="afap", date="2026-10-15", session_source="simple", seed=7)
+    single = client.post("/stations/aggregate_load", json=base).get_json()
+    assert "ensemble" not in single["source"]
+    many = client.post("/stations/aggregate_load", json={**base, "ensemble": 8}).get_json()
+    band = many["source"]["ensemble"]
+    # The line is still the requested seed's own draw, so a band never changes the single-draw result
+    assert many["y"] == single["y"]
+    assert band["members"] == 8 and band["seeds"] == list(range(7, 15)) and band["quantiles"] == [10, 50, 90]
+    steps = len(single["y"])
+    assert len(band["p10"]) == len(band["p50"]) == len(band["p90"]) == steps
+    assert all(low <= middle <= high for low, middle, high in zip(band["p10"], band["p50"], band["p90"]))
+    assert max(band["p90"]) > 0
+    # a repeated request is identical: nothing about the band is random
+    again = client.post("/stations/aggregate_load", json={**base, "ensemble": 8}).get_json()
+    assert again["source"]["ensemble"] == band
+
+
+def test_ensemble_band_widens_with_different_seeds_and_collapses_for_one_draw(scenario_client):
+    client, _ = scenario_client
+    base = dict(selected_markers=[1], strategy="alap", date="2026-10-15", session_source="spatial")
+    one = client.post("/stations/aggregate_load", json={**base, "ensemble": 1}).get_json()
+    assert "ensemble" not in one["source"]
+    band = client.post("/stations/aggregate_load", json={**base, "ensemble": 12}).get_json()["source"]["ensemble"]
+    assert any(high > low for low, high in zip(band["p10"], band["p90"]))
+
+
+@pytest.mark.parametrize("extra,message", [
+    (dict(ensemble=0), "between 1 and"), (dict(ensemble=500), "between 1 and"), (dict(ensemble="many"), "whole number"),
+    (dict(ensemble=3, strategy="ocost"), "cost optimisation"), (dict(ensemble=3, session_source="database"), "generated session source"),
+])
+def test_invalid_ensembles_are_rejected(scenario_client, extra, message):
+    client, _ = scenario_client
+    query = dict(selected_markers=[1], strategy="avg", date="2026-10-15", session_source="simple")
+    query.update(extra)
+    response = client.post("/stations/aggregate_load", json=query)
+    assert response.status_code == 400
+    assert message in response.get_json()["error"]
+
+
+def test_ensemble_counts_towards_the_point_day_limit(scenario_client):
+    client, _ = scenario_client
+    client.application.config["MAX_POINT_DAYS"] = 10
+    query = dict(selected_markers=[1], strategy="avg", date="2026-10-15", session_source="simple")
+    assert client.post("/stations/aggregate_load", json={**query, "ensemble": 5}).status_code == 200
+    refused = client.post("/stations/aggregate_load", json={**query, "ensemble": 6})
+    assert refused.status_code == 422
+    assert "12 point-days" in refused.get_json()["error"]
+

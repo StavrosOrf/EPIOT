@@ -10,7 +10,6 @@ from backend.models import (
 
 from sqlalchemy import select, func, extract
 from scipy.stats import gamma
-from backend.aggregators import time_forecast, sample_timestamps
 
 # from backend.ml.predictor import PredictiveModel, DataScaler
 # from backend.ml.preprocessing import Processing
@@ -24,6 +23,44 @@ import yaml
 import pandas as pd
 import numpy as np
 import datetime
+import random
+import polars as pl
+from itertools import compress
+
+# Time-grid helpers formerly in backend/aggregators.py, which only this module used
+def time_forecast(date=None):
+
+    next = date + datetime.timedelta(days=1)
+    dt = datetime.datetime.combine(next, datetime.datetime.min.time())
+    return [dt + datetime.timedelta(minutes=10 * x) for x in range(144)]
+
+
+def sample_timestamps(time, n: int = 1):
+    start_timestamps = random.sample(time[:-1], n)
+    start_timestamps.sort()
+    end_timestamps = []
+
+    for i, ts_start in enumerate(start_timestamps):
+        if i + 1 < len(start_timestamps):  # As long there are more timestamps
+            max_end = start_timestamps[i + 1]
+        else:  # Last timestamp in list
+            s_time = pl.Series(time)
+            later_timestamps = list(compress(time, s_time > ts_start))
+            if len(later_timestamps) > 0:
+                max_end = random.sample(later_timestamps, 1)[0]
+            else:  # If ts_start is the last timestamp, i.e. 23:50
+                max_end = time[-1]
+
+        # Calculate number of 10 min intervals until next session start
+        n_ts = int((max_end - ts_start).total_seconds() / 600)
+        sample_range = [
+            ts_start + datetime.timedelta(minutes=10 * x) for x in range(n_ts)
+        ]
+        end_timestamp = random.sample(sample_range, 1)[0]
+        end_timestamps.append(end_timestamp)
+
+    return start_timestamps, end_timestamps
+
 
 NL_BOUNDARIES = """
                 POLYGON((

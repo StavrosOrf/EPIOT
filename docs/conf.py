@@ -12,13 +12,12 @@ extensions = [
     "myst_parser",
     "sphinx_design",
     "sphinx_copybutton",
-    "sphinxcontrib.mermaid",
     "sphinx.ext.autosectionlabel",
 ]
 
 source_suffix = {".md": "markdown"}
 root_doc = "index"
-exclude_patterns = ["_build", "_scripts", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "README.md", "Thumbs.db", ".DS_Store"]
 
 myst_enable_extensions = [
     "colon_fence",
@@ -43,7 +42,6 @@ html_logo = "_static/logo.svg"
 html_favicon = "../static/images/favicon.ico"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
-html_js_files = ["mermaid-size.js"]
 html_last_updated_fmt = "%d %b %Y"
 html_copy_source = False
 
@@ -64,17 +62,6 @@ html_theme_options = {
         "color-brand-primary": "#4cc27a",
         "color-brand-content": "#4cc27a",
     },
-}
-
-# -- Mermaid ------------------------------------------------------------------
-mermaid_version = "11.4.1"
-mermaid_light_theme = "neutral"
-mermaid_dark_theme = "dark"
-mermaid_init_config = {
-    "startOnLoad": False,
-    "fontFamily": "Inter, system-ui, sans-serif",
-    "flowchart": {"curve": "basis", "htmlLabels": True},
-    "sequence": {"mirrorActors": False, "showSequenceNumbers": True},
 }
 
 copybutton_prompt_text = r"\$ |>>> "

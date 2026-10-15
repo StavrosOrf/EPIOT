@@ -121,20 +121,31 @@ where possible).
 | `FLASK_GRID_ALLOW_STALE` | `true` | `false` disables the historical reference for missing grid hours |
 | `FLASK_ANALYSIS_DATA_REVISION` | – | Bump after data changes in a database that is not a file |
 | `REFLEX_BASE_URL` | `https://drive2x-reflex.hesi.energy/services` | ReFlex service for *Min. Charging Cost* |
+| `FLASK_MAX_POINT_DAYS` | `1000000` | Largest charging points × days a load-profile or KPI request may cover (about 25 s); `0` disables the limit |
+| `FLASK_MAX_ENSEMBLE` | `30` | Most seeded draws one load-profile request may combine into a band |
+| `EPIOT_DEBUG` | `1` for `python app.py`, `0` under a WSGI server | Werkzeug debugger and reloader; `0` also enables `ProxyFix` |
 
 ## Deployment
 
-Set `DEBUG = False` in `app.py`, which also enables `ProxyFix`, and run the application under a
-WSGI server behind a TLS-terminating reverse proxy that forwards `X-Forwarded-Proto`,
-`X-Forwarded-Host` and, for a sub-path, `X-Forwarded-Prefix`:
+A WSGI server that imports `app:app` runs in production mode: no Werkzeug debugger, and `ProxyFix`
+enabled. Run the application behind a TLS-terminating reverse proxy that forwards
+`X-Forwarded-Proto`, `X-Forwarded-Host` and, for a sub-path, `X-Forwarded-Prefix`. (`python app.py`
+is the development server and starts with debug on; `EPIOT_DEBUG=0` turns that off and
+`EPIOT_DEBUG=1` turns it on under a WSGI server.)
 
 ```bash
-gunicorn -w 4 -b 127.0.0.1:5000 app:app
+gunicorn -w 4 --threads 4 --timeout 300 -b 127.0.0.1:5000 app:app
 ```
 
+Threads keep a worker responsive while another request waits on the ReFlex service
+(*Min. Charging Cost* polls it for up to two minutes). The in-process caches are lock-protected.
+
 The browser sends area selections with `POST`. Scripts that pass thousands of IDs in a `GET` query
-string need `--limit-request-line 18190` or higher. The database is a single file
-(`instance/default.sqlite`); back it up with the application stopped.
+string need `--limit-request-line 18190` or higher. `GET /healthz` answers `{"status": "ok"}` when
+the database responds and SpatiaLite is loaded, and `503` otherwise: use it for the proxy's health
+check. The database is a single file (`instance/default.sqlite`); back it up with the application
+stopped, and run `uv run flask --app app db upgrade` after updating (recent versions index the
+`sessions` table, which makes stored-session day and KPI queries much faster).
 
 ## Troubleshooting
 

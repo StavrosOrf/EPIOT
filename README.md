@@ -118,12 +118,13 @@ uv run python scripts/update_charger_data.py
 uv run python scripts/export_country_data.py
 ```
 
-Sources, licences, the field mapping and next steps are in
-[docs/charger_sources.md](docs/charger_sources.md).
+Sources and licences are listed in
+[docs/getting-started.md](docs/getting-started.md#data-coverage).
 
-The standard install supports stored, simple and spatial sessions. CPFT inference
-also requires `uv sync --extra cpft`; its checkpoints and preprocessing are already
-in the repository. The remote ReFlex service still requires project network access.
+The standard install supports the simple, spatial and CPFT session sources. CPFT reads
+a prebuilt library, `backend/data/cpft_library.npz`; `uv sync --extra cpft` (TensorFlow)
+is needed only to rebuild it. The remote ReFlex service, used by the Min. Charging Cost
+strategy, requires project network access.
 
 ## Running the app
 

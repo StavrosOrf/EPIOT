@@ -10,8 +10,10 @@ from sqlalchemy import select
 from backend.cpft import day_window
 from backend.cpft_runtime import CPFTUnavailable
 from backend.kpi.statistics import calculate_kpis, calculate_environment_kpis, days_between
-from backend.models import ChargingPoint, Location, Session
-from backend.scenario_sampling import ScenarioSession, UTC
+from backend.models import ChargingPoint, Location
+from backend.stored_sessions import STORED_LABEL, STORED_NOTE, stored_records
+from backend.request_args import (RequestTooLarge, check_point_days, demand_assumption, request_arguments,
+                                  scenario_seed, session_source)
 from backend.session_sources import SOURCE_LABELS, session_service
 from backend.grid_data import app_grid_hours
 
@@ -32,10 +34,8 @@ def calendar_date(value, zone):
 
 @kpi_data.route("/user", methods=["GET", "POST"])
 def get_user_kpi():
-    arguments = request.get_json(silent=True) if request.method == "POST" else request.args
-    if arguments is None or not hasattr(arguments, "get"):
-        return jsonify(error="Expected a JSON object"), 400
     try:
+        arguments = request_arguments(request)
         section = arguments.get("section", "all")
         if section not in {"all", "basic", "environment"}:
             raise ValueError("Unknown KPI section")
@@ -48,21 +48,16 @@ def get_user_kpi():
         # Synthetic scenarios have no "today": any date is only a calendar context
         if (end_date-start_date).days >= MAX_RANGE_DAYS:
             raise ValueError(f"KPI ranges are limited to {MAX_RANGE_DAYS} days")
-        source = str(arguments.get("session_source", "database")).strip()
-        if source not in {"database", *SOURCE_LABELS}:
-            raise ValueError("Unknown session source")
-        assumption = arguments.get("demand_assumption", "base")
-        if assumption not in {"low", "base", "high"}:
-            raise ValueError("Unknown demand assumption")
-        seed = int(arguments.get("seed", 42))
-        if not 0 <= seed <= 2**32-1:
-            raise ValueError("Seed must be an integer between 0 and 4294967295")
+        source = session_source(arguments)
+        assumption = demand_assumption(arguments)
+        seed = scenario_seed(arguments)
         markers = arguments.get("selected_markers", [])
         if isinstance(markers, str):
             markers = markers.strip().split(",") if markers.strip() else []
         if not isinstance(markers, list):
             raise ValueError("Selected markers must be IDs or a comma-separated string")
         ids = sorted({int(value) for value in markers})
+        check_point_days(current_app.config, len(ids), (end_date-start_date).days+1)
         db = current_app.config["station_data.db"]
         rows = list(db.session.execute(select(ChargingPoint.id, ChargingPoint.power, ChargingPoint.type,
             Location.latitude, Location.longitude, Location.country).join(ChargingPoint.column).join(Location)
@@ -75,20 +70,16 @@ def get_user_kpi():
         mix = app_grid_hours(left, right, db.session,
             cache_path=current_app.config.get("GRID_DATA_CACHE", Path(current_app.instance_path)/"grid_data.sqlite"),
             allow_stale=current_app.config.get("GRID_ALLOW_STALE", True), timezone_name=timezone_name) if section != "basic" else ()
-        metadata = dict(source=source, label=SOURCE_LABELS.get(source, "Stored sessions"),
+        metadata = dict(source=source, label=SOURCE_LABELS.get(source, STORED_LABEL),
             synthetic=source != "database", assumption=assumption if source != "database" else None,
             seed=seed, point_count=len(chargers),
             note="Synthetic scenarios with assumed demand, not verified local charging forecasts."
-                 if source != "database" else "Stored session dataset; local charging observations are not verified.")
+                 if source != "database" else STORED_NOTE)
         if source == "database":
             # Existing Session timestamps are local, timezone-free datetimes.
             local_left = datetime.combine(start_date, time.min)
             local_right = datetime.combine(end_date+timedelta(days=1), time.min)
-            stored = db.session.execute(select(Session.cp_id, Session.start, Session.end, Session.consumption)
-                .where(Session.cp_id.in_(ids), Session.start < local_right, Session.end > local_left)).all()
-            records = [ScenarioSession(cp_id, start.replace(tzinfo=zone).astimezone(UTC),
-                       end.replace(tzinfo=zone).astimezone(UTC), float(energy or 0))
-                       for cp_id, start, end, energy in stored if start and end and end > start and (energy or 0) >= 0]
+            records = stored_records(db.session, ids, local_left, local_right, zone)
             daily = ((day, records) for day in days_between(start_date, end_date))
         elif not chargers:
             daily = ((day, []) for day in days_between(start_date, end_date))
@@ -106,6 +97,8 @@ def get_user_kpi():
         output["source"] = metadata
         output["section"] = section
         return jsonify(output)
+    except RequestTooLarge as exc:
+        return jsonify(error=str(exc)), 422
     except (ValueError, TypeError, KeyError) as exc:
         return jsonify(error=str(exc)), 400
     except CPFTUnavailable as exc:

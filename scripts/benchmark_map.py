@@ -34,11 +34,29 @@ def git(*args):
                                    cwd=ROOT, encoding="utf-8")
 
 
+# Profile simulators the baseline views import and this benchmark never calls;
+# they were replaced by the vectorised engine in backend/scenario_profiles.py.
+REMOVED_SIMULATORS = ("simulate_uncontrolled_profiles_from_sessions", "simulate_delayed_profiles_from_sessions",
+                      "simulate_avg_charging_profiles_from_sessions")
+
+
 def old_module(revision, path):
+    import backend.aggregators as aggregators
+
+    def removed(*args, **kwargs):
+        raise RuntimeError("Removed from the application; not used by the map benchmark")
+
+    added = [name for name in REMOVED_SIMULATORS if not hasattr(aggregators, name)]
+    for name in added:
+        setattr(aggregators, name, removed)
     module = ModuleType("map_before_"+path.replace("/", "_").replace(".", "_"))
     module.__file__ = str(ROOT/path)
     sys.modules[module.__name__] = module
-    exec(compile(git("show", f"{revision}:{path}"), module.__file__, "exec"), module.__dict__)
+    try:
+        exec(compile(git("show", f"{revision}:{path}"), module.__file__, "exec"), module.__dict__)
+    finally:
+        for name in added:
+            delattr(aggregators, name)
     return module
 
 

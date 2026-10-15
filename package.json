@@ -1,0 +1,9 @@
+{
+  "name": "epiot-frontend",
+  "private": true,
+  "type": "module",
+  "description": "The browser modules in static/scripts are ES modules; this file lets Node import them for tests (no dependencies).",
+  "scripts": {
+    "test": "node --test tests/*.mjs"
+  }
+}

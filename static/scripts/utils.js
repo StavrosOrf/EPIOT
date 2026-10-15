@@ -39,6 +39,9 @@ function generateLoadDataSheet(profile_data) {
       "Session source", "Demand assumption", "Synthetic", "Charging strategy",
     ],
   ];
+  // Seeded draws add the 10th and 90th percentile of the load
+  const withBand = profile_data.some((group) => group.band);
+  if (withBand) wsData[0].push("EV Load 10th percentile (kW)", "EV Load 90th percentile (kW)");
 
   // Calculate the starting time (yesterday 00:00)
   const today = new Date();
@@ -82,9 +85,11 @@ function generateLoadDataSheet(profile_data) {
         .replace("T", " ")
         .substring(0, 19);
 
-      wsData.push([groupName, formattedTimestamp, evLoad, upFlex, downFlex,
+      const row = [groupName, formattedTimestamp, evLoad, upFlex, downFlex,
         group.source?.label || "Stored sessions", group.source?.assumption || "", group.source?.synthetic ?? "",
-        strategyLabel(group.strategy)]);
+        strategyLabel(group.strategy)];
+      if (withBand) row.push(group.band?.p10[t] ?? "", group.band?.p90[t] ?? "");
+      wsData.push(row);
     }
   }
 

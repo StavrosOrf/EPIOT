@@ -15,8 +15,7 @@ run `uv run flask --app app db upgrade` to apply new migrations.
 
 Supplier refreshes use `scripts/update_charger_data.py`; regenerate snapshots
 with `scripts/export_country_data.py` afterwards. See
-[the data model](../docs/architecture/backend.md) and
-[charger-source documentation](../docs/charger_sources.md).
+[the data-coverage documentation](../docs/getting-started.md#data-coverage).
 
 ## Database Model ERD
 

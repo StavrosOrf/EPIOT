@@ -193,3 +193,12 @@ def test_api_environment_reference_is_labelled_and_all_schedules_have_same_energ
     assert all(row['same_energy'] and row['status']=='historical_reference' for row in strategies.values())
     assert strategies['mincarbon']['emissions_kg'] <= strategies['afap']['emissions_kg']+1e-8
     assert all(row['matching_date_carbon_coverage_pct']==0 for row in strategies.values())
+
+def test_ranges_beyond_the_point_day_limit_are_refused(client):
+    browser, engine = client
+    browser.application.config["MAX_POINT_DAYS"] = 5
+    assert request(browser, selected_markers=[1], start_date="2025-10-13", end_date="2025-10-15").status_code == 200
+    response = request(browser, selected_markers=[1, 2, 3], start_date="2025-10-13", end_date="2025-10-14")
+    assert response.status_code == 422
+    assert "6 point-days" in response.get_json()["error"]
+

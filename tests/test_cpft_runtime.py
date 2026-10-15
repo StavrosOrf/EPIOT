@@ -1,7 +1,6 @@
 """Batched CPFT features and inference reproduce the row-by-row reference."""
 
 from datetime import datetime, timedelta, timezone
-import importlib.util
 
 import numpy as np
 import pandas as pd
@@ -11,6 +10,7 @@ from backend.cpft_runtime import hourly_observations, input_windows
 from backend.scenario_sampling import ScenarioSession
 from backend.session_frame import SessionFrame
 from scripts.evaluate_cpft_models import AVAIL_COLS, ENERGY_COLS, causal_input_rows, feature_row, observations_at_issue
+from .cpft_helpers import require_tensorflow
 
 UTC = timezone.utc
 ISSUE = datetime(2026, 10, 14, 16, tzinfo=UTC)
@@ -57,8 +57,8 @@ def test_batched_observations_and_input_rows_match_reference():
             np.testing.assert_allclose(actual, expected[name].to_numpy(float), rtol=1e-8, atol=1e-7, err_msg=name)
 
 
-@pytest.mark.skipif(importlib.util.find_spec("tensorflow") is None, reason="Install the cpft extra for checkpoint inference")
 def test_batched_recursive_forecast_matches_reference_loop():
+    require_tensorflow()
     from backend.cpft_runtime import get_runtime
     from scripts.evaluate_cpft_models import scale_availability, scale_energy
     runtime = get_runtime()

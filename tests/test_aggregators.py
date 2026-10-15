@@ -1,82 +1,69 @@
+"""The cost-optimal path through ReFlex, the one strategy that is not computed locally.
+
+The other strategies (and their hand-built-session tests) live in
+tests/test_scenario_profiles.py: every session source shares that engine.
+"""
+
 import datetime
 
-from backend.aggregators import simulate_uncontrolled_profiles_from_sessions
+import pytest
 
-# The profiles cover two days at 10-minute resolution.
-STEPS_PER_DAY = 144
-PROFILE_LEN = STEPS_PER_DAY * 2
+from backend import aggregators
 
-
-def make_session(cp_id, start, end, consumption):
-    """Build a session row shaped like the query result the views pass in."""
-    return (cp_id, start, end, consumption)
+ROWS = [(1, datetime.datetime(2025, 1, 15, 10), datetime.datetime(2025, 1, 15, 14), 5.0)]
+ZEROS = [0.0]*288
 
 
-def test_uncontrolled_profile_charges_at_full_power_from_arrival():
-    # 6 kW over a 10-minute step is exactly 1 kWh, so 5 kWh needs 5 steps.
-    chargers = {1: 6.0}
-    sessions = [
-        make_session(
-            1,
-            datetime.datetime(2025, 1, 15, 10, 0),
-            datetime.datetime(2025, 1, 15, 14, 0),
-            5.0,
-        )
-    ]
+class Services:
+    """Stands in for the price feed and the ReFlex service, and records what was called."""
 
-    profile, up_flex, down_flex = simulate_uncontrolled_profiles_from_sessions(
-        chargers, sessions, start_date="2025-01-15"
-    )
+    def __init__(self, charge_points=1):
+        self.calls = []
+        self.charge_points = charge_points
 
-    assert len(profile) == PROFILE_LEN
-    start_step = 10 * 6  # 10:00 on the first day
+    def install(self, monkeypatch):
+        def prices(start_date, days_ahead):
+            self.calls.append(("prices", start_date, days_ahead))
+            return "prices"
 
-    # Uncontrolled charging starts on arrival and runs at the connection limit.
-    assert profile[start_step : start_step + 5] == [6.0] * 5
-    assert profile[start_step - 1] == 0
-    assert profile[start_step + 5] == 0
+        def query(chargers, sessions, price_data, start_date):
+            self.calls.append(("query", chargers, len(sessions)))
+            return {"assets": {"evChargePoints": ["point"]*self.charge_points}}, "availability"
 
-    # Energy is conserved: each step is a sixth of an hour.
-    assert sum(profile) / 6 == 5.0
+        class Client:
+            def run(_, request):
+                self.calls.append(("run",))
+                return "results"
 
-    # Downward flexibility is the same block shifted to the departure time.
-    end_step = 14 * 6
-    assert down_flex[end_step - 4 : end_step + 1] == [-6.0] * 5
-    assert up_flex == [0] * PROFILE_LEN
+        def aggregate(request, availability, results):
+            self.calls.append(("aggregate", availability, results))
+            return [1.0]*288, [2.0]*288, [3.0]*288
+
+        monkeypatch.setattr(aggregators, "retrieve_day_ahead_prices", prices)
+        monkeypatch.setattr(aggregators, "create_ReFlex_Query", query)
+        monkeypatch.setattr(aggregators, "ReflexClient", Client)
+        monkeypatch.setattr(aggregators, "aggregate_reflex_results", aggregate)
 
 
-def test_uncontrolled_profile_skips_sessions_outside_the_window():
-    chargers = {1: 6.0}
-    sessions = [
-        make_session(
-            1,
-            datetime.datetime(2025, 1, 20, 10, 0),
-            datetime.datetime(2025, 1, 20, 14, 0),
-            5.0,
-        )
-    ]
-
-    profile, _, down_flex = simulate_uncontrolled_profiles_from_sessions(
-        chargers, sessions, start_date="2025-01-15"
-    )
-
-    assert profile == [0] * PROFILE_LEN
-    assert down_flex == [0] * PROFILE_LEN
+def test_without_sessions_nothing_is_requested(monkeypatch):
+    services = Services()
+    services.install(monkeypatch)
+    assert aggregators.simulate_cost_optimal_operation({1: 6.0}, [], "2025-01-14") == (ZEROS, ZEROS, ZEROS)
+    assert services.calls == []
 
 
-def test_uncontrolled_profile_falls_back_to_11kw_for_unknown_limit():
-    chargers = {1: None}
-    sessions = [
-        make_session(
-            1,
-            datetime.datetime(2025, 1, 15, 0, 0),
-            datetime.datetime(2025, 1, 15, 6, 0),
-            11.0,
-        )
-    ]
+def test_sessions_are_priced_optimised_and_aggregated(monkeypatch):
+    services = Services()
+    services.install(monkeypatch)
+    load, up, down = aggregators.simulate_cost_optimal_operation({1: 6.0}, ROWS, "2025-01-14")
+    assert (load[0], up[0], down[0]) == (1.0, 2.0, 3.0)
+    assert [call[0] for call in services.calls] == ["prices", "query", "run", "aggregate"]
+    assert services.calls[0] == ("prices", "2025-01-14", 2)
+    assert services.calls[-1] == ("aggregate", "availability", "results")
 
-    profile, _, _ = simulate_uncontrolled_profiles_from_sessions(
-        chargers, sessions, start_date="2025-01-15"
-    )
 
-    assert max(profile) == 11.0
+def test_a_query_without_charge_points_skips_the_service(monkeypatch):
+    services = Services(charge_points=0)
+    services.install(monkeypatch)
+    assert aggregators.simulate_cost_optimal_operation({1: 6.0}, ROWS, "2025-01-14") == (ZEROS, ZEROS, ZEROS)
+    assert ("run",) not in services.calls

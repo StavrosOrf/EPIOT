@@ -18,7 +18,7 @@ data, KNMI and ERA5 temperatures) and are stored in calendar_effects.json. Every
 random quantity is hashed from (country, date, seed), so any date is
 reproducible and independent of the requested window. Factors are normalized
 so that the long-run averages of the bundled ElaadNL priors are preserved.
-See docs/concepts/calendar-effects.md.
+See docs/session-sources.md.
 """
 
 from dataclasses import dataclass

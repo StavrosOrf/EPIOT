@@ -21,6 +21,21 @@ uv run --extra cpft pytest -q  # also runs the TensorFlow checkpoint tests
 CPFT library tests use `cpft_helpers.write_test_library`, a small library in the
 real format that needs no TensorFlow.
 
+## API behaviour and the profile engine
+
+| File | Coverage |
+| --- | --- |
+| `test_scenario_profiles.py` | Hand-built sessions through the vectorised engine every source uses: as fast as possible, as late as possible and average power, energy conservation, windows, the 11 kW fallback and overnight connections |
+| `test_api_hardening.py` | Stored sessions through the same engine and strategies, JSON errors, date and ID validation, the `(cp_id, start)` indexes and their migration, shared request parsing, `/healthz`, static MIME types and the debug flag |
+| `test_aggregators.py` | The cost-optimal path through ReFlex (the only strategy not computed locally) with stubbed services |
+| `*.mjs` | Browser modules under Node, imported directly (the root `package.json` marks them ES modules): `node --test tests/*.mjs` or `npm test`. `test_group_actions.mjs` and `test_analysis_cache.mjs` use the real `areas.js` and `analysis.js` with stand-in collaborators |
+| `test_ensemble.mjs` | Seeded draws: the band in the chart data, the note, the request and the report |
+
+`scripts/e2e_smoke.mjs` drives the running app in Chrome (draw, analyse, edit cards, draws, tabs); it is
+a manual check, see its header.
+
+CI (`.github/workflows/ci.yml`) runs both suites on every push.
+
 ## CPFT prediction, persistence, and retrieval
 
 ```bash

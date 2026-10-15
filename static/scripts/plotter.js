@@ -96,14 +96,16 @@ function withAlpha(hex, alpha) {
 // those keep their lines. Bars are drawn solid.
 function washFills(data) {
   const filled = {};
+  // The uncertainty band is a deliberate wash of its own and is not counted
+  const isBand = (trace) => trace.legendgroup === "ensemble";
   data.forEach((trace) => {
     if (trace.type === "bar") delete trace.opacity;
-    if (!trace.fill || trace.fill === "none") return;
+    if (!trace.fill || trace.fill === "none" || isBand(trace)) return;
     const key = (trace.xaxis || "x") + (trace.yaxis || "y");
     filled[key] = (filled[key] || 0) + 1;
   });
   data.forEach((trace) => {
-    if (!trace.fill || trace.fill === "none") return;
+    if (!trace.fill || trace.fill === "none" || isBand(trace)) return;
     if (filled[(trace.xaxis || "x") + (trace.yaxis || "y")] > 2) {
       delete trace.fill;
       delete trace.opacity;
@@ -549,6 +551,21 @@ function utcNote(item) {
     : [];
 }
 
+// The 10th-90th percentile of several seeded draws: an invisible lower edge and
+// an upper edge filled down to it, drawn over the load lines
+function ensembleBand(times, band) {
+  const edge = (y, name, extra) => ({
+    x: times, y, mode: "lines", name, line: { width: 0, shape: "hv" },
+    legendgroup: "ensemble", hovertemplate: `${name}: %{y:,.1f} kW`, ...extra,
+  });
+  return [
+    edge(band.p10, "10th percentile", { showlegend: false }),
+    edge(band.p90, `10th to 90th percentile of ${band.members} draws`, {
+      fill: "tonexty", fillcolor: withAlpha(SERIES[0], 0.2), hovertemplate: "90th percentile: %{y:,.1f} kW",
+    }),
+  ];
+}
+
 function loadChart(item, { range }) {
   const times = chartTimes(item);
   const split = item.pastData.length;
@@ -565,6 +582,7 @@ function loadChart(item, { range }) {
     data: [
       trace(0, split, item.pastData, "Previous day", SERIES[1], 1.75),
       trace(split, times.length, item.futureData, "Target day", SERIES[0], 2),
+      ...(item.band ? ensembleBand(times, item.band) : []),
     ],
     layout: {
       xaxis: { hoverformat: "%a %d %b, %H:%M" },
@@ -632,7 +650,8 @@ function polytopeChart(item, { range }) {
 
 export function createGraph(groupData) {
   // One scale for every area, so loads can be compared across cards
-  const peak = Math.max(0, ...groupData.map((item) => Math.max(...item.pastData, ...item.futureData)));
+  const peak = Math.max(0, ...groupData.map((item) =>
+    Math.max(...item.pastData, ...item.futureData, ...(item.band ? item.band.p90 : []))));
   const range = [0, peak > 0 ? peak * 1.1 : 1];
   renderGroupPanels(groupData, (item) => loadChart(item, { range }));
 }

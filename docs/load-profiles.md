@@ -50,8 +50,9 @@ the copy another strategy is the quickest comparison.
 | `selected_markers` | Yes | Charging-point IDs: a JSON array, or comma-separated in a query string |
 | `date` | Yes | Target date, `YYYY-MM-DD` |
 | `strategy` | Yes | `afap`, `alap`, `avg`, `mincarbon` or `ocost` |
-| `session_source` | – | `simple`, `spatial` or `cpft` ({doc}`session-sources`) |
+| `session_source` | – | `simple`, `spatial` or `cpft` ({doc}`session-sources`), or `database` for the stored sessions of the Amsterdam pilot chargers (the default when omitted) |
 | `demand_assumption`, `seed` | – | Scenario settings ({doc}`session-sources`) |
+| `ensemble` | – | Number of seeded draws to combine into a band, 1 to 30 (default 1). Scenario sources and every strategy except `ocost` |
 
 ```bash
 curl -G http://127.0.0.1:5000/stations/aggregate_load \
@@ -67,6 +68,7 @@ curl -G http://127.0.0.1:5000/stations/aggregate_load \
 | `up_flex`, `down_flex` | Flexibility signals, kW ({doc}`flexibility`) |
 | `flex_polytope` | Feasible envelope ({doc}`flexibility`) |
 | `source` | Scenario provenance, including `calendar` and `note` |
+| `source.ensemble` | With `ensemble` above 1: `p10`, `p50`, `p90` load per step over seeds `seed` to `seed + ensemble - 1`, plus `members` and `seeds`. `y` stays the draw of `seed` itself |
 | `x` | Step index |
 
 ```python
@@ -79,8 +81,21 @@ target = r["y"][r["past_steps"]:]
 print(f"{sum(target) / 6:.1f} kWh, peak {max(target):.1f} kW")
 ```
 
-An empty selection returns zero profiles. Unknown strategies and sources return `400`;
-minimum-carbon scheduling without carbon data returns `422`.
+An empty selection returns zero profiles. Unknown strategies, sources, charging points and
+malformed dates or `ensemble` values return `400`; minimum-carbon scheduling without carbon data
+returns `422`, as does a request over the size limit (charging points × days, see
+`FLASK_MAX_POINT_DAYS` in {doc}`getting-started`). Every draw counts towards that limit.
+
+Stored sessions use the same engine and strategies as the scenario sources. Connections that
+cross the window edge are included in full and cropped to the window.
+
+### Several draws
+
+One seeded draw is one possible day, so a single line overstates how sure the result is. With
+`ensemble=10` the page shades the 10th to 90th percentile of ten draws behind the line (the
+**Draws** control in the header). Sessions, day effects and weather all vary with the seed. The band
+shows how much the synthetic sampling matters; it is not a calibrated forecast interval. Ten draws
+take about two seconds for a city-sized area and thirty about six. KPIs are computed from one draw.
 
 ## Export
 
@@ -94,5 +109,6 @@ The report's **Load Data** sheet has one row per area and step:
 | `Upward Flexibility (kW)`, `Downward Flexibility (kW)` | Flexibility signals |
 | `Session source`, `Demand assumption`, `Synthetic` | Scenario provenance |
 | `Charging strategy` | Strategy of the area card |
+| `EV Load 10th percentile (kW)`, `EV Load 90th percentile (kW)` | Only when several draws were requested |
 
 The **Charger IDs** sheet lists the charging points of each area.
