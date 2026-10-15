@@ -8,7 +8,7 @@ Quantify EV charging load and flexibility for any area on the map.</p>
 
 <p align="center">
   <a href="https://github.com/StavrosOrf/EPIOT/actions/workflows/ci.yml"><img src="https://github.com/StavrosOrf/EPIOT/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://epiot.readthedocs.io/"><img src="https://readthedocs.org/projects/epiot/badge/?version=latest" alt="Documentation"></a>
+  <a href="https://epiot.readthedocs.io/en/latest/"><img src="https://readthedocs.org/projects/epiot/badge/?version=latest" alt="Documentation"></a>
   <img src="https://img.shields.io/badge/python-3.11%E2%80%933.13-blue" alt="Python 3.11 to 3.13">
   <img src="https://img.shields.io/badge/licence-BSD--3--Clause-green" alt="BSD-3-Clause licence">
 </p>
@@ -101,7 +101,7 @@ mklink /J .venv %USERPROFILE%\.venvs\EPIOT
 
 ## Documentation
 
-Full documentation is at **<https://epiot.readthedocs.io/>**.
+Full documentation is at **<https://epiot.readthedocs.io/en/latest/>**.
 
 | Guide | Reference |
 |---|---|

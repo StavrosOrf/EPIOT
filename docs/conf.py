@@ -3,7 +3,7 @@
 from datetime import date
 
 project = "EPIOT"
-author = "DRIVE2X WP5 — DLR & TU Delft"
+author = "DRIVE2X"
 copyright = f"{date.today().year}, {author}"
 release = "0.1.0"
 version = release

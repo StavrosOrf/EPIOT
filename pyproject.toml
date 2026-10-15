@@ -43,7 +43,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://drive2x.eu/"
 Repository = "https://github.com/StavrosOrf/EPIOT"
-Documentation = "https://epiot.readthedocs.io/"
+Documentation = "https://epiot.readthedocs.io/en/latest/"
 
 [project.optional-dependencies]
 # Load forecasting models in backend/ml. Kept separate because torch is a

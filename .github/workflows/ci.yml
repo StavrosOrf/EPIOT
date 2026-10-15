@@ -10,7 +10,11 @@ jobs:
     name: Python tests
     runs-on: ubuntu-24.04
     steps:
+      # test_map_density.py benchmarks against a baseline commit by hash, so
+      # the default shallow (depth-1) checkout leaves it unreachable.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install SpatiaLite
         run: |
           sudo apt-get update

@@ -294,7 +294,7 @@ Contact: [Stavros Orfanoudakis](https://www.stavrosorfanoudakis.com/) (TU Delft,
 [Babak Ravanbach](https://www.linkedin.com/in/babakpr/) (DLR, <babak.ravanbach@dlr.de>).
 
 The source code is on [GitHub](https://github.com/StavrosOrf/EPIOT) and these pages are hosted on
-[Read the Docs](https://epiot.readthedocs.io/). Project news and the consortium are on the
+[Read the Docs](https://epiot.readthedocs.io/en/latest/). Project news and the consortium are on the
 [DRIVE2X website](https://drive2x.eu/). EPIOT is released under the BSD-3-Clause licence.
 
 ```{toctree}
