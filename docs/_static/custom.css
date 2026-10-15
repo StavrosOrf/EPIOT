@@ -32,6 +32,14 @@ figure.screenshot img, img.screenshot {
   box-shadow: var(--epiot-shadow);
   border: 1px solid var(--color-background-border);
 }
+/* Charts and diagrams are SVGs on their own white background, so they read as cards in dark mode */
+figure.chart img {
+  border-radius: var(--epiot-radius);
+  border: 1px solid var(--color-background-border);
+  background: #fff;
+  max-width: 100%;
+  height: auto;
+}
 figure figcaption, .figure .caption {
   font-size: 0.88rem;
   color: var(--color-foreground-secondary);
@@ -55,3 +63,94 @@ kbd {
   border-radius: 5px; border: 1px solid var(--color-background-border);
   border-bottom-width: 2px; background: var(--color-background-secondary);
 }
+
+/* ---- Landing page --------------------------------------------------------- */
+.epiot-eyebrow {
+  margin: 0 0 0.4rem; font-size: 0.78rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--color-brand-content);
+}
+.epiot-eyebrow a { color: inherit; }
+.epiot-lead {
+  max-width: 46rem; margin: 0 0 1.25rem; font-size: 1.15rem; line-height: 1.55;
+  color: var(--color-foreground-secondary);
+}
+.epiot-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.5rem; }
+.epiot-actions > p { margin: 0; }
+.epiot-stats {
+  display: grid; gap: 0.75rem; margin: 1.25rem 0 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+}
+.epiot-stat {
+  padding: 0.85rem 1rem; font-size: 0.85rem; line-height: 1.3;
+  color: var(--color-foreground-secondary);
+  background: var(--epiot-green-soft);
+  border: 1px solid var(--color-background-border); border-radius: var(--epiot-radius);
+}
+.epiot-stat strong {
+  display: block; margin-bottom: 0.15rem; font-size: 1.7rem; line-height: 1.1;
+  color: var(--color-brand-content);
+}
+.epiot-features .sd-card { height: 100%; }
+.epiot-features .sd-card-title { display: flex; align-items: center; gap: 0.4rem; }
+.epiot-features .sd-card-title svg { color: var(--color-brand-content); flex: none; }
+.epiot-partner .sd-card-body { color: var(--color-foreground-secondary); font-size: 0.9rem; }
+.epiot-partner .sd-card-body p { margin: 0.2rem 0; }
+.epiot-partner em { color: var(--color-brand-content); font-style: normal; font-weight: 600; }
+
+/* Logos sit on a white strip so the transparent PNGs stay legible in dark mode */
+.epiot-funding {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 1.25rem 2.5rem; margin: 1rem 0 1.25rem; padding: 1.1rem 1.5rem;
+  background: #fff; border: 1px solid var(--color-background-border); border-radius: var(--epiot-radius);
+}
+.epiot-funding a { line-height: 0; }
+.epiot-funding img { display: block; height: 54px; width: auto; max-width: 100%; }
+
+/* Compact logo strip at the top of the landing page */
+.epiot-funding--hero {
+  justify-content: flex-start; gap: 0.9rem 1.75rem; margin: 0 0 1.1rem; padding: 0.7rem 1.1rem;
+  width: fit-content; max-width: 100%;
+}
+.epiot-funding--hero img { height: 40px; }
+
+/* ---- DRIVE2X badge in the sidebar --------------------------------------- */
+.epiot-sidebar-drive2x {
+  display: block; margin: 0.25rem var(--sidebar-item-spacing-horizontal) 0.75rem;
+  padding: 0.5rem 0.75rem 0.6rem; text-align: center; text-decoration: none;
+  background: #fff; border: 1px solid var(--color-background-border); border-radius: var(--epiot-radius);
+}
+.epiot-sidebar-drive2x span {
+  display: block; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #5f6b7a;
+}
+.epiot-sidebar-drive2x img { display: block; width: 100%; max-width: 150px; height: auto; margin: 0 auto; }
+
+/* ---- Partner and funding strip above the page footer --------------------- */
+.epiot-footer {
+  margin: 3rem 0 1.5rem; padding: 1.25rem 1.5rem; display: grid; gap: 1.1rem;
+  background: #fff; color: #334155;
+  border: 1px solid var(--color-background-border); border-radius: var(--epiot-radius);
+}
+.epiot-footer__group { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem; }
+.epiot-footer__funders { padding-top: 1rem; border-top: 1px solid #e5e9f0; }
+.epiot-footer__label {
+  margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #5f6b7a;
+}
+.epiot-footer__funders .epiot-footer__label { margin: 0; }
+.epiot-footer__lead { line-height: 0; flex: none; }
+.epiot-footer__lead img { height: 56px; width: auto; display: block; }
+.epiot-footer__logos {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.75rem;
+  margin: 0; padding: 0; list-style: none;
+}
+.epiot-footer__logos li { margin: 0; padding: 0; }
+.epiot-footer__logos a { display: block; line-height: 0; }
+.epiot-footer__logos img { height: 38px; width: auto; display: block; }
+.epiot-footer__logos img.epiot-footer__tno { height: 26px; }
+.epiot-footer__logos a.epiot-footer__wordmark {
+  line-height: 1; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; color: #0b3d6b;
+  text-decoration: none;
+}
+.epiot-footer a { color: inherit; }

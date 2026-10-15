@@ -44,13 +44,18 @@ class StubPredictor:
         return cpft_rows(kwargs["start"], kwargs["end"], self.energies.get(kwargs["cp_id"]))
 
 
-def write_test_library(path, timezone_name="Europe/Amsterdam", lead=16, kwh=2.0, entries=2, mark_volume=False, mark_weekday=False):
+def write_test_library(path, timezone_name="Europe/Amsterdam", lead=None, kwh=2.0, entries=2, mark_volume=False, mark_weekday=False,
+                       run=1, ongoing_until=None):
     """A tiny CPFT library in the real format, without TensorFlow.
 
-    Every entry occupies one hour `lead` hours after the 18:00 issue (10:00 local
-    on the target day) with `kwh` delivered (or 1 + the volume-bin index with
-    `mark_volume`, or 1 + the context's weekday with `mark_weekday`), after a 3 kWh
-    history connection 10 or 12 hours before issue.
+    Every entry is occupied for `run` hours from `lead` hours after the 18:00 issue
+    (16, which is 10:00 local on the target day, unless given), after a 3 kWh history
+    connection 10 or 12 hours before issue. `mark_volume` moves the run later by the
+    volume-bin index and `mark_weekday` by the context's weekday, so a sample shows
+    which cell it came from. With `ongoing_until` the history connection (3 kWh, from
+    3 hours before issue) is still running at issue, due to end that many hours after
+    it, and the run starts at issue unless `lead` says otherwise. The hourly kWh is
+    stored as `kwh` but is not what the sampler delivers.
     """
     import json
     import numpy as np
@@ -59,17 +64,21 @@ def write_test_library(path, timezone_name="Europe/Amsterdam", lead=16, kwh=2.0,
     contexts = calendar_contexts(timezone_name)
     cells = len(contexts)*len(VOLUME_BINS)*2
     total = cells*entries
-    occupied = np.zeros((total, HORIZON), np.uint8)
-    occupied[:, lead] = 1
     volume = (np.arange(total)//entries//2) % len(VOLUME_BINS)
     weekday = np.array([key[0] for key, _ in contexts])[np.arange(total)//(entries*2*len(VOLUME_BINS))]
-    marked = 1.+volume if mark_volume else 1.+weekday if mark_weekday else np.full(total, kwh)
-    energy = (occupied*marked[:, None]*1000).astype(np.uint16)
+    lead = (16 if ongoing_until is None else 0) if lead is None else lead
+    first = lead+(volume if mark_volume else weekday if mark_weekday else np.zeros(total, int))
+    hours = np.arange(HORIZON)[None, :]
+    occupied = ((hours >= first[:, None]) & (hours < (first+run)[:, None])).astype(np.uint8)
+    energy = (occupied*kwh*1000).astype(np.uint16)
     starts = np.repeat(np.array([-10*3600, -12*3600], np.int32)[None], total, 0)[np.arange(total), np.arange(total) % 2]
+    ends = starts+2*3600
+    if ongoing_until is not None:
+        starts, ends = np.full(total, -3*3600, np.int32), np.full(total, int(ongoing_until*3600), np.int32)
     meta = dict(timezone=timezone_name, contexts=[list(key) for key, _ in contexts], mixtures=[list(FALLBACK)],
                 volume_bins=list(VOLUME_BINS), inputs_sha256=current_inputs(), built_at="test")
     np.savez_compressed(path, meta=np.frombuffer(json.dumps(meta).encode(), np.uint8),
         cell_offsets=np.arange(cells+1, dtype=np.int64)*entries, probability_255=occupied*250, occupied=occupied,
         kwh_milli=energy, history_offsets=np.arange(total+1, dtype=np.int64), history_start=starts,
-        history_end=starts+2*3600, history_energy=np.full(total, 3., np.float32))
+        history_end=ends, history_energy=np.full(total, 3., np.float32))
     return path

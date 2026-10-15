@@ -1091,212 +1091,72 @@ function renderKpiPanels(groupData, columns, panelsFor, summaryFor) {
   });
 }
 
+// The four strategies of the Environment dashboard: the key of `environment.strategies`, the suffix of
+// the flat `co2_intensities_*` / `renewable_energy_shared_*` fields older responses carry, and the style
+const ENVIRONMENT_STRATEGIES = [
+  { key: "afap", flat: "uncontrolled", name: "As Fast As Possible", color: SERIES[0] },
+  { key: "alap", flat: "delayed", name: "As Late As Possible", color: SERIES[1] },
+  { key: "avg", flat: "avg", name: "Average Power", color: SERIES[2] },
+  { key: "mincarbon", flat: "mincarbon", name: "Minimum Carbon", color: SERIES[3] },
+];
+
+// One card per area: what each strategy emits in every hour of the day, and the share of its
+// energy that is renewable. Emissions differ between strategies because they charge in different
+// hours. The grid's own intensity at those hours would not (it is the same number whichever
+// strategy draws power), so it is only drawn for responses that carry nothing else.
 function environmentKpiChart(groupData) {
-    var data = [];
-
-  var layout = {
-    grid: {
-      rows: groupData.length,
-      // rows: 1,
-      columns: 2,
-      pattern: "independent",
-    },
+  const hours = Array.from({ length: 24 }, (_, hour) => hour);
+  const data = [];
+  const layout = {
+    grid: { rows: groupData.length, columns: 2, pattern: "independent" },
     showlegend: true,
-    hovermode: "x unified", // Synchronize hover over x-axis
-    legend: {
-      orientation: "h",
-      x: 0.5,
-      y: 1.1,
-      xanchor: "center",
-      yanchor: "bottom",
-      traceorder: "normal",
-      ncols: 2,
-    },
-    // automargin: true,
+    hovermode: "x unified",
+    legend: { orientation: "h", x: 0.5, y: 1.1, xanchor: "center", yanchor: "bottom", traceorder: "normal" },
     margin: { t: 80, b: 100, l: 80, r: 80 },
-    xaxis1: { title: "Time of the Day (Hour)" },
-    yaxis1: { title: "Carbon (gCO2eq/kWh)" },    
-    xaxis2: { title: " " },
-    yaxis2: { title: "Percentage (%)" },
-    xaxis3: { title: " " },
-    yaxis3: { title: "gCO2eq/kWh" },
-    xaxis4: { title: " " },
-    yaxis4: { title: "Percentage (%)" },
-    xaxis5: { title: "Time of the Day (Hour)" },
-    yaxis5: { title: "gCO2eq/kWh" },
-    xaxis6: { title: " " },
-    yaxis6: { title: "Percentage (%)" },
-
-
+    annotations: [],
   };
 
-  layout.shapes = [];
-  layout.annotations = [];
+  groupData.forEach((group, index) => {
+    const kpi = group.kpi || {};
+    const strategies = (kpi.environment && kpi.environment.strategies) || {};
+    const hourly = (strategy) => strategies[strategy.key] && strategies[strategy.key].emissions_by_hour_kg;
+    const emissions = ENVIRONMENT_STRATEGIES.some((strategy) => Array.isArray(hourly(strategy)));
+    const lineAxis = { xaxis: "x" + (2 * index + 1), yaxis: "y" + (2 * index + 1) };
+    const barAxis = { xaxis: "x" + (2 * index + 2), yaxis: "y" + (2 * index + 2) };
 
-  let today = new Date();
-  let startDate = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() - 1,
-    0,
-    0,
-    0
-  );
-
-  // Generate time steps as Date objects
-  var timeSteps = Array.from({ length: 24 }, (_, i) => {
-    let date = new Date(startDate.getTime());
-    date.setHours(date.getHours() + i);
-    return date.getHours();
-  });
-  // console.log(timeSteps);
-  groupData.forEach((dataItem, index) => {
-    // Create traces for past and future data as step plots
-    var d1 = {
-      x: timeSteps,
-      y: dataItem.kpi.co2_intensities_uncontrolled,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[0], shape: "hvh" },
-      name: "As Fast As Possible",
-      xaxis: "x" + (2 * index + 1),
-      yaxis: "y" + (2 * index + 1),
-      opacity: 0.3,
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-    };
-
-    var d2 = {
-      x: timeSteps,
-      y: dataItem.kpi.co2_intensities_delayed,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[1], shape: "hvh" }, // Step plot
-      name: "As Late As Possible",
-      xaxis: "x" + (2 * index + 1),
-      yaxis: "y" + (2 * index + 1),
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-      opacity: 0.3,
-    };
-
-    var d3 = {
-      x: timeSteps,
-      y: dataItem.kpi.co2_intensities_avg,
-      type: "scatter",
-      mode: "lines",
-      fill: "tozeroy", // Fills the area under the line to the x-axis
-      line: { color: SERIES[2], shape: "hvh" }, // Step plot
-      name: "Average Power",
-      xaxis: "x" + (2 * index + 1),
-      yaxis: "y" + (2 * index + 1),
-      // legendgroup: "group",
-      showlegend: index === 0, // Show legend only once
-      opacity: 0.3,
-    };
-
-    var d4 = {
-      x: ["As Fast As Possible"],
-      y: [dataItem.kpi.renewable_energy_shared_uncontrolled],
-      type: "bar",
-      marker: { color: SERIES[0] },
-      name: "As Fast As Possible",
-      opacity: 0.7,
-      xaxis: "x" + (2 * index + 2),
-      yaxis: "y" + (2 * index + 2),
-      showlegend: false,
-    };
-
-    var d5 = {
-      x: ["As Late As Possible"],
-      y: [dataItem.kpi.renewable_energy_shared_delayed],
-      type: "bar",
-      marker: { color: SERIES[1] },
-      name: "As Late As Possible",
-      opacity: 0.7,
-      xaxis: "x" + (2 * index + 2),
-      yaxis: "y" + (2 * index + 2),
-      showlegend: false,
-    };
-
-    var d6 = {
-      x: ["Average Power"],
-      y: [dataItem.kpi.renewable_energy_shared_avg],
-      type: "bar",
-      marker: { color: SERIES[2] },
-      name: "Average Power",
-      opacity: 0.7,
-      xaxis: "x" + (2 * index + 2),
-      yaxis: "y" + (2 * index + 2),
-      showlegend: false,
-    };
-
-
-    data.push(
-      d1,
-      d2,
-      d3,
-      d4,
-      d5,
-      d6
-    );
-    if (dataItem.kpi.co2_intensities_mincarbon) {
+    ENVIRONMENT_STRATEGIES.forEach((strategy) => {
+      const series = emissions ? hourly(strategy) : kpi["co2_intensities_" + strategy.flat];
+      const share = kpi["renewable_energy_shared_" + strategy.flat];
+      // An unavailable minimum-carbon schedule has neither a curve nor a bar
+      if (!Array.isArray(series)) return;
       data.push({
-        x: timeSteps, y: dataItem.kpi.co2_intensities_mincarbon,
-        type: "scatter", mode: "lines", name: "Minimum Carbon",
-        line: {color: SERIES[3], shape: "hvh"},
-        xaxis: "x"+(2*index+1), yaxis: "y"+(2*index+1), showlegend: index===0,
-      }, {
-        x: ["Minimum Carbon"], y: [dataItem.kpi.renewable_energy_shared_mincarbon],
-        type: "bar", name: "Minimum Carbon", marker: {color: SERIES[3]},
-        xaxis: "x"+(2*index+2), yaxis: "y"+(2*index+2), showlegend: false,
+        x: hours, y: series, type: "scatter", mode: "lines", name: strategy.name,
+        line: { color: strategy.color, shape: "hvh", width: 2 },
+        hovertemplate: emissions ? "%{y:,.2f} kgCO₂e" : "%{y:,.0f} gCO₂e/kWh",
+        ...lineAxis, showlegend: index === 0,
       });
-    }
-
-
-    if (index == 0) {
-      // change y-axis title
-      layout.yaxis1.title = "Carbon (gCO2eq/kWh)";
-    } else if (index == 1) {
-      layout.yaxis3.title = "Carbon (gCO2eq/kWh)";
-    } else if (index == 2) {
-      layout.yaxis5.title = "Carbon (gCO2eq/kWh)";
-    }
-
-
-    let label1 = "<b>Charging-weighted Carbon Intensity</b>";
-    let label2 = "<b>Renewable Energy Share</b>";
-
-
-
-    if (index == 0) {
-      // Add titles to each subplot
-      layout.annotations.push({
-        text: label1,
-        xref: "x" + (2 * index + 1) + " domain",
-        yref: "y" + (2 * index + 1) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
+      data.push({
+        x: [strategy.name], y: [share], type: "bar", name: strategy.name,
+        marker: { color: strategy.color }, opacity: 0.8,
+        hovertemplate: "%{y:.1f}%", ...barAxis, showlegend: false,
       });
-      layout.annotations.push({
-        text: label2,
-        xref: "x" + (2 * index + 2) + " domain",
-        yref: "y" + (2 * index + 2) + " domain",
-        x: 0.5,
-        y: 1.05,
-        xanchor: "center",
-        yanchor: "bottom",
-        showarrow: false,
-        font: { size: 16 },
-      });
+    });
 
-     
+    layout["xaxis" + (2 * index + 1)] = { title: "Hour of day (local)", range: [0, 24], tickvals: [0, 6, 12, 18, 24] };
+    layout["yaxis" + (2 * index + 1)] = {
+      title: emissions ? "kgCO₂e over the range" : "Carbon (gCO2eq/kWh)", rangemode: "tozero",
+    };
+    layout["xaxis" + (2 * index + 2)] = { title: " " };
+    layout["yaxis" + (2 * index + 2)] = { title: "Percentage (%)", rangemode: "tozero" };
+
+    if (index === 0) {
+      const title = (text, axis) => ({
+        text: `<b>${text}</b>`, xref: `x${axis} domain`, yref: `y${axis} domain`,
+        x: 0, y: 1.05, xanchor: "left", yanchor: "bottom", showarrow: false,
+      });
+      layout.annotations.push(
+        title(emissions ? "Emissions by hour of day" : "Charging-weighted Carbon Intensity", 1),
+        title("Renewable Energy Share", 2));
     }
   });
 

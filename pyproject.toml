@@ -6,8 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = { text = "BSD-3-Clause" }
 authors = [
-    { name = "Babak Ravanbach" },
     { name = "Stavros Orfanoudakis" },
+    { name = "Babak Ravanbach" },
     { name = "Arellano Ruiz, Eugenio Salvador" },
 ]
 
@@ -39,6 +39,11 @@ dependencies = [
     "py7zr; sys_platform == 'win32'",
     "holidays>=0.106",
 ]
+
+[project.urls]
+Homepage = "https://drive2x.eu/"
+Repository = "https://github.com/StavrosOrf/EPIOT"
+Documentation = "https://epiot.readthedocs.io/"
 
 [project.optional-dependencies]
 # Load forecasting models in backend/ml. Kept separate because torch is a

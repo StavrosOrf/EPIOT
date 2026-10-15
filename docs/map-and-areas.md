@@ -126,6 +126,13 @@ The welcome dialog summarises the tool and its audiences on the first visit. Tic
 again** to hide it (stored in the browser as `epiotr_intro_seen`), reopen it with **About**, or
 add `?landing` to the address to force it open.
 
+```{figure} _static/screenshots/landing.jpg
+:class: screenshot
+:alt: The welcome dialog with the main functions, audiences and a four-step guide
+
+The welcome dialog.
+```
+
 ```{figure} _static/screenshots/mobile-map.jpg
 :class: screenshot
 :alt: EPIOT on a phone-sized screen

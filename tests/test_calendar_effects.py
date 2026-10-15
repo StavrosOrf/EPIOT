@@ -134,14 +134,27 @@ def test_disabled_effects_reproduce_the_calendar_free_world(tmp_path):
 
 
 def test_cpft_forecasts_a_holiday_as_a_sunday_and_scales_energy_with_temperature(tmp_path, calendar):
+    # The run starts as many hours after 10:00 as the context's weekday, so a sample shows which context it used
     library = CPFTLibrary(write_test_library(tmp_path/"weekday.npz", mark_weekday=True))
     chargers = CHARGERS[:300]
-    def forecast(day):
-        frame, info = sample_cpft(chargers, day, library=library, calendar=calendar, countries=["NL"]*len(chargers))
-        return frame.select(frame.start >= issue_time(day, ZONE).timestamp()), info
-    kings_day, info = forecast(date(2026, 4, 27))  # a Monday
-    factor = info["calendar"]["NL"][1]["energy_factor"]
+
+    def forecast(day, effects=True):
+        options = dict(calendar=calendar, countries=["NL"]*len(chargers)) if effects else {}
+        frame, info = sample_cpft(chargers, day, library=library, **options)
+        issue = issue_time(day, ZONE).timestamp()
+        frame = frame.select(frame.start >= issue)
+        return frame, np.floor((frame.start-issue)/3600)-16, info
+    kings_day, weekday, info = forecast(date(2026, 4, 27))  # a Monday
     assert info["calendar"]["NL"][1]["holiday"] == "Koningsdag"
-    np.testing.assert_allclose(kings_day.energy_kwh, (1+6)*factor, rtol=1e-3)  # Sunday context
-    tuesday, info = forecast(date(2026, 4, 28))
-    np.testing.assert_allclose(tuesday.energy_kwh, (1+1)*info["calendar"]["NL"][1]["energy_factor"], rtol=1e-3)
+    assert set(weekday) == {6}  # Sunday context
+    tuesday, weekday, info = forecast(date(2026, 4, 28))
+    assert set(weekday) == {1}
+    # Energy follows the day's temperature on top of the priors' own: the same arrivals, scaled
+    plain, _, _ = forecast(date(2026, 4, 28), effects=False)
+    factor = info["calendar"]["NL"][1]["energy_factor"]
+    assert factor != pytest.approx(1, abs=.01)
+    np.testing.assert_allclose(tuesday.start, plain.start)
+    room = 11*(tuesday.end-tuesday.start)/3600
+    free = (plain.energy_kwh < room-1e-9) & (tuesday.energy_kwh < room-1e-9)
+    assert free.sum() > 100
+    np.testing.assert_allclose(tuesday.energy_kwh[free], plain.energy_kwh[free]*factor, rtol=2e-3)  # the summary rounds the factor

@@ -196,6 +196,32 @@ def test_emissions_summary_and_afap_difference_are_energy_weighted():
     assert all(row['same_energy'] and row['carbon_energy_coverage_pct']==pytest.approx(100) for row in result['strategies'].values())
 
 
+def test_hourly_emissions_show_where_each_strategy_charges_while_the_intensity_curve_does_not():
+    record = ScenarioSession(1,LEFT,LEFT+timedelta(hours=2),1)
+    hours = [GridHour(LEFT+timedelta(hours=i),500 if i==0 else 100,50,False,False) for i in range(24)]
+    strategies = compare([record],hours)['strategies']
+    baseline, minimum, delayed = strategies['afap'], strategies['mincarbon'], strategies['alap']
+    # As fast as possible charges in the dirty first hour, minimum carbon in the clean second hour
+    assert baseline['emissions_by_hour_kg'][0] == pytest.approx(.5) and baseline['emissions_by_hour_kg'][1] == 0
+    assert minimum['emissions_by_hour_kg'][0] == 0 and minimum['emissions_by_hour_kg'][1] == pytest.approx(.1)
+    assert baseline['energy_by_hour_kwh'][:2] == pytest.approx([1, 0])
+    assert delayed['energy_by_hour_kwh'][:2] == pytest.approx([0, 1])
+    for row in strategies.values():
+        assert len(row['emissions_by_hour_kg']) == len(row['energy_by_hour_kwh']) == 24
+        assert sum(row['emissions_by_hour_kg']) == pytest.approx(row['emissions_kg'])
+        assert sum(row['energy_by_hour_kwh']) == pytest.approx(row['energy_kwh'])
+    # The intensity is the grid's own value at the hour a strategy charges, so it cannot tell strategies apart
+    assert baseline['intensity_by_hour'][0] == pytest.approx(500) and minimum['intensity_by_hour'][1] == pytest.approx(100)
+    assert baseline['intensity_by_hour'][1] is None and minimum['intensity_by_hour'][0] is None
+
+
+def test_unavailable_strategy_has_no_hourly_series():
+    record = ScenarioSession(1,LEFT,LEFT+timedelta(hours=2),1)
+    result = compare([record],[GridHour(LEFT,100,None),GridHour(LEFT+timedelta(hours=1),None,80)])
+    assert result['strategies']['mincarbon']['emissions_by_hour_kg'] is None
+    assert result['strategies']['mincarbon']['energy_by_hour_kwh'] is None
+
+
 def test_independent_carbon_and_renewable_coverage_and_no_partial_savings_claim():
     record = ScenarioSession(1,LEFT,LEFT+timedelta(hours=2),1)
     hours = [GridHour(LEFT,100,None),GridHour(LEFT+timedelta(hours=1),None,80)]

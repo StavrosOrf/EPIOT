@@ -122,8 +122,13 @@ class EnvironmentalComparison:
                 unknown_estimation_flag_energy_pct=pct(values["unknown_flag_energy"]),
                 carbon_complete=carbon_complete, renewable_complete=renewable_complete,
                 same_energy=available and abs(energy-self.required_energy) <= max(1e-8, self.required_energy*1e-10),
+                # The grid's own intensity at the hours the energy was drawn: the same for every strategy
+                # that charges in an hour, so it shows the grid and not the schedule
                 intensity_by_hour=[float(total/weight) if weight and available else None for total, weight in
-                    zip(values["carbon_by_hour"], values["energy_by_hour"])])
+                    zip(values["carbon_by_hour"], values["energy_by_hour"])],
+                # Where each strategy puts its energy and what that emits, by local hour of day over the range
+                energy_by_hour_kwh=[float(value) for value in values["energy_by_hour"]] if available else None,
+                emissions_by_hour_kg=[float(value)/1000 for value in values["carbon_by_hour"]] if available else None)
         baseline = strategies["afap"]
         for strategy, value in strategies.items():
             eligible = value["available"] and value["same_energy"] and baseline["same_energy"] and value["carbon_complete"] and baseline["carbon_complete"]

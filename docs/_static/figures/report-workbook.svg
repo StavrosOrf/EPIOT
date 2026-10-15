@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="922.68pt" height="368.28pt" viewBox="0 0 922.68 368.28" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="922.68pt" height="281.88pt" viewBox="0 0 922.68 281.88" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
@@ -20,8 +20,8 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M -0 368.28 
-L 922.68 368.28 
+   <path d="M -0 281.88 
+L 922.68 281.88 
 L 922.68 0 
 L -0 0 
 z
@@ -29,86 +29,86 @@ z
   </g>
   <g id="axes_1">
    <g id="patch_2">
-    <path d="M 33.481714 255.342857 
-L 305.115429 255.342857 
-Q 313.56 255.342857 313.56 247.205388 
-L 313.56 39.699918 
-Q 313.56 31.562449 305.115429 31.562449 
-L 33.481714 31.562449 
-Q 25.037143 31.562449 25.037143 39.699918 
-L 25.037143 247.205388 
-Q 25.037143 255.342857 33.481714 255.342857 
+    <path d="M 33.481714 257.05 
+L 305.115429 257.05 
+Q 313.56 257.05 313.56 248.854 
+L 313.56 39.856 
+Q 313.56 31.66 305.115429 31.66 
+L 33.481714 31.66 
+Q 25.037143 31.66 25.037143 39.856 
+L 25.037143 248.854 
+Q 25.037143 257.05 33.481714 257.05 
 z
-" clip-path="url(#p3413b386e7)" style="fill: #ffffff; stroke: #2a78d6; stroke-width: 1.4; stroke-linejoin: miter"/>
+" clip-path="url(#p45256cd4a0)" style="fill: #ffffff; stroke: #2a78d6; stroke-width: 1.4; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
-    <path d="M 343.116 112.937143 
-L 537.341143 112.937143 
-Q 545.785714 112.937143 545.785714 104.799673 
-L 545.785714 39.699918 
-Q 545.785714 31.562449 537.341143 31.562449 
-L 343.116 31.562449 
-Q 334.671429 31.562449 334.671429 39.699918 
-L 334.671429 104.799673 
-Q 334.671429 112.937143 343.116 112.937143 
+    <path d="M 343.116 113.62 
+L 537.341143 113.62 
+Q 545.785714 113.62 545.785714 105.424 
+L 545.785714 39.856 
+Q 545.785714 31.66 537.341143 31.66 
+L 343.116 31.66 
+Q 334.671429 31.66 334.671429 39.856 
+L 334.671429 105.424 
+Q 334.671429 113.62 343.116 113.62 
 z
-" clip-path="url(#p3413b386e7)" style="fill: #ffffff; stroke: #1baf7a; stroke-width: 1.4; stroke-linejoin: miter"/>
+" clip-path="url(#p45256cd4a0)" style="fill: #ffffff; stroke: #1baf7a; stroke-width: 1.4; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
-    <path d="M 582.378857 214.65551 
-L 889.198286 214.65551 
-Q 897.642857 214.65551 897.642857 206.518041 
-L 897.642857 39.699918 
-Q 897.642857 31.562449 889.198286 31.562449 
-L 582.378857 31.562449 
-Q 573.934286 31.562449 573.934286 39.699918 
-L 573.934286 206.518041 
-Q 573.934286 214.65551 582.378857 214.65551 
+    <path d="M 582.378857 216.07 
+L 889.198286 216.07 
+Q 897.642857 216.07 897.642857 207.874 
+L 897.642857 39.856 
+Q 897.642857 31.66 889.198286 31.66 
+L 582.378857 31.66 
+Q 573.934286 31.66 573.934286 39.856 
+L 573.934286 207.874 
+Q 573.934286 216.07 582.378857 216.07 
 z
-" clip-path="url(#p3413b386e7)" style="fill: #ffffff; stroke: #eb6834; stroke-width: 1.4; stroke-linejoin: miter"/>
+" clip-path="url(#p45256cd4a0)" style="fill: #ffffff; stroke: #eb6834; stroke-width: 1.4; stroke-linejoin: miter"/>
    </g>
    <g id="patch_5">
-    <path d="M 33.481714 66.824816 
-L 305.115429 66.824816 
-Q 313.56 66.824816 313.56 58.687347 
-L 313.56 39.699918 
-Q 313.56 31.562449 305.115429 31.562449 
-L 33.481714 31.562449 
-Q 25.037143 31.562449 25.037143 39.699918 
-L 25.037143 58.687347 
-Q 25.037143 66.824816 33.481714 66.824816 
+    <path d="M 33.481714 67.176 
+L 305.115429 67.176 
+Q 313.56 67.176 313.56 58.98 
+L 313.56 39.856 
+Q 313.56 31.66 305.115429 31.66 
+L 33.481714 31.66 
+Q 25.037143 31.66 25.037143 39.856 
+L 25.037143 58.98 
+Q 25.037143 67.176 33.481714 67.176 
 z
-" clip-path="url(#p3413b386e7)" style="fill: #2a78d6; stroke: #2a78d6; stroke-width: 1.4; stroke-linejoin: miter"/>
+" clip-path="url(#p45256cd4a0)" style="fill: #2a78d6; stroke: #2a78d6; stroke-width: 1.4; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
-    <path d="M 343.116 66.824816 
-L 537.341143 66.824816 
-Q 545.785714 66.824816 545.785714 58.687347 
-L 545.785714 39.699918 
-Q 545.785714 31.562449 537.341143 31.562449 
-L 343.116 31.562449 
-Q 334.671429 31.562449 334.671429 39.699918 
-L 334.671429 58.687347 
-Q 334.671429 66.824816 343.116 66.824816 
+    <path d="M 343.116 67.176 
+L 537.341143 67.176 
+Q 545.785714 67.176 545.785714 58.98 
+L 545.785714 39.856 
+Q 545.785714 31.66 537.341143 31.66 
+L 343.116 31.66 
+Q 334.671429 31.66 334.671429 39.856 
+L 334.671429 58.98 
+Q 334.671429 67.176 343.116 67.176 
 z
-" clip-path="url(#p3413b386e7)" style="fill: #1baf7a; stroke: #1baf7a; stroke-width: 1.4; stroke-linejoin: miter"/>
+" clip-path="url(#p45256cd4a0)" style="fill: #1baf7a; stroke: #1baf7a; stroke-width: 1.4; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
-    <path d="M 582.378857 66.824816 
-L 889.198286 66.824816 
-Q 897.642857 66.824816 897.642857 58.687347 
-L 897.642857 39.699918 
-Q 897.642857 31.562449 889.198286 31.562449 
-L 582.378857 31.562449 
-Q 573.934286 31.562449 573.934286 39.699918 
-L 573.934286 58.687347 
-Q 573.934286 66.824816 582.378857 66.824816 
+    <path d="M 582.378857 67.176 
+L 889.198286 67.176 
+Q 897.642857 67.176 897.642857 58.98 
+L 897.642857 39.856 
+Q 897.642857 31.66 889.198286 31.66 
+L 582.378857 31.66 
+Q 573.934286 31.66 573.934286 39.856 
+L 573.934286 58.98 
+Q 573.934286 67.176 582.378857 67.176 
 z
-" clip-path="url(#p3413b386e7)" style="fill: #eb6834; stroke: #eb6834; stroke-width: 1.4; stroke-linejoin: miter"/>
+" clip-path="url(#p45256cd4a0)" style="fill: #eb6834; stroke: #eb6834; stroke-width: 1.4; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <!-- Exported from the Load profiles or Flexibility tab: -->
-    <g style="fill: #5b6a61" transform="translate(334.671429 160.23274) scale(0.088 -0.088)">
+    <g style="fill: #5b6a61" transform="translate(334.671429 161.20825) scale(0.088 -0.088)">
      <defs>
       <path id="SegoeUI-45" d="M 2963 0 
 L 588 0 
@@ -575,7 +575,7 @@ z
      <use xlink:href="#SegoeUI-3a" transform="translate(2123.398438 0)"/>
     </g>
     <!-- Load Data and Charger IDs. -->
-    <g style="fill: #5b6a61" transform="translate(334.671429 170.12119) scale(0.088 -0.088)">
+    <g style="fill: #5b6a61" transform="translate(334.671429 171.0967) scale(0.088 -0.088)">
      <defs>
       <path id="SegoeUI-44" d="M 588 0 
 L 588 4481 
@@ -707,9 +707,9 @@ z
      <use xlink:href="#SegoeUI-2e" transform="translate(1183.626953 0)"/>
     </g>
     <!--  -->
-    <g style="fill: #5b6a61" transform="translate(334.671429 180.00964) scale(0.088 -0.088)"/>
+    <g style="fill: #5b6a61" transform="translate(334.671429 180.98515) scale(0.088 -0.088)"/>
     <!-- Exported from the KPIs tab: -->
-    <g style="fill: #5b6a61" transform="translate(334.671429 189.96354) scale(0.088 -0.088)">
+    <g style="fill: #5b6a61" transform="translate(334.671429 190.93905) scale(0.088 -0.088)">
      <defs>
       <path id="SegoeUI-4b" d="M 3706 0 
 L 2975 0 
@@ -779,7 +779,7 @@ z
      <use xlink:href="#SegoeUI-3a" transform="translate(1184.197266 0)"/>
     </g>
     <!-- Charger IDs and one KPI sheet per area. -->
-    <g style="fill: #5b6a61" transform="translate(334.671429 199.80524) scale(0.088 -0.088)">
+    <g style="fill: #5b6a61" transform="translate(334.671429 200.78075) scale(0.088 -0.088)">
      <use xlink:href="#SegoeUI-43"/>
      <use xlink:href="#SegoeUI-68" transform="translate(61.914062 0)"/>
      <use xlink:href="#SegoeUI-61" transform="translate(118.505859 0)"/>
@@ -823,7 +823,7 @@ z
    </g>
    <g id="text_2">
     <!-- Load Data   (one row per area and step) -->
-    <g style="fill: #ffffff" transform="translate(36.296571 51.617617) scale(0.095 -0.095)">
+    <g style="fill: #ffffff" transform="translate(36.296571 51.841984) scale(0.095 -0.095)">
      <defs>
       <path id="SegoeUI-Bold-4c" d="M 3181 0 
 L 513 0 
@@ -1152,7 +1152,7 @@ z
    </g>
    <g id="text_3">
     <!-- Area Name -->
-    <g style="fill: #18221c" transform="translate(36.296571 82.140485) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 82.586781) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-41" d="M 4056 0 
 L 3475 0 
@@ -1206,7 +1206,7 @@ z
    </g>
    <g id="text_4">
     <!-- Timestamp (UTC) -->
-    <g style="fill: #18221c" transform="translate(36.296571 102.484159) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 103.076781) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-54" d="M 3238 4006 
 L 1944 4006 
@@ -1270,7 +1270,7 @@ z
    </g>
    <g id="text_5">
     <!-- EV Load (kW) -->
-    <g style="fill: #18221c" transform="translate(36.296571 122.827832) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 123.566781) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-56" d="M 3919 4481 
 L 2259 0 
@@ -1343,7 +1343,7 @@ z
    </g>
    <g id="text_6">
     <!-- Upward Flexibility (kW) -->
-    <g style="fill: #18221c" transform="translate(36.296571 143.149724) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 144.035) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-77" d="M 4550 3200 
 L 3591 0 
@@ -1398,7 +1398,7 @@ z
    </g>
    <g id="text_7">
     <!-- Downward Flexibility (kW) -->
-    <g style="fill: #18221c" transform="translate(36.296571 163.493398) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 164.525) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-44"/>
      <use xlink:href="#SegoeUI-6f" transform="translate(70.117188 0)"/>
      <use xlink:href="#SegoeUI-77" transform="translate(128.710938 0)"/>
@@ -1428,7 +1428,7 @@ z
    </g>
    <g id="text_8">
     <!-- Session source -->
-    <g style="fill: #18221c" transform="translate(36.296571 183.858853) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 185.036781) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-53" d="M 378 181 
 L 378 800 
@@ -1528,7 +1528,7 @@ z
    </g>
    <g id="text_9">
     <!-- Demand assumption -->
-    <g style="fill: #18221c" transform="translate(36.296571 204.202526) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 205.526781) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-44"/>
      <use xlink:href="#SegoeUI-65" transform="translate(70.117188 0)"/>
      <use xlink:href="#SegoeUI-6d" transform="translate(122.412109 0)"/>
@@ -1550,7 +1550,7 @@ z
    </g>
    <g id="text_10">
     <!-- Synthetic -->
-    <g style="fill: #18221c" transform="translate(36.296571 224.524418) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 225.995) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-53"/>
      <use xlink:href="#SegoeUI-79" transform="translate(50.875 0)"/>
      <use xlink:href="#SegoeUI-6e" transform="translate(99.263672 0)"/>
@@ -1564,7 +1564,7 @@ z
    </g>
    <g id="text_11">
     <!-- Charging strategy -->
-    <g style="fill: #18221c" transform="translate(36.296571 244.868092) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(36.296571 246.485) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-43"/>
      <use xlink:href="#SegoeUI-68" transform="translate(61.914062 0)"/>
      <use xlink:href="#SegoeUI-61" transform="translate(118.505859 0)"/>
@@ -1586,7 +1586,7 @@ z
    </g>
    <g id="text_12">
     <!-- Charger IDs -->
-    <g style="fill: #ffffff" transform="translate(345.930857 51.594609) scale(0.095 -0.095)">
+    <g style="fill: #ffffff" transform="translate(345.930857 51.818977) scale(0.095 -0.095)">
      <defs>
       <path id="SegoeUI-Bold-43" d="M 3725 159 
 Q 3234 -78 2444 -78 
@@ -1678,7 +1678,7 @@ z
    </g>
    <g id="text_13">
     <!-- Area Name -->
-    <g style="fill: #18221c" transform="translate(345.930857 82.140485) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(345.930857 82.586781) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-41"/>
      <use xlink:href="#SegoeUI-72" transform="translate(64.501953 0)"/>
      <use xlink:href="#SegoeUI-65" transform="translate(97.892578 0)"/>
@@ -1692,7 +1692,7 @@ z
    </g>
    <g id="text_14">
     <!-- Charger IDs -->
-    <g style="fill: #18221c" transform="translate(345.930857 102.462378) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(345.930857 103.055) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-43"/>
      <use xlink:href="#SegoeUI-68" transform="translate(61.914062 0)"/>
      <use xlink:href="#SegoeUI-61" transform="translate(118.505859 0)"/>
@@ -1708,7 +1708,7 @@ z
    </g>
    <g id="text_15">
     <!-- &lt;Area&gt;_KPIs   (one sheet per area) -->
-    <g style="fill: #ffffff" transform="translate(585.193714 51.617617) scale(0.095 -0.095)">
+    <g style="fill: #ffffff" transform="translate(585.193714 51.841984) scale(0.095 -0.095)">
      <defs>
       <path id="SegoeUI-Bold-3c" d="M 3725 197 
 L 806 1528 
@@ -1833,7 +1833,7 @@ z
    </g>
    <g id="text_16">
     <!-- Session source, demand, range, time zone -->
-    <g style="fill: #18221c" transform="translate(585.193714 82.118704) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 82.565) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-2c" d="M 988 713 
 L 488 -825 
@@ -1900,7 +1900,7 @@ z
    </g>
    <g id="text_17">
     <!-- Environmental method and strategy table -->
-    <g style="fill: #18221c" transform="translate(585.193714 102.462378) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 103.055) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-76" d="M 3034 3200 
 L 1759 0 
@@ -1959,7 +1959,7 @@ z
    </g>
    <g id="text_18">
     <!-- arrival_dist_wd, arrival_dist_we, ... -->
-    <g style="fill: #18221c" transform="translate(585.193714 122.827832) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 123.566781) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-5f" d="M 2656 -928 
 L 0 -928 
@@ -2010,7 +2010,7 @@ z
    </g>
    <g id="text_19">
     <!-- ... one row per distribution -->
-    <g style="fill: #18221c" transform="translate(585.193714 143.171506) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 144.056781) scale(0.082 -0.082)">
      <use xlink:href="#SegoeUI-2e"/>
      <use xlink:href="#SegoeUI-2e" transform="translate(21.679688 0)"/>
      <use xlink:href="#SegoeUI-2e" transform="translate(43.359375 0)"/>
@@ -2043,7 +2043,7 @@ z
    </g>
    <g id="text_20">
     <!-- sessions_per_day_0 ... sessions_per_day_6 -->
-    <g style="fill: #18221c" transform="translate(585.193714 163.493398) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 164.525) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-30" d="M 3188 2259 
 Q 3188 1697 3086 1262 
@@ -2159,7 +2159,7 @@ z
    </g>
    <g id="text_21">
     <!-- Charger | Occupancy | Utilisation | ... -->
-    <g style="fill: #18221c" transform="translate(585.193714 183.937009) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 185.114938) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-7c" d="M 1000 -1506 
 L 538 -1506 
@@ -2233,7 +2233,7 @@ z
    </g>
    <g id="text_22">
     <!-- Headline figures -->
-    <g style="fill: #18221c" transform="translate(585.193714 204.224307) scale(0.082 -0.082)">
+    <g style="fill: #18221c" transform="translate(585.193714 205.548563) scale(0.082 -0.082)">
      <defs>
       <path id="SegoeUI-48" d="M 3956 0 
 L 3431 0 
@@ -2272,8 +2272,8 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p3413b386e7">
-   <rect x="18" y="18" width="886.68" height="332.28"/>
+  <clipPath id="p45256cd4a0">
+   <rect x="18" y="18" width="886.68" height="245.88"/>
   </clipPath>
  </defs>
 </svg>

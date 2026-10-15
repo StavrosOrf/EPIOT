@@ -1,0 +1,30 @@
+{#- Furo page template with a DRIVE2X partner and funding strip above the standard footer. -#}
+{% extends "!page.html" %}
+
+{% block footer %}
+<section class="epiot-footer" aria-label="DRIVE2X partners and funding">
+  <div class="epiot-footer__group">
+    <a class="epiot-footer__lead" href="https://drive2x.eu/" title="DRIVE2X project">
+      <img src="{{ pathto('_static/logos/drive2x.png', 1) }}" alt="DRIVE2X">
+    </a>
+    <div>
+      <p class="epiot-footer__label">EPIOT is developed in DRIVE2X Work Package 5 with</p>
+      <ul class="epiot-footer__logos">
+        <li><a href="https://www.dlr.de/en" title="DLR, German Aerospace Center"><img src="{{ pathto('_static/logos/dlr.svg', 1) }}" alt="DLR, German Aerospace Center"></a></li>
+        <li><a href="https://www.tudelft.nl/en" title="TU Delft"><img src="{{ pathto('_static/logos/tudelft.svg', 1) }}" alt="TU Delft"></a></li>
+        <li><a href="https://www.tno.nl/en" title="TNO"><img class="epiot-footer__tno" src="{{ pathto('_static/logos/tno.svg', 1) }}" alt="TNO"></a></li>
+        <li><a class="epiot-footer__wordmark" href="https://edp.com/en/innovation/labelec" title="Labelec">Labelec</a></li>
+        <li><a href="https://www.salford.ac.uk/" title="University of Salford"><img src="{{ pathto('_static/logos/salford.png', 1) }}" alt="University of Salford"></a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="epiot-footer__group epiot-footer__funders">
+    <p class="epiot-footer__label">Funded by</p>
+    <ul class="epiot-footer__logos">
+      <li><a href="https://european-union.europa.eu/" title="European Union"><img src="{{ pathto('_static/logos/eu.png', 1) }}" alt="Co-funded by the European Union"></a></li>
+      <li><a href="https://www.ukri.org/" title="UK Research and Innovation"><img src="{{ pathto('_static/logos/ukri.png', 1) }}" alt="UK Research and Innovation"></a></li>
+    </ul>
+  </div>
+</section>
+{{ super() }}
+{% endblock footer %}

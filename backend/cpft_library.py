@@ -12,9 +12,24 @@ resulting hourly trajectories by cell:
 Each entry keeps its own synthetic history around the issue time and its
 31-hour recursive forecast. A request picks one entry per point and day with a
 counter-based random number, so no TensorFlow, model call or stored scenario is
-needed at request time. Entries are real CPFT outputs; the cells are the only
-approximation (volume uses the two neighbouring bins with log-linear odds,
-mixtures the nearest codebook entry, charger power only caps energy).
+needed at request time. Occupancy entries are real CPFT outputs; the cells are
+the only approximation of them (volume uses the two neighbouring bins with
+log-linear odds, mixtures the nearest codebook entry).
+
+CPFT decides when a point is occupied; the connections inside an occupied run
+come from the same priors as the other sources. Two properties of the
+checkpoints make that necessary. Their hourly kWh is an expected value far
+below what a session delivers, and the recursive forecast often holds a point
+occupied for the whole horizon, longer than any one stay in the duration prior.
+Hourly occupancy cannot tell one long stay from several in a row, so each
+occupied run is covered by back-to-back connections whose lengths follow the
+duration prior and whose energy follows the energy prior given their length
+(`energy_given_duration`), capped by the plug. That keeps CPFT's occupied hours
+and gives the day arrivals and energy comparable to the other sources.
+
+A run that starts at issue continues the connection the history shows at issue
+(with that connection's own energy) instead of starting a new one at 18:00 for
+every plugged-in point, and other runs start somewhere inside their first hour.
 
 Day-level calendar effects (backend/scenario_calendar.py) enter through the
 same cells: the day's demand factor scales the volume before the bin is
@@ -32,11 +47,19 @@ from zoneinfo import ZoneInfo
 import numpy as np
 
 from backend.cpft_runtime import CPFTUnavailable, MANIFEST, MODEL_DIR
-from backend.scenario_sampling import ASSUMPTION_MULTIPLIERS, PRIORS, ROOT, point_power
-from backend.scenario_world import WORLD_VERSION, point_keys, profile_arrays, uniforms
+from backend.scenario_sampling import ASSUMPTION_MULTIPLIERS, PRIORS, ROOT, load_priors, point_power
+from backend.scenario_world import (FAST_DURATION_SCALE, WORLD_VERSION, energy_given_duration, point_keys,
+                                    profile_arrays, quantiles, uniforms)
 from backend.session_frame import SessionFrame
 
 LIBRARY = ROOT / "backend/data/cpft_library.npz"
+# Counter space of the per-run random numbers, apart from the day ordinals used for choosing entries;
+# each occupied run owns SLOTS_PER_RUN counters: one per connection, and the last for where it starts
+RUN_SLOTS = 1 << 40
+SLOTS_PER_RUN = 128
+MAX_CONNECTIONS = SLOTS_PER_RUN-8
+MIN_HOURS = .25  # the shortest connection, as in the world sampler
+RESOLUTION_HOURS = 1.  # CPFT's occupancy is hourly: what it leaves under an hour after a connection is not another one
 ISSUE_HOUR = 18
 HORIZON = 31  # 18:00 to midnight plus the longest (25-hour) target day
 HISTORY_HOURS = 20  # covers the window start before issue, including DST days
@@ -169,21 +192,56 @@ def choose_entries(library, chargers, target, *, profiles, seed, assumption, dai
     first, last = library.cell_offsets[cells], library.cell_offsets[cells+1]
     entry = first+np.minimum((uniforms(keys, day, 2)*(last-first)).astype(np.int64), last-first-1)
     active = np.flatnonzero(volume > 0)
-    return dict(ids=ids[active], power=power[active], entry=entry[active], cells=cells[active],
-                energy_today=energy_today[active], energy_before=energy_before[active])
+    return dict(ids=ids[active], power=power[active], fast=fast[active], keys=keys[active], entry=entry[active],
+                cells=cells[active], energy_today=energy_today[active], energy_before=energy_before[active])
+
+
+def connections(first, last, keys, slots, fast, priors):
+    """Back-to-back connections that cover each run from `first` to `last`.
+
+    Lengths follow the public duration prior (shorter at fast points), at least
+    15 minutes, and what would be left after a connection when that is less than
+    an hour (the resolution of the occupancy) joins it. Returns, per connection,
+    its run, start, end and turn.
+    """
+    scale = np.where(fast, FAST_DURATION_SCALE, 1.)
+    cursor = np.asarray(first, float).copy()
+    active = np.flatnonzero(last-cursor > 1e-6)
+    runs_, starts, ends, turns = [], [], [], []
+    for turn in range(MAX_CONNECTIONS):
+        if not len(active):
+            break
+        drawn = quantiles(priors["duration"], "public", uniforms(keys[active], slots[active]+turn, 0))*scale[active]
+        left = (last[active]-cursor[active])/3600
+        hours = np.maximum(drawn, MIN_HOURS)
+        hours = np.where((left-hours < RESOLUTION_HOURS) | (turn == MAX_CONNECTIONS-1), left, hours)
+        finish = cursor[active]+hours*3600
+        runs_.append(active)
+        starts.append(cursor[active].copy())
+        ends.append(finish)
+        turns.append(np.full(len(active), turn, np.int64))
+        cursor[active] = finish
+        active = active[last[active]-cursor[active] > 1e-6]
+    if not runs_:
+        empty = np.zeros(0)
+        return np.zeros(0, np.int64), empty, empty, np.zeros(0, np.int64)
+    return np.concatenate(runs_), np.concatenate(starts), np.concatenate(ends), np.concatenate(turns)
 
 
 def sample_cpft(chargers, target, *, profiles=None, seed=42, assumption="base", daily_arrivals=2.,
                 timezone_name="Europe/Amsterdam", library=None, calendar=None, countries=None):
     """Synthetic history up to 18:00 the day before and CPFT occupancy from then to the end of `target`.
 
-    With a `calendar`, `countries` gives each point's ISO code for its day effects.
+    Occupied runs become sessions whose energy follows the priors, given their length; a run that
+    starts at issue continues the history's connection at issue. With a `calendar`, `countries`
+    gives each point's ISO code for its day effects.
     """
     if assumption not in ASSUMPTION_MULTIPLIERS:
         raise ValueError("Unknown demand assumption")
     zone = ZoneInfo(timezone_name)
     issue = issue_time(target, timezone_name).timestamp()
     window_start = datetime.combine(target-timedelta(days=1), time.min, zone).timestamp()
+    day_start = datetime.combine(target, time.min, zone).timestamp()
     end = datetime.combine(target+timedelta(days=1), time.min, zone).timestamp()
     horizon = round((end-issue)/3600)
     info = dict(issue_time=datetime.fromtimestamp(issue, ZoneInfo("UTC")).isoformat(), horizon_hours=horizon,
@@ -196,15 +254,8 @@ def sample_cpft(chargers, target, *, profiles=None, seed=42, assumption="base", 
     chosen = choose_entries(library, chargers, target, profiles=profiles, seed=seed, assumption=assumption,
                             daily_arrivals=daily_arrivals, timezone_name=timezone_name, calendar=calendar,
                             countries=countries, info=info)
-    ids, power, entry = chosen["ids"], chosen["power"], chosen["entry"]
+    ids, power, fast, keys, entry = chosen["ids"], chosen["power"], chosen["fast"], chosen["keys"], chosen["entry"]
     energy_today, energy_before = chosen["energy_today"], chosen["energy_before"]
-
-    # Forecast: occupied hours become sessions; energy is capped by the point's power
-    occupied = library.occupied[entry, :horizon].astype(bool)
-    energy = np.minimum(library.kwh_milli[entry, :horizon]/1000.*energy_today[:, None], power[:, None])*occupied
-    total = np.concatenate([np.zeros((len(entry), 1)), np.cumsum(energy, axis=1)], axis=1)
-    row, low, high = runs(occupied)
-    forecast = SessionFrame(ids[row], issue+low*3600., issue+high*3600., total[row, high]-total[row, low])
 
     # History: the entry's own synthetic connections, cut at issue as CPFT saw them
     starts, lengths = library.history_offsets[entry], library.history_offsets[entry+1]-library.history_offsets[entry]
@@ -214,8 +265,40 @@ def sample_cpft(chargers, target, *, profiles=None, seed=42, assumption="base", 
     finish = issue+library.history_end[index].astype(float)
     keep = finish > window_start
     owner, begin, finish, index = owner[keep], begin[keep], finish[keep], index[keep]
-    cut = np.minimum(finish, issue)
-    delivered = np.where(finish <= issue, library.history_energy[index].astype(float)*energy_before[owner], 0.)
-    delivered = np.minimum(delivered, power[owner]*(cut-begin)/3600)
-    history = SessionFrame(ids[owner], begin, cut, delivered)
+
+    # Forecast: CPFT says when each point is occupied
+    priors = load_priors()
+    occupied = library.occupied[entry, :horizon].astype(bool)
+    row, low, high = runs(occupied)
+    departure = issue+high*3600.
+    # A run that starts at issue is the connection the history shows at issue, continued. It keeps its own
+    # arrival and energy and leaves when it was due to, or when CPFT's run ends if that is sooner. What is
+    # left of the run after that is covered by further connections.
+    ongoing = finish > issue
+    running = np.full(len(entry), -1, np.int64)
+    running[owner[ongoing]] = np.flatnonzero(ongoing)
+    continued = np.where(low == 0, running[row], -1)
+    joined = continued >= 0
+    stop = np.minimum(finish[continued[joined]], departure[joined])
+    stop = np.where(departure[joined]-stop < RESOLUTION_HOURS*3600, departure[joined], stop)
+    end = np.minimum(finish, issue)
+    end[continued[joined]] = stop
+    share = np.where(finish > end, (end-begin)/np.maximum(finish-begin, 1.), 1.)
+    delivered = library.history_energy[index].astype(float)*energy_before[owner]*share
+    delivered = np.minimum(delivered, power[owner]*np.maximum(end-begin, 0.)/3600)
+    history = SessionFrame(ids[owner], begin, end, delivered)
+
+    # Occupancy is hourly: a run starts somewhere inside its first hour (not on the hour for every point), and
+    # whatever it covers is back-to-back connections drawn from the priors
+    base = RUN_SLOTS+(target.toordinal()*64+low)*SLOTS_PER_RUN
+    first = np.empty(len(low))
+    first[joined] = stop
+    first[~joined] = issue+(low[~joined]+.75*uniforms(keys[row[~joined]], base[~joined]+SLOTS_PER_RUN-1, 0))*3600.
+    run, begins, ends, turn = connections(first, departure, keys[row], base, fast[row], priors)
+    point = row[run]
+    # Energy follows the priors given each connection's length, and the weather of its arrival day
+    day_energy = np.where(begins < day_start, energy_before[point], energy_today[point])
+    energy = energy_given_duration((ends-begins)/3600, uniforms(keys[point], base[run]+turn, 1), power[point], fast[point],
+                                   priors, day_energy)
+    forecast = SessionFrame(ids[point], begins, ends, energy)
     return SessionFrame.concat([history, forecast]).sorted(), info

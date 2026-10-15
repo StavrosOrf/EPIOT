@@ -147,13 +147,88 @@ def test_cpft_history_stops_at_issue_and_forecast_covers_the_target_day(library,
     history, forecast = frame.select(frame.start < issue), frame.select(frame.start >= issue)
     assert (history.end <= issue).all()
     # CPFT forecasts elapsed UTC hours: 16 hours after issue is 10:00 local, or
-    # 09:00/11:00 on the days the clocks change
+    # 09:00/11:00 on the days the clocks change. The run starts somewhere inside its first hour.
     assert len(forecast) == len(CHARGERS)
-    assert set(forecast.start) == {issue+16*3600} and set(forecast.end) == {issue+17*3600}
+    arrival = (forecast.start-issue)/3600
+    assert ((arrival >= 16) & (arrival <= 16.75)).all() and len(set(forecast.start)) > len(CHARGERS)//2
+    assert set(forecast.end) == {issue+17*3600}
     _, end = day_window(target, ZONE)
     assert issue+horizon*3600 == end.timestamp()
     power = np.array([point_power(next(c for c in CHARGERS if c["id"] == cp_id)) for cp_id in forecast.cp_id])
-    np.testing.assert_allclose(forecast.energy_kwh, np.minimum(2., power))
+    hours = (forecast.end-forecast.start)/3600
+    assert (forecast.energy_kwh >= 0).all() and (forecast.energy_kwh <= power*hours+1e-9).all()
+    assert np.mean(forecast.energy_kwh > 0) > .9  # the priors' lowest quantile is a vehicle that takes nothing
+
+
+def test_cpft_energy_follows_the_priors_and_not_the_checkpoints_hourly_kwh(tmp_path):
+    low = CPFTLibrary(write_test_library(tmp_path/"low.npz", kwh=.05))
+    high = CPFTLibrary(write_test_library(tmp_path/"high.npz", kwh=5.))
+    first, _ = sample_cpft(CHARGERS, date(2026, 10, 15), library=low)
+    second, _ = sample_cpft(CHARGERS, date(2026, 10, 15), library=high)
+    assert first.equals(second)
+
+
+def test_cpft_continues_the_history_connection_at_issue_instead_of_starting_one_at_18(tmp_path):
+    target = date(2026, 5, 6)
+    issue = issue_time(target, ZONE).timestamp()
+    # Plugged in since 15:00, due to leave 5 hours after issue; CPFT keeps the point occupied for 8 hours
+    library = CPFTLibrary(write_test_library(tmp_path/"ongoing.npz", run=8, ongoing_until=5))
+    chargers = [dict(id=cp_id, power=11., type="regular") for cp_id in range(1, 201)]
+    frame, _ = sample_cpft(chargers, target, library=library)
+    assert not (frame.start == issue).any() and not ((frame.start > issue) & (frame.start < issue+1)).any()
+    first = frame.select(frame.start == issue-3*3600)
+    assert len(first) == len(chargers)
+    # The connection keeps its own arrival and its energy, and ends when it was due to
+    np.testing.assert_allclose(first.end, issue+5*3600)
+    np.testing.assert_allclose(first.energy_kwh, 3.)
+    # CPFT's run outlasts it: another connection takes over until the run ends, with no gap or overlap
+    rest = frame.select(frame.start >= issue+5*3600)
+    assert set(rest.cp_id) == {c["id"] for c in chargers}
+    assert (rest.end <= issue+8*3600+1e-6).all()
+    per_point = {}
+    for cp_id, start, end in zip(rest.cp_id, rest.start, rest.end):
+        per_point.setdefault(int(cp_id), []).append((start, end))
+    for spans in per_point.values():
+        spans.sort()
+        assert spans[0][0] == issue+5*3600 and spans[-1][1] == issue+8*3600
+        assert all(left[1] == right[0] for left, right in zip(spans, spans[1:]))
+
+
+def test_cpft_connection_cut_at_issue_when_the_forecast_says_the_point_is_free(tmp_path):
+    target = date(2026, 5, 6)
+    issue = issue_time(target, ZONE).timestamp()
+    # Due to leave 5 hours after issue, but CPFT forecasts the point free until 04:00 the next morning
+    library = CPFTLibrary(write_test_library(tmp_path/"free.npz", lead=10, ongoing_until=5))
+    chargers = [dict(id=cp_id, power=11., type="regular") for cp_id in range(1, 51)]
+    frame, _ = sample_cpft(chargers, target, library=library)
+    ongoing = frame.select(frame.start == issue-3*3600)
+    assert len(ongoing) == len(chargers)
+    # It stops at issue with the share of its energy delivered by then (3 of its 8 hours)
+    np.testing.assert_allclose(ongoing.end, issue)
+    np.testing.assert_allclose(ongoing.energy_kwh, 3.*3/8)
+
+
+def test_cpft_covers_a_long_occupied_run_with_connections_of_plausible_length(tmp_path):
+    library = CPFTLibrary(write_test_library(tmp_path/"long.npz", lead=0, run=31))
+    chargers = [dict(id=cp_id, power=11., type="regular") for cp_id in range(1, 401)]
+    target = date(2026, 5, 6)
+    issue = issue_time(target, ZONE).timestamp()
+    frame, info = sample_cpft(chargers, target, library=library)
+    forecast = frame.select(frame.end > issue+3600)
+    assert len(forecast) > 2*len(chargers)  # several connections per point, not one 31-hour stay
+    hours = (forecast.end-forecast.start)/3600
+    assert (hours >= .25-1e-9).all() and np.median(hours) < 12
+    same_point = forecast.cp_id[1:] == forecast.cp_id[:-1]
+    assert (forecast.start[1:][same_point] >= forecast.end[:-1][same_point]-1e-6).all()
+    # Occupied hours are CPFT's: every point is covered from its run's start to the end of the horizon
+    for cp_id in (1, 200, 400):
+        rows = forecast.select(forecast.cp_id == cp_id)
+        assert rows.end.max() == issue+info["horizon_hours"]*3600
+        assert rows.start.min() <= issue+.75*3600
+    # Each connection's energy is a deliverable amount, and the day's total is of the order of a session per few hours
+    power = np.full(len(forecast), 11.)
+    assert (forecast.energy_kwh <= power*hours+1e-9).all()
+    assert 3 < forecast.energy_kwh.sum()/len(chargers) < 80
 
 
 def test_cpft_days_are_the_same_alone_or_in_a_range(tmp_path):
@@ -167,17 +242,18 @@ def test_cpft_days_are_the_same_alone_or_in_a_range(tmp_path):
 def test_cpft_volume_between_bins_mixes_the_neighbouring_bins(tmp_path):
     library = CPFTLibrary(write_test_library(tmp_path/"marked.npz", mark_volume=True))
     chargers = [dict(id=cp_id, power=11.) for cp_id in range(1, 4001)]
-    # 2.5 arrivals/day lies between the 2 and 3 bins; marked energy is 1 + the bin index
-    lower, upper = 1.+VOLUME_BINS.index(2.), 1.+VOLUME_BINS.index(3.)
+    # 2.5 arrivals/day lies between the 2 and 3 bins; the marked run starts that many hours later as the bin index
+    lower, upper = VOLUME_BINS.index(2.), VOLUME_BINS.index(3.)
+    issue = issue_time(date(2026, 5, 5), ZONE).timestamp()
+    marked = lambda frame: np.floor((frame.select(frame.start >= issue).start-issue)/3600)-16
     profiles = [{"weights": {"mixed": 1.}, "arrival_multiplier": 1.25}]*len(chargers)
     frame, info = sample_cpft(chargers, date(2026, 5, 5), profiles=profiles, library=library)
-    forecast = frame.select(frame.start >= issue_time(date(2026, 5, 5), ZONE).timestamp())
-    assert set(np.round(forecast.energy_kwh)) == {lower, upper}
+    assert set(marked(frame)) == {lower, upper}
     expected = np.log(2.5/2)/np.log(3/2)
-    assert np.mean(forecast.energy_kwh > lower+.5) == pytest.approx(expected, abs=.03)
+    assert np.mean(marked(frame) > lower) == pytest.approx(expected, abs=.03)
     assert info["outside_volume_range"] == 0
     exact, _ = sample_cpft(chargers[:500], date(2026, 5, 5), library=library)  # generic 2/day: exactly the 2/day bin
-    assert set(np.round(exact.select(exact.start >= issue_time(date(2026, 5, 5), ZONE).timestamp()).energy_kwh)) == {lower}
+    assert set(marked(exact)) == {lower}
     zero, info = sample_cpft(chargers[:5], date(2026, 5, 5), profiles=[{"weights": {"mixed": 1.}, "arrival_multiplier": 0.}]*5,
                              library=library)
     assert len(zero) == 0 and info["zero_volume_points"] == 5

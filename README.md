@@ -1,10 +1,18 @@
 ## EPIOT - Drive2X WP5
-This is the development repository of the Drive2X working package 5. The purpose of the tool to be developed is 
+This is the development repository of the [Drive2X](https://drive2x.eu/) working package 5. The purpose of the tool to be developed is 
 the following:
 
 - provide short-term load forecasting for charge point operators and grid operators
 
 The tool is supposed to be easily accessible and to provide a range of interfaces for researchers and developpers.
+
+- Source code: https://github.com/StavrosOrf/EPIOT
+- Documentation: https://epiot.readthedocs.io/
+- Project website: https://drive2x.eu/
+
+EPIOT is developed by DLR and TU Delft together with TNO, Labelec and the University of Salford.
+It is funded by the European Union (Horizon Europe, Grant Agreement No. 101056934) and UK Research
+and Innovation (UKRI).
 
 
 ## Environment setup
@@ -155,7 +163,7 @@ https://docs.djangoproject.com/en/5.1/ref/contrib/gis/install/spatialite/
 
 The current development team consists of:
 
-- Stavros Orfanoudakis (TU Delft, lead developper)
+- [Stavros Orfanoudakis](https://www.stavrosorfanoudakis.com/) (TU Delft, lead developper)
 - Babak Ravanbach (DLR, product owner)
 
 Past developpers:

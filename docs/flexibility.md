@@ -26,6 +26,13 @@ $\sum_i \min(\overline{E}_i, u_i(A))$ and at least $\sum_i \max(0, \underline{E}
 
 ### Reading the chart
 
+```{figure} _static/screenshots/panel-flexibility.jpg
+:class: screenshot
+:alt: Feasible envelopes of three areas
+
+The Flexibility tab for the three areas of the load-profile example.
+```
+
 Each area card has two panels with the same time axis as the load profile:
 
 | Panel | Band | Line |
@@ -42,6 +49,14 @@ scale.
 | How much load could the area shed at 18:00? | Scheduled power minus the lower edge at 18:00 |
 | How much could it absorb at noon, for example to use solar surplus? | Upper edge at noon minus scheduled power |
 | Is the schedule itself feasible? | `schedule_feasible` in the API |
+
+```{figure} _static/figures/flexibility-envelope.svg
+:class: chart
+:alt: Power and cumulative energy envelope of 60 chargers with the absorb and shed margins marked at 18:00
+
+The envelope of 60 chargers under As Fast As Possible. At 18:00 on the target day the fleet could
+absorb the distance up to the upper edge and shed the distance down to the lower edge.
+```
 
 The per-step bounds are individually attainable. Using flexibility in one step changes what is left
 to charge later, which the cumulative band captures. Vehicle-to-grid, state of charge limits and
@@ -65,6 +80,13 @@ downward flexibility is the power it could shed by deferring charging as late as
 | As Fast As Possible | 0 | −11 kW, 08:00 – 10:00 |
 | As Late As Possible | +11 kW, 08:00 – 10:00 | 0 |
 | Average Power | +8.6 kW, 08:00 – 10:00 | −2.4 kW, 08:00 – 15:00 |
+
+```{figure} _static/figures/flexibility-headroom.svg
+:class: chart
+:alt: Scheduled load and the upward and downward headroom for one session under three strategies
+
+The headroom signals of the same session under three strategies.
+```
 
 For *Min. Charging Cost*, upward flexibility is rated power while plugged in minus the scheduled
 load, and downward flexibility is the negative of the scheduled load.

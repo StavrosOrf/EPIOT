@@ -115,9 +115,8 @@ def test_selected_source_range_equals_sum_of_its_days(client, source):
     assert data['summary']['energy_kwh'] == pytest.approx(sum(item['summary']['energy_kwh'] for item in singles))
     if source == 'cpft':
         assert data['summary']['session_count'] == 6  # one forecast hour per point and day, no history arrivals
-        # 2 kWh per point and day, scaled by each day's temperature effect
-        factors = [day['energy_factor'] for day in data['source']['calendar']['days']['NL']]
-        assert data['summary']['energy_kwh'] == pytest.approx(sum(3*2*factor for factor in factors), rel=1e-3)
+        # Each run's energy comes from the priors, capped by what 11 kW delivers in under an hour
+        assert 0 < data['summary']['energy_kwh'] <= 6*11
     with engine.connect() as db:
         assert db.exec_driver_sql('SELECT COUNT(*) FROM sessions').scalar() == 5
 

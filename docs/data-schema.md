@@ -7,8 +7,9 @@ below. The database is SQLite with the SpatiaLite extension, managed by Alembic 
 ```{figure} _static/figures/er-diagram.svg
 :class: chart
 :alt: Entity-relationship diagram of the EPIOT database
+:target: _static/figures/er-diagram.svg
 
-Entity-relationship diagram. `PK` marks primary keys and `FK` foreign keys.
+Entity-relationship diagram (click to enlarge). `PK` marks primary keys and `FK` foreign keys.
 ```
 
 ## Charging infrastructure

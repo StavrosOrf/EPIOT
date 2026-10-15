@@ -7,8 +7,9 @@ the request.
 ```{figure} _static/figures/architecture.svg
 :class: chart
 :alt: Components of EPIOT: browser, Flask application, session sources, calculation, stored data, bundled inputs and external services
+:target: _static/figures/architecture.svg
 
-Components and the direction of calls.
+Components and the direction of calls (click to enlarge).
 ```
 
 ## Principles

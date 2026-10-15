@@ -73,13 +73,13 @@ async function setCardField(page, field, index, value) {
 }
 
 // Drop focus and hover so no tooltip or open menu ends up in a screenshot
-async function settle(page) {
+async function settle(page, { top = true } = {}) {
   await page.mouse.move(5, 5);
-  await page.evaluate(() => {
+  await page.evaluate((top) => {
     document.querySelectorAll(".flatpickr-input").forEach((input) => input._flatpickr && input._flatpickr.close());
-    document.querySelectorAll("#analysis-view, #graph").forEach((element) => element.scrollTo(0, 0));
+    if (top) document.querySelectorAll("#analysis-view, #graph").forEach((element) => element.scrollTo(0, 0));
     if (document.activeElement) document.activeElement.blur();
-  });
+  }, top);
   await pause(page, 700);
 }
 
@@ -255,7 +255,7 @@ async function popupShot(page, name) {
     if (kpi === "environment_kpi") {
       // The charts follow the summary table
       await page.evaluate(() => document.querySelector("#graph .group-card")?.scrollIntoView({ block: "start" }));
-      await settle(page);
+      await settle(page, { top: false });
       await shot(page, "kpi-environment-charts.jpg");
       await page.evaluate(() => document.querySelector("#analysis-view")?.scrollTo(0, 0));
     }

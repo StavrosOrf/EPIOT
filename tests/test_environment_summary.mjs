@@ -57,6 +57,30 @@ test("minimum-carbon chart adds aligned traces alongside all three baselines", (
   for (const trace of captured) assert.equal(trace.x.length,trace.y.length);
 });
 
+test("environment chart plots what each strategy emits per hour and leaves out an unavailable schedule", () => {
+  const {api,plots} = loadPlotter();
+  const at = hour => Array.from({length:24},(_,index)=>index===hour?1.5:0);
+  const kpi = {environment:{strategies:{
+    afap:{emissions_by_hour_kg:at(8)}, alap:{emissions_by_hour_kg:at(20)}, avg:{emissions_by_hour_kg:at(12)},
+    mincarbon:{emissions_by_hour_kg:null,available:false}}}};
+  for (const label of ["uncontrolled","delayed","avg","mincarbon"]) {
+    // The grid's own intensity is the same whichever strategy draws power
+    kpi[`co2_intensities_${label}`] = Array(24).fill(100);
+    kpi[`renewable_energy_shared_${label}`] = 50;
+  }
+  api.createEnvironmentKPIGraph([{groupName:"Area",kpi}]);
+  const {data,layout} = plots[0];
+  const lines = data.filter(trace=>trace.type==="scatter");
+  assert.deepEqual(lines.map(trace=>trace.name),["As Fast As Possible","As Late As Possible","Average Power"]);
+  assert.equal(lines[0].y[8],1.5);
+  assert.equal(lines[1].y[20],1.5);
+  assert.notDeepEqual(lines[0].y,lines[1].y);
+  assert.equal(data.filter(trace=>trace.type==="bar").length,3);
+  const text = JSON.stringify(layout);
+  assert.ok(text.includes("Emissions by hour of day") && text.includes("kgCO₂e"));
+  assert.ok(!text.includes("Charging-weighted Carbon Intensity"));
+});
+
 test("environmental export contains energy coverage, status and the AFAP difference", () => {
   const toSheet = new Function("XLSX",read("utils.js")+";return generateKPIsSheet;")({utils:{aoa_to_sheet:rows=>rows}});
   const group = sample();

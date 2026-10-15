@@ -37,14 +37,20 @@ def points(count, rng):
 
 
 def hourly(frame, ids, issue, horizon):
-    """Occupied flags and kWh per forecast hour from sessions starting at or after issue."""
+    """Occupied flags and kWh per forecast hour from the sessions still running after issue.
+
+    A connection that continues one the history shows at issue starts before it; only its
+    part after issue is a forecast. The library's energy comes from the priors, not from the
+    checkpoint, so the kWh columns of the report differ by design; occupancy is what is compared.
+    """
     occupied, energy = np.zeros((len(ids), horizon)), np.zeros((len(ids), horizon))
     index = {cp_id: row for row, cp_id in enumerate(ids)}
     for cp_id, start, end, kwh in zip(frame.cp_id, frame.start, frame.end, frame.energy_kwh):
-        if start >= issue:
-            first, last = int((start-issue)//3600), int(round((end-issue)/3600))
-            occupied[index[int(cp_id)], first:last] = 1
-            energy[index[int(cp_id)], first:last] = kwh/(last-first)
+        if end > issue:
+            first, last = max(int((start-issue)//3600), 0), int(round((end-issue)/3600))
+            if last > first:
+                occupied[index[int(cp_id)], first:last] = 1
+                energy[index[int(cp_id)], first:last] += kwh/(last-first)
     return occupied, energy
 
 
@@ -133,6 +139,9 @@ def main():
                      f"{row['mean_abs_hourly_occupancy_difference']:.3f} |")
     lines += ["", f"Across dates: {exact:.2f} occupied hours per point exactly, {sampled:.2f} from the library; "
               f"chi-square {statistic:.1f} on {len(rows)} degrees of freedom (p = {summary['chi2_p']:.3f}).", "",
+              "Occupancy is the checkpoint's. The library's kWh columns are the sessions' energy from the priors given each",
+              "connection's length, not the checkpoint's hourly kWh, which is far lower, so they are not comparable with the",
+              "exact runs' kWh.", "",
               "The standard error combines the exact runs' sampling error with the library's: each cell's finite",
               "trajectories are shared by every point that uses it on that day, so a cell's mean error is common to",
               "those points. A small p-value would indicate an approximation beyond this sampling error.", ""]

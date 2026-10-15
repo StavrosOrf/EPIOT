@@ -38,6 +38,21 @@ Idle time $s_i = (e_i - a_i) - E_i / P_c$ is the part of a stay in which chargin
 assumes the vehicle accepts the rated power, so it is an upper bound.
 *Headline:* sessions, mean arrival time, median and 90th-percentile stay, idle share of stay time.
 
+```{figure} _static/figures/idle-time.svg
+:class: chart
+:alt: A session's connection time split into charging time and idle time
+
+Idle time for a 22 kWh session on an 11 kW charger connected for nine hours.
+```
+
+```{figure} _static/screenshots/kpi-user.jpg
+:class: screenshot
+:alt: User dashboard with arrival, connection, departure and idle-time distributions for two areas
+
+The User dashboard. Weekdays are blue and weekends orange; each area card lists its headline
+figures.
+```
+
 ## Grid
 
 | Chart | Content |
@@ -59,6 +74,13 @@ with $L_t$ the 10-minute uncontrolled load and $P_c$ the rated power of charger 
 near 1 is a flat load; a coincidence factor near 1 means all chargers draw at once. Also the share
 of charger-days without charging, which are left out of *Daily energy per charger*.
 
+```{figure} _static/screenshots/kpi-grid.jpg
+:class: screenshot
+:alt: Grid dashboard with uncontrolled load, load duration and energy distributions
+
+The Grid dashboard.
+```
+
 ## Environment
 
 Four strategies deliver identical energy and are compared on carbon intensity and renewable
@@ -67,7 +89,7 @@ Footprint.
 
 | Element | Content |
 |---|---|
-| Carbon intensity chart | Energy-weighted gCO₂e/kWh for each hour of the day, per strategy |
+| Emissions by hour of day | kgCO₂e emitted in each local hour, summed over the range, per strategy |
 | Renewable share chart | Share of charged energy from renewables, per strategy |
 | Summary table | Energy, emissions (kgCO₂e), mean intensity, renewable share, grid-data coverage and difference against As Fast As Possible |
 
@@ -75,6 +97,31 @@ Sessions count on their arrival day and are charged from their true arrival; a c
 running at the end of the range keeps its in-range share. A badge marks whether the grid data
 matched the dates, came from a historical reference, or are partial. Results are estimated
 scenario footprints, not verified emissions or demonstrated avoided emissions.
+
+```{figure} _static/screenshots/kpi-environment.jpg
+:class: screenshot
+:alt: Environment summary table with four strategies for one area
+
+The summary table, with the badge that marks a historical reference.
+```
+
+```{figure} _static/screenshots/kpi-environment-charts.jpg
+:class: screenshot
+:alt: Emissions by hour of day and renewable share by strategy for three areas
+
+The charts below the tables.
+```
+
+The emissions chart shows where each strategy puts its energy and what that costs in carbon:
+As Fast As Possible emits when vehicles arrive, As Late As Possible just before they leave, and
+Min. Carbon Footprint in the cleanest hours. A strategy's emissions in an hour are its energy in
+that hour times the grid's intensity then, so the chart separates the strategies whatever the grid
+data. The grid's own intensity would not: it is the same number for every strategy that charges in
+an hour. The API still returns it as `intensity_by_hour`.
+
+As Late As Possible schedules each connection against its departure and is cropped at the end of
+the range, so its emissions gather in the last hours; connections that cross the end keep only
+their in-range share.
 
 ### Grid data
 
@@ -115,6 +162,13 @@ Weekdays absent from the range are left empty, not drawn as zero. *Headline:* se
 charger-day, the median idle gap between two connections on the same charger, and the share of
 unused charger-days. Gaps are only seen inside the range.
 
+```{figure} _static/screenshots/kpi-mobility.jpg
+:class: screenshot
+:alt: Mobility dashboard with sessions per charger and day and the split of charger-days
+
+The Mobility dashboard.
+```
+
 ## City
 
 | Chart | Content |
@@ -128,6 +182,14 @@ finished charging. *Utilisation* is energy delivered divided by what the charger
 its rated power. A large gap between them means chargers are held by vehicles that are not
 charging. *Headline:* mean occupancy and utilisation, and the highest all-busy probability. The
 all-busy probability needs 1 to 2,000 chargers.
+
+```{figure} _static/screenshots/kpi-city.jpg
+:class: screenshot
+:alt: City dashboard with free chargers by time of day and the distribution of occupancy
+
+The City dashboard. With more than 30 chargers the third chart shows the distribution of
+occupancy instead of one bar per charger.
+```
 
 ## API
 
@@ -152,7 +214,8 @@ The interface requests `basic` first and `environment` only when that dashboard 
 | `weekday_availability`, `weekend_availability`, `weekday_blocking`, `weekend_blocking` | 48 half-hour values |
 | `occupation_ratio_dist`, `charger_usage` | 20 bins; per charger when 200 or fewer |
 | `overflow`, `summary`, `range`, `source` | Open-bin counts, headline figures, range and provenance |
-| `environment`, `co2_intensities_*`, `renewable_energy_shared_*` | Environment section, per strategy |
+| `environment.strategies.<strategy>` | Per strategy (`afap`, `alap`, `avg`, `mincarbon`): `energy_kwh`, `emissions_kg`, `average_intensity_g_per_kwh`, `renewable_share_pct`, coverage and `status`, `footprint_difference_vs_afap_*`, and per local hour of day `energy_by_hour_kwh`, `emissions_by_hour_kg` and `intensity_by_hour` |
+| `co2_intensities_*`, `renewable_energy_shared_*` | The same intensity and renewable-share series under flat names, kept for older clients |
 
 Fields without data are `null`. Invalid input returns `400`, and an unavailable source `503`.
 
@@ -164,6 +227,6 @@ curl -G http://127.0.0.1:5000/kpi/user \
 
 ## Export
 
-The report adds one **`<Area>_KPIs`** sheet per area: source, demand scenario, date range and time
-zone, the environment table, every distribution as a row, the per-charger table, and the headline
-figures. Opening the Environment dashboard is not required; the export fetches it.
+Exporting from this tab writes **Charger IDs** and one **`<Area>_KPIs`** sheet per area, including
+the Environment section even if that dashboard was not opened. The rows are listed in
+{doc}`reports`.

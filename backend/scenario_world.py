@@ -43,6 +43,10 @@ MAX_HOURS = 72.
 # Earlier days whose connections can still be running when a day starts
 LOOKBACK_ROWS = -(-int(MAX_HOURS*3600)//(BLOCK_SLOTS*SLOT))
 DURATION_SCALE = {"residential": 1.4, "workplace": 1., "retail": .4, "mixed": 1.}
+# Gaussian-copula correlation between a session's duration and its energy (assumed)
+DURATION_ENERGY_CORRELATION = .4
+# Stays at fast (DC) points are this share of the public prior's
+FAST_DURATION_SCALE = .6
 FALLBACK_PROFILE = {"weights": {"mixed": 1.}, "arrival_multiplier": 1.}
 CHUNK_CELLS = 4_000_000
 
@@ -118,12 +122,13 @@ def session_attributes(keys, slots, weights, component, power, fast, priors, ene
     u_duration, u_other = uniforms(keys, slots, 2), uniforms(keys, slots, 3)
     workplace = kind == ARCHETYPES.index("workplace")
     # Positive duration/energy dependence is assumed (Gaussian copula, 0.4)
-    u_energy = ndtr(.4*ndtri(u_duration)+np.sqrt(1-.4**2)*ndtri(u_other))
+    u_energy = ndtr(DURATION_ENERGY_CORRELATION*ndtri(u_duration)
+                    +np.sqrt(1-DURATION_ENERGY_CORRELATION**2)*ndtri(u_other))
     duration, energy = [np.where(workplace, quantiles(priors[name], "workplace", u), quantiles(priors[name], "public", u))
                         for name, u in (("duration", u_duration), ("energy", u_energy))]
     duration *= np.array([DURATION_SCALE[name] for name in ARCHETYPES])[kind]
     # Whole seconds keep departures and the next free quarter-hour exact
-    seconds = np.round(np.clip(np.where(fast, duration*.6, duration), .25, MAX_HOURS)*3600).astype(np.int64)
+    seconds = np.round(np.clip(np.where(fast, duration*FAST_DURATION_SCALE, duration), .25, MAX_HOURS)*3600).astype(np.int64)
     energy = np.where(kind == ARCHETYPES.index("retail"), energy*.75, energy)*energy_factor
     return seconds, np.clip(energy, 0., power*seconds/3600)
 
@@ -131,6 +136,30 @@ def session_attributes(keys, slots, weights, component, power, fast, priors, ene
 def quantiles(table, column, probability):
     percentages = table["Percentage of charging events"].to_numpy(float)
     return np.interp((1-probability)*100, percentages, table[column].to_numpy(float))
+
+
+def energy_given_duration(hours, uniform, power, fast, priors, energy_factor=1.):
+    """Energy of connections whose length is already known.
+
+    Used where something else decides when a vehicle is plugged in (the CPFT
+    occupancy forecast) and the energy still has to be consistent with the
+    other sources. The length's place in the public duration prior fixes a
+    duration quantile; energy follows through the same copula as a freshly
+    sampled session, from `uniform` (one per connection), and is capped by
+    what the plug can deliver in that time.
+    """
+    hours = np.asarray(hours, float)
+    table = priors["duration"]
+    exceeded = table["Percentage of charging events"].to_numpy(float)
+    lengths = table["public"].to_numpy(float)
+    order = np.argsort(lengths, kind="stable")
+    # Share of sessions lasting longer than the prior-equivalent length
+    longer = np.interp(hours/np.where(fast, FAST_DURATION_SCALE, 1.), lengths[order], exceeded[order])
+    u_duration = np.clip(1-longer/100, 1e-6, 1-1e-6)
+    u_energy = ndtr(DURATION_ENERGY_CORRELATION*ndtri(u_duration)
+                    +np.sqrt(1-DURATION_ENERGY_CORRELATION**2)*ndtri(uniform))
+    energy = quantiles(priors["energy"], "public", u_energy)*energy_factor
+    return np.clip(energy, 0., np.asarray(power, float)*hours)
 
 
 def blocked_walk(row, slot, seconds):
