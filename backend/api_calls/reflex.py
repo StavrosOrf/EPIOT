@@ -1,17 +1,17 @@
-"""ReFlex request, transport and result contracts for EPIOT's 48-hour grid."""
+"""Transport for the DRIVE2X ReFlex Insights service (OpenAPI 0.3.0).
 
-from datetime import datetime, timedelta, timezone
+The request and result contracts live in backend/cost_charging.py; this module
+only submits runs, waits for them and fetches their device plans.
+"""
+
 import math
 import os
 import time
 from urllib.parse import quote
 
-import numpy as np
 import requests
 
 DEFAULT_BASE_URL = "https://drive2x-reflex.hesi.energy/services"
-PROFILE_STEPS = 288
-STEP_SECONDS = 600
 
 
 class ReflexError(RuntimeError):
@@ -22,83 +22,14 @@ class ReflexTimeout(ReflexError):
     """A submitted run did not finish within the polling deadline."""
 
 
-def _utc(value):
-    # Existing EPIOT database rows are naive. Preserve the legacy UTC assumption;
-    # timezone-aware inputs are converted rather than merely relabelled with Z.
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
-def create_ReFlex_Query(chargers, charging_sessions, prices, start_date):
-    """Convert (cp_id, start, end, kWh) rows and kW ratings to ReFlex W/J.
-
-    The horizon is 288 ten-minute intervals starting at UTC midnight. Availability
-    is the plugged-in fraction of each interval. Sessions wholly outside the
-    horizon are ignored; partially covered sessions are rejected because their
-    in-window energy demand is unknown.
-    """
-    start = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    end = start + timedelta(seconds=PROFILE_STEPS * STEP_SECONDS)
-    prices = np.asarray(prices, dtype=float)
-    if prices.shape != (PROFILE_STEPS,) or not np.isfinite(prices).all():
-        raise ValueError("ReFlex requires 288 finite ten-minute prices")
-    result = {
-        "runType": "singleRunConfig",
-        "congestionPoints": [],
-        "globalTarget": {
-            "start": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "timeStepDuration": "PT10M",
-            "elements": [{"targetType": "price", "value": float(p)} for p in prices],
-        },
-        "assets": {"evChargePoints": [], "nonFlexibleAssets": []},
-    }
-    points, availability, windows = {}, {}, {}
-    steps = np.arange(PROFILE_STEPS) * STEP_SECONDS
-    for cp_id, arrival, departure, energy in charging_sessions:
-        arrival, departure = _utc(arrival), _utc(departure)
-        energy = float(energy)
-        if departure <= arrival or not math.isfinite(energy) or energy < 0:
-            raise ValueError("Sessions require increasing times and finite nonnegative kWh")
-        if departure <= start or arrival >= end:
-            continue
-        if arrival < start or departure > end:
-            raise ValueError("Session crosses the ReFlex horizon; in-window energy is unknown")
-        power = chargers[cp_id]
-        power = 11.0 if power is None or power <= 0 else float(power)
-        if not math.isfinite(power):
-            raise ValueError("Charger power must be finite")
-        if cp_id not in points:
-            points[cp_id] = {
-                "id": str(cp_id), "minChargePower": 0,
-                "maxChargePower": int(power * 1000), "chargeSessions": [],
-            }
-            availability[cp_id] = np.zeros(PROFILE_STEPS)
-            windows[cp_id] = []
-        if any(arrival < b and departure > a for a, b in windows[cp_id]):
-            raise ValueError(f"Overlapping sessions for charge point {cp_id}")
-        windows[cp_id].append((arrival, departure))
-        points[cp_id]["chargeSessions"].append({
-            "startTime": arrival.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "endTime": departure.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "energyToCharge": round(energy * 3.6e6),
-        })
-        a = (arrival - start).total_seconds()
-        b = (departure - start).total_seconds()
-        availability[cp_id] += np.maximum(0, np.minimum(steps + STEP_SECONDS, b)
-                                           - np.maximum(steps, a)) / STEP_SECONDS
-    result["assets"]["evChargePoints"] = list(points.values())
-    return result, availability
-
-
 class ReflexClient:
     """Bounded, TLS-verified API calls. No automatic retries of run submission.
 
-    REFLEX_BASE_URL overrides the historical EPIOT endpoint. Requests also
-    supports REQUESTS_CA_BUNDLE for installations using a project-specific CA.
+    REFLEX_BASE_URL overrides the default endpoint. Requests also supports
+    REQUESTS_CA_BUNDLE for installations using a project-specific CA.
     """
 
-    def __init__(self, base_url=None, *, request_timeout=10, run_timeout=120,
+    def __init__(self, base_url=None, *, request_timeout=30, run_timeout=120,
                  poll_interval=1, transport=None, clock=None, sleep=None):
         self.base_url = (base_url or os.environ.get("REFLEX_BASE_URL")
                          or DEFAULT_BASE_URL).rstrip("/")
@@ -113,7 +44,7 @@ class ReflexClient:
         self.clock = time.monotonic if clock is None else clock
         self.sleep = time.sleep if sleep is None else sleep
 
-    def _request(self, method, path, *, timeout=None, **kwargs):
+    def _request(self, method, path, *, timeout=None, parse=True, **kwargs):
         try:
             response = self.transport.request(
                 method, self.base_url + path,
@@ -125,6 +56,8 @@ class ReflexClient:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             detail = f"HTTP {status}" if status is not None else type(exc).__name__
             raise ReflexError(f"ReFlex {method} {path} failed: {detail}") from exc
+        if not parse:
+            return None
         try:
             data = response.json()
         except ValueError as exc:
@@ -133,55 +66,67 @@ class ReflexClient:
             raise ReflexError(f"ReFlex {method} {path} must return a JSON object")
         return data
 
-    def run(self, query):
-        submitted = self._request("POST", "/run/single", json=query)
-        run_id = submitted.get("id")
+    def submit(self, query):
+        run_id = self._request("POST", "/run/single", json=query).get("id")
         if not isinstance(run_id, str) or not run_id.strip():
             raise ReflexError("ReFlex submission did not return a run id")
-        path_id = quote(run_id, safe="")
-        deadline = self.clock() + self.run_timeout
-        while True:
-            remaining = deadline - self.clock()
-            if remaining <= 0:
-                raise ReflexTimeout(f"ReFlex run {run_id} exceeded {self.run_timeout}s; "
-                                    "the remote run may still be queued or running")
-            status = self._request("GET", f"/run/info/{path_id}",
-                                   timeout=min(self.request_timeout, remaining)).get("runStatus")
-            if status == "completed":
-                return self._request("GET", f"/run/results/{path_id}")
-            if status in {"failed", "cancelled"}:
-                raise ReflexError(f"ReFlex run {run_id} {status}")
-            if status not in {"submitted", "running"}:
-                raise ReflexError(f"ReFlex run {run_id} returned an unknown runStatus")
-            self.sleep(min(self.poll_interval, max(0, deadline - self.clock())))
+        return run_id
 
+    def status(self, run_id, timeout=None):
+        return self._request("GET", f"/run/info/{quote(run_id, safe='')}", timeout=timeout).get("runStatus")
 
-def aggregate_reflex_results(query, availability, results):
-    """Validate energy plans and return EPIOT load/up/down arrays in average kW.
+    def results(self, run_id):
+        return self._request("GET", f"/run/results/{quote(run_id, safe='')}")
 
-    Flexibility is instantaneous power headroom, not a guarantee that energy
-    targets remain feasible after a schedule change.
-    """
-    points = {p["id"]: p for p in query["assets"]["evChargePoints"]}
-    plans = results.get("devicePlans")
-    if not isinstance(plans, dict) or set(plans) != set(points):
-        raise ReflexError("ReFlex devicePlans must contain exactly the requested charge points")
-    fractions = {str(key): value for key, value in availability.items()}
-    load, up, down = (np.zeros(PROFILE_STEPS) for _ in range(3))
-    for key, values in plans.items():
+    def delete(self, run_id):
+        """Remove a finished run, or cancel a waiting one; the instance is shared."""
         try:
-            energy = np.asarray(values, dtype=float)
-        except (TypeError, ValueError) as exc:
-            raise ReflexError(f"ReFlex plan {key} must contain numeric joules") from exc
-        if (energy.shape != (PROFILE_STEPS,) or not np.isfinite(energy).all()
-                or (energy < 0).any()):
-            raise ReflexError(f"ReFlex plan {key} requires 288 finite nonnegative joule values")
-        power = energy / (STEP_SECONDS * 1000)
-        limit = points[key]["maxChargePower"] / 1000 * fractions[key]
-        # Integer-Joule output can differ by one Joule due to rounding.
-        if (power > limit + 1 / (STEP_SECONDS * 1000)).any():
-            raise ReflexError(f"ReFlex plan {key} exceeds charger power or plugged-in availability")
-        load += power
-        up += np.maximum(0, limit - power)
-        down -= power
-    return load.tolist(), up.tolist(), down.tolist()
+            self._request("DELETE", f"/run/{quote(run_id, safe='')}", parse=False)
+        except ReflexError:
+            pass
+
+    def run(self, query):
+        """Submit one run and return its results."""
+        results = {}
+        self.run_many([query], lambda index, result: results.setdefault(index, result))
+        return results[0]
+
+    def run_many(self, queries, on_result, *, parallel=8):
+        """Run every query, at most `parallel` at a time, polling them together.
+
+        `on_result(index, results)` is called as each run completes, so the work
+        already done is kept when a later run fails or the deadline passes. The
+        deadline covers all runs. Runs still waiting at the end are cancelled.
+        """
+        waiting = list(range(len(queries)))
+        pending = {}
+        try:
+            deadline = self.clock()+self.run_timeout
+            while waiting or pending:
+                while waiting and len(pending) < parallel:
+                    index = waiting.pop(0)
+                    pending[index] = self.submit(queries[index])
+                for index, run_id in list(pending.items()):
+                    remaining = deadline-self.clock()
+                    if remaining <= 0:
+                        raise ReflexTimeout(
+                            f"ReFlex did not finish {len(pending)+len(waiting)} of {len(queries)} runs within "
+                            f"{self.run_timeout:g} s. The service is shared and may be busy; the finished part "
+                            "is kept, so a retry continues from there.")
+                    status = self.status(run_id, timeout=min(self.request_timeout, remaining))
+                    if status == "completed":
+                        result = self.results(run_id)
+                        del pending[index]
+                        self.delete(run_id)
+                        on_result(index, result)
+                    elif status in {"failed", "cancelled"}:
+                        del pending[index]
+                        self.delete(run_id)
+                        raise ReflexError(f"ReFlex run {run_id} {status}")
+                    elif status not in {"submitted", "running"}:
+                        raise ReflexError(f"ReFlex run {run_id} returned an unknown runStatus")
+                if pending and not (waiting and len(pending) < parallel):
+                    self.sleep(min(self.poll_interval, max(0, deadline-self.clock())))
+        finally:
+            for run_id in pending.values():
+                self.delete(run_id)

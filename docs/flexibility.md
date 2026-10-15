@@ -89,7 +89,8 @@ The headroom signals of the same session under three strategies.
 ```
 
 For *Min. Charging Cost*, upward flexibility is rated power while plugged in minus the scheduled
-load, and downward flexibility is the negative of the scheduled load.
+load, and downward flexibility is the negative of the scheduled load. For *Min. Cost with V2G*,
+downward flexibility also includes the discharge power while plugged in.
 
 These signals are indicative differences between feasible schedules. They ignore the energy
 consequences of using them and are not a firm capacity commitment.

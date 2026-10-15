@@ -36,6 +36,11 @@ def configure_spatialite() -> str:
         # LoadLibrary call uses for the extension and its dependencies.
         os.environ["PATH"] = f"{BUNDLE_DIR}{os.pathsep}{os.environ.get('PATH', '')}"
 
+    # pyproj (also behind geopandas) bundles its own PROJ and SQLite. Loaded after
+    # mod_spatialite has pulled in the system copies, they corrupt memory when the
+    # process exits ("free(): invalid pointer"); loaded first, both coexist.
+    import pyproj  # noqa: F401
+
     configured = os.environ.get("SPATIALITE_LIBRARY_PATH")
     # A stale value (e.g. a removed conda env) would break every connection;
     # only a bare library name or an existing file is respected.

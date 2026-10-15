@@ -70,12 +70,19 @@ def input_files():
     return [MODEL_DIR/name for name in CHECKPOINTS]+[MANIFEST]+sorted(PRIORS.glob("distribution-of-*.csv"))
 
 
-def inputs_digest():
-    """Checkpoints, preprocessing, sampling priors and world version behind a library."""
+def inputs_digest(line_ending=b"\n"):
+    """Checkpoints, preprocessing, sampling priors and world version behind a library.
+
+    Text inputs are hashed with `line_ending` (LF by default), so a checkout on
+    Windows and one on Linux give the same digest.
+    """
     digest = hashlib.sha256(WORLD_VERSION.encode())
     for path in input_files():
+        content = path.read_bytes()
+        if path.suffix in (".csv", ".json"):
+            content = content.replace(b"\r\n", b"\n").replace(b"\n", line_ending)
         digest.update(path.name.encode())
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
+        digest.update(hashlib.sha256(content).digest())
     return digest.hexdigest()
 
 
@@ -108,7 +115,8 @@ class CPFTLibrary:
     def check(self, timezone_name):
         if self.meta["timezone"] != timezone_name:
             raise CPFTUnavailable(f"The CPFT library was built for {self.meta['timezone']}; rebuild it for {timezone_name}.")
-        if self.meta["inputs_sha256"] != current_inputs():
+        # Libraries built before the digest ignored line endings hashed CRLF text files
+        if self.meta["inputs_sha256"] not in (current_inputs(), current_inputs(b"\r\n")):
             raise CPFTUnavailable("CPFT checkpoints or sampling priors changed since the library was built. "
                                   "Rebuild it with `uv run --extra cpft python scripts/build_cpft_library.py`.")
 
@@ -125,14 +133,15 @@ class CPFTLibrary:
         return options[0]
 
 
-@lru_cache(maxsize=1)
-def _inputs(stamps):
-    return inputs_digest()
+@lru_cache(maxsize=2)
+def _inputs(stamps, line_ending):
+    return inputs_digest(line_ending)
 
 
-def current_inputs():
+def current_inputs(line_ending=b"\n"):
     """Hash the inputs again only when one of their files changes."""
-    return _inputs(tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size) for path in input_files()))
+    return _inputs(tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size) for path in input_files()),
+                   line_ending)
 
 
 @lru_cache(maxsize=2)

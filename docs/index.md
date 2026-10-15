@@ -191,7 +191,7 @@ Download the Excel report, or call the {doc}`REST API <rest-api>` from your own 
 | **Areas** | Up to three polygons or rectangles, compared side by side |
 | **Time** | Any past or future date; 10-minute resolution; local days in Europe/Amsterdam |
 | **Sessions** | Synthetic scenarios from Simple, Spatial or CPFT sources, at low, base or high demand |
-| **Strategies** | As Fast As Possible, As Late As Possible, Average Power, Min. Carbon Footprint, Min. Charging Cost |
+| **Strategies** | As Fast As Possible, As Late As Possible, Average Power, Min. Carbon Footprint, Min. Charging Cost, Min. Cost with V2G |
 | **Outputs** | Load profiles, flexibility envelopes, five KPI dashboards, Excel report |
 | **Coverage** | About 590,000 charging points in the Netherlands, Germany, France, Switzerland, Finland and seven further cities; transformers and the spatial atlas for Amsterdam |
 

@@ -52,7 +52,7 @@ dashboard is opened.
 | `scenario_calendar.py` | Season, holidays, demand shock and temperature |
 | `cpft_library.py`, `cpft.py`, `cpft_runtime.py` | CPFT sampling from the prebuilt library; the runtime is used only to build it |
 | `day_profile.py`, `scenario_profiles.py`, `carbon_charging.py` | Strategies, headroom and minimum carbon |
-| `aggregators.py`, `api_calls/` | Cost optimisation through ReFlex and Energy-Charts |
+| `cost_charging.py`, `day_ahead_prices.py`, `api_calls/` | Min. cost and V2G through ReFlex, with the plan and price stores; Energy-Charts prices |
 | `flex_polytope.py` | Feasible envelope of the aggregate |
 | `kpi/statistics.py`, `kpi/environment.py` | KPI statistics and the environmental comparison |
 | `grid_data.py` | Hourly grid observations and the historical reference |

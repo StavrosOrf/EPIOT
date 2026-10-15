@@ -5,6 +5,7 @@ export const STRATEGIES = [
   ["avg", "Average Power"],
   ["mincarbon", "Min. Carbon Footprint"],
   ["ocost", "Min. Charging Cost"],
+  ["v2g", "Min. Cost with V2G"],
 ];
 // Demand scenarios: [value, label]
 export const DEMANDS = [

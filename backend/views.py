@@ -21,7 +21,10 @@ from backend.session_sources import SOURCE_LABELS, session_service
 from backend.request_args import (RequestTooLarge, check_point_days, demand_assumption, ensemble_size,
                                   request_arguments, scenario_seed, session_source)
 from backend.cpft_runtime import CPFTUnavailable
-from backend.day_profile import UnsupportedWindow, day_profile, empty_profile, ensemble_summary
+from backend.api_calls.reflex import ReflexError
+from backend.cost_charging import cost_optimiser
+from backend.day_ahead_prices import PricesUnavailable
+from backend.day_profile import day_profile, empty_profile, ensemble_summary
 from backend.session_frame import SessionFrame
 from backend.stored_sessions import STORED_LABEL, STORED_NOTE, stored_records
 from pathlib import Path
@@ -175,7 +178,9 @@ def get_aggregate_load():
 
     Input (JSON body for POST, query string for GET):
     - selected_markers: charging-point IDs, a list or a comma-separated string
-    - strategy: afap, alap, avg, ocost or mincarbon
+    - strategy: afap, alap, avg, mincarbon, ocost (minimum cost) or v2g (minimum
+      cost with vehicle-to-grid); the last two are optimised by ReFlex and kept
+      in the plan store
     - date: the target day, YYYY-MM-DD
     - session_source: database (stored sessions), simple, spatial or cpft
     - demand_assumption, seed: scenario sources only
@@ -209,7 +214,7 @@ def get_aggregate_load():
         source = session_source(arguments)
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
-    if method not in {"afap", "alap", "avg", "ocost", "mincarbon"}:
+    if method not in {"afap", "alap", "avg", "mincarbon", "ocost", "v2g"}:
         return jsonify(error="Unknown charging strategy"), 400
     if method == "mincarbon" and source == "database":
         return jsonify(error="Select a simple, spatial or CPFT session source for minimum-carbon charging."), 400
@@ -223,8 +228,6 @@ def get_aggregate_load():
             return jsonify(error=str(exc)), 400
     elif arguments.get("ensemble") not in (None, "", 1, "1"):
         return jsonify(error="Several draws need a generated session source; stored sessions have no sampling to vary."), 400
-    if draws > 1 and method == "ocost":
-        return jsonify(error="Several draws are not available for cost optimisation; choose another strategy."), 400
 
     target_day = None
     # An empty selection of stored sessions without a date has no day to look up
@@ -287,16 +290,19 @@ def get_aggregate_load():
             service = session_service(current_app)
             sessions, metadata = service.get(charger_data, target_day, source=source, assumption=assumption,
                                              seed=seed, timezone_name=timezone_name)
-        profile = day_profile(charger_data, sessions, metadata, target_day, method, timezone_name, grid_hours)
+        optimiser = cost_optimiser(current_app) if method in {"ocost", "v2g"} else None
+        profile = day_profile(charger_data, sessions, metadata, target_day, method, timezone_name, grid_hours,
+                              optimiser)
         if draws > 1:
             seeds = [(seed+offset) % 2**32 for offset in range(draws)]
             more = (service.get(charger_data, target_day, source=source, assumption=assumption, seed=other,
                                 timezone_name=timezone_name)[0] for other in seeds[1:])
             profile["source"]["ensemble"] = ensemble_summary(
-                charger_data, [sessions, *more], seeds, target_day, method, timezone_name, grid_hours)
+                charger_data, [sessions, *more], seeds, target_day, method, timezone_name, grid_hours, optimiser)
         return jsonify(profile)
-    except UnsupportedWindow as exc:
-        return jsonify(error=str(exc)), 422
+    except (ReflexError, PricesUnavailable) as exc:
+        current_app.logger.warning("Cost optimisation failed: %s", exc)
+        return jsonify(error=f"Cost optimisation is unavailable: {exc}"), 503
     except CarbonScheduleUnavailable as exc:
         return jsonify(error=str(exc)), 422
     except (ValueError, KeyError, TypeError) as exc:

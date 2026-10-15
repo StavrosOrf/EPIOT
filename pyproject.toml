@@ -38,6 +38,8 @@ dependencies = [
     # mod_spatialite bundle, which is distributed as a .7z archive.
     "py7zr; sys_platform == 'win32'",
     "holidays>=0.106",
+    # WSGI server for production (see docs/operations.md)
+    "gunicorn>=26.2.0; sys_platform != 'win32'",
 ]
 
 [project.urls]

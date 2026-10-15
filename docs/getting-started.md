@@ -12,7 +12,7 @@ are needed.
 | [uv](https://docs.astral.sh/uv/) | Creates the environment from `uv.lock` |
 | SpatiaLite | The `mod_spatialite` SQLite extension |
 | Browser | A current Chrome, Edge, Firefox or Safari. The page loads Leaflet, Plotly and SheetJS from public CDNs. |
-| Network | Outbound HTTPS for map tiles and location search (PDOK, Photon). ReFlex and Energy-Charts are needed only for *Min. Charging Cost*. |
+| Network | Outbound HTTPS for map tiles and location search (PDOK, Photon). ReFlex and Energy-Charts are needed only for *Min. Charging Cost* and *Min. Cost with V2G*. |
 
 ## Install and run
 
@@ -59,7 +59,7 @@ Three areas drawn over central Amsterdam, ready to analyse.
 
 | Control | Tabs | Options |
 |---|---|---|
-| Charging strategy | Load profiles, Flexibility | As Fast As Possible (default), As Late As Possible, Average Power, Min. Carbon Footprint, Min. Charging Cost |
+| Charging strategy | Load profiles, Flexibility | As Fast As Possible (default), As Late As Possible, Average Power, Min. Carbon Footprint, Min. Charging Cost, Min. Cost with V2G |
 | Target date | Load profiles, Flexibility | Any date, past or future. The chart shows that day and the day before. |
 | Date range | KPIs | Up to 366 days, inclusive. Defaults to the last seven days. |
 | Demand scenario | All | Low, Base (default) or High demand |

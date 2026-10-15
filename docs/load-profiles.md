@@ -43,7 +43,7 @@ day without restarting at midnight.
 ## Charging strategies
 
 Each area card has its own strategy: As Fast As Possible (the default), As Late As Possible,
-Average Power, Min. Carbon Footprint or Min. Charging Cost. They change when energy is delivered,
+Average Power, Min. Carbon Footprint, Min. Charging Cost or Min. Cost with V2G. They change when energy is delivered,
 never how much. Definitions, requirements and limits are in {doc}`charging-strategies`.
 Duplicating an area and giving the copy another strategy is the quickest comparison.
 
@@ -55,10 +55,10 @@ Duplicating an area and giving the copy another strategy is the quickest compari
 |---|---|---|
 | `selected_markers` | Yes | Charging-point IDs: a JSON array, or comma-separated in a query string |
 | `date` | Yes | Target date, `YYYY-MM-DD` |
-| `strategy` | Yes | `afap`, `alap`, `avg`, `mincarbon` or `ocost` |
+| `strategy` | Yes | `afap`, `alap`, `avg`, `mincarbon`, `ocost` or `v2g` |
 | `session_source` | – | `simple`, `spatial` or `cpft` ({doc}`session-sources`), or `database` for the stored sessions of the Amsterdam pilot chargers (the default when omitted) |
 | `demand_assumption`, `seed` | – | Scenario settings ({doc}`session-sources`) |
-| `ensemble` | – | Number of seeded draws to combine into a band, 1 to 30 (default 1). Scenario sources and every strategy except `ocost` |
+| `ensemble` | – | Number of seeded draws to combine into a band, 1 to 30 (default 1). Scenario sources only |
 
 ```bash
 curl -G http://127.0.0.1:5000/stations/aggregate_load \

@@ -75,8 +75,10 @@ export async function get_LoadProfiles(polygons, names, date, options = {}) {
     const query = { selected_markers: selection.chargerIds, date: forArea(date, index),
       strategy: forArea(options.strategy, index) || "avg", ...sourceOptions(options, index),
       ...(options.ensemble > 1 ? { ensemble: options.ensemble } : {}) };
-    const response = await cached(profiles, JSON.stringify([revision.analysis, query]),
-      () => jsonFetch("/stations/aggregate_load", query));
+    const key = JSON.stringify([revision.analysis, query]);
+    const response = await cached(profiles, key, () => jsonFetch("/stations/aggregate_load", query));
+    // Plans ReFlex is still optimising are replaced on the server: ask again next time
+    if (response.source?.optimisation?.reflex_pending) profiles.delete(key);
     return { ...selection, groupName: names[index], response };
   }));
 }

@@ -17,6 +17,7 @@ from backend.scenario_profiles import grid, simulate_scenarios
 from backend.scenario_sampling import ScenarioSession, generate_sessions
 from backend.session_sources import SessionSourceService
 from backend.spatial_profiles import profile_from_attributes, SpatialAtlas
+from tests import reflex_fakes
 from tests.cpft_helpers import require_tensorflow, write_test_library
 
 UTC = timezone.utc
@@ -40,6 +41,15 @@ def test_spatial_context_changes_behaviour_weights_and_handles_missing_values():
     unknown = profile_from_attributes(dict(oppervlakte_land_in_ha=-99999999, woningvoorraad=-99999999))
     assert unknown["matched"] is False
     assert unknown["weights"]["mixed"] == 1
+
+
+def test_bundled_atlas_is_read_without_gdal():
+    """GDAL in the same process as mod_spatialite crashes, so the GeoPackage is read with sqlite3."""
+    from backend.spatial_profiles import DEFAULT_ATLAS, SpatialAtlas
+    atlas = SpatialAtlas(DEFAULT_ATLAS)
+    assert len(atlas.frame) == 481 and atlas.frame.crs.to_epsg() == 4326 and atlas.frame.geometry.is_valid.all()
+    centre = atlas.resolve(dict(latitude=52.3731, longitude=4.8926))  # Dam square
+    assert centre["matched"] and centre["neighbourhood_code"].startswith("BU0363")
 
 
 def test_geographic_join_is_by_coordinate_and_does_not_reclassify_access_type(tmp_path):
@@ -132,10 +142,23 @@ def test_missing_cpft_library_is_explicit_and_never_falls_back_to_random(tmp_pat
 
 def test_cpft_library_built_from_other_inputs_is_rejected(tmp_path, monkeypatch):
     path = write_test_library(tmp_path/"stale.npz")
-    monkeypatch.setattr("backend.cpft_library.current_inputs", lambda: "changed checkpoints")
+    monkeypatch.setattr("backend.cpft_library.current_inputs", lambda line_ending=b"\n": "changed checkpoints")
     service = SessionSourceService(atlas_path=tmp_path/"missing.gpkg", library_path=path)
     with pytest.raises(CPFTUnavailable, match="Rebuild"):
         service.get(CHARGERS, TARGET, source="cpft")
+
+
+def test_cpft_library_built_from_crlf_inputs_is_accepted(tmp_path, monkeypatch):
+    """A library built on Windows hashed the same priors with CRLF line endings."""
+    from backend.cpft_library import current_inputs
+    crlf = current_inputs(b"\r\n")
+    assert crlf != current_inputs()
+    monkeypatch.setattr("backend.cpft_library.current_inputs", lambda line_ending=b"\n": crlf)
+    path = write_test_library(tmp_path/"windows.npz")  # stamped with the CRLF digest
+    monkeypatch.setattr("backend.cpft_library.current_inputs",
+                        lambda line_ending=b"\n": crlf if line_ending == b"\r\n" else "linux checkout")
+    service = SessionSourceService(atlas_path=tmp_path/"missing.gpkg", library_path=path)
+    assert len(service.get(CHARGERS, TARGET, source="cpft")[0]) >= 0
 
 
 def test_frozen_scalers_keep_original_in_place_float32_arithmetic():
@@ -169,6 +192,8 @@ def scenario_client(tmp_path):
         app.config.update(TESTING=True, aggregator_config={}, GRID_DATA_CACHE=str(tmp_path/'grid.sqlite'), **{"station_data.db": SimpleNamespace(session=session)})
         app.extensions["session_source_service"] = SessionSourceService(atlas_path=tmp_path/"missing.gpkg",
             library_path=write_test_library(tmp_path/"library.npz"))
+        # Cost strategies use stand-ins for ReFlex and Energy-Charts: no network in tests
+        app.extensions["cost_optimiser"] = reflex_fakes.optimiser(tmp_path)
         app.register_blueprint(station_data, url_prefix="/stations")
         yield app.test_client(), engine
     engine.dispose()
@@ -209,13 +234,57 @@ def test_post_selection_and_empty_cpft_selection(scenario_client):
 
 
 @pytest.mark.parametrize("target,expected", [("2026-03-29", 138), ("2026-10-25", 150)])
-def test_api_dst_day_lengths_and_optimizer_limit(scenario_client, target, expected):
+@pytest.mark.parametrize("strategy", ["avg", "ocost", "v2g"])
+def test_api_dst_day_lengths_for_every_strategy(scenario_client, target, expected, strategy):
     client, _ = scenario_client
-    query = dict(selected_markers=[1], strategy="avg", date=target, session_source="simple")
-    data = client.post("/stations/aggregate_load", json=query).get_json()
+    query = dict(selected_markers=[1], strategy=strategy, date=target, session_source="simple")
+    response = client.post("/stations/aggregate_load", json=query)
+    assert response.status_code == 200
+    data = response.get_json()
     assert len(data["y"])-data["past_steps"] == expected
-    query["strategy"] = "ocost"
-    assert client.post("/stations/aggregate_load", json=query).status_code == 422
+
+
+def test_cost_strategies_answer_at_once_and_reflex_replaces_the_plans_later(scenario_client):
+    client, _ = scenario_client
+    optimiser = client.application.extensions["cost_optimiser"]
+    query = dict(selected_markers=[1], date="2026-10-15", session_source="simple")
+    first = {strategy: client.post("/stations/aggregate_load", json={**query, "strategy": strategy}).get_json()
+             for strategy in ("ocost", "v2g")}
+    for strategy, profile in first.items():
+        source = profile["source"]
+        assert source["optimisation"]["engine"] == "DRIVE2X ReFlex" and "scheduling_note" in source
+        # Nothing waited for ReFlex: the exact local optimum stands in for its plans
+        assert source["optimisation"]["reflex_pending"] > 0
+    assert first["v2g"]["flex_polytope"]["schedule_feasible"] is None
+    assert optimiser.wait_idle(timeout=30)
+    for strategy, profile in first.items():
+        again = client.post("/stations/aggregate_load", json={**query, "strategy": strategy}).get_json()
+        optimisation = again["source"]["optimisation"]
+        assert optimisation["reflex_pending"] == 0 and optimisation["by_reflex"] > 0
+        assert optimisation["from_store"] == optimisation["connections"]
+        # ReFlex's plans differ from the optimum only in timing, not in energy
+        assert sum(again["y"]) == pytest.approx(sum(profile["y"]), rel=.1)
+    band = client.post("/stations/aggregate_load", json={**query, "strategy": "ocost", "ensemble": 3}).get_json()
+    assert band["source"]["ensemble"]["members"] == 3
+
+
+def test_a_reflex_failure_never_fails_a_request(scenario_client):
+    from backend.api_calls.reflex import ReflexError
+    client, _ = scenario_client
+    optimiser = client.application.extensions["cost_optimiser"]
+
+    class Down:
+        def run_many(self, *args, **kwargs):
+            raise ReflexError("ReFlex POST /run/single failed: HTTP 503")
+    optimiser.client_factory = Down
+    query = dict(selected_markers=[1], strategy="v2g", date="2026-10-15", session_source="simple")
+    response = client.post("/stations/aggregate_load", json=query)
+    assert response.status_code == 200
+    pending = response.get_json()["source"]["optimisation"]["reflex_pending"]
+    assert pending > 0 and optimiser.wait_idle(timeout=30)
+    # The provisional plans stay, and the failed connections are not sent again at once
+    again = client.post("/stations/aggregate_load", json=query).get_json()["source"]["optimisation"]
+    assert again["reflex_pending"] == pending and not optimiser.waiting
 
 
 def test_api_model_failure_is_explicit(scenario_client, tmp_path):
@@ -267,6 +336,7 @@ def test_real_saved_checkpoints_reproduce_export_with_runtime_scalers():
             predicted = max(0, np.expm1(predicted))
         assert predicted == pytest.approx(float(first[output]), abs=1e-5)
 
+
 def test_ensemble_returns_a_percentile_band_around_the_requested_draw(scenario_client):
     client, _ = scenario_client
     base = dict(selected_markers=[1], strategy="afap", date="2026-10-15", session_source="simple", seed=7)
@@ -297,7 +367,7 @@ def test_ensemble_band_widens_with_different_seeds_and_collapses_for_one_draw(sc
 
 @pytest.mark.parametrize("extra,message", [
     (dict(ensemble=0), "between 1 and"), (dict(ensemble=500), "between 1 and"), (dict(ensemble="many"), "whole number"),
-    (dict(ensemble=3, strategy="ocost"), "cost optimisation"), (dict(ensemble=3, session_source="database"), "generated session source"),
+    (dict(ensemble=3, session_source="database"), "generated session source"),
 ])
 def test_invalid_ensembles_are_rejected(scenario_client, extra, message):
     client, _ = scenario_client

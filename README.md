@@ -37,7 +37,7 @@ operators, city and mobility planners, and researchers.
   (an offline library built from trained models), each at low, base or high demand with calendar,
   holiday and weather day effects.
 - **Five charging strategies:** As Fast As Possible, As Late As Possible, Average Power,
-  Min. Carbon Footprint and Min. Charging Cost.
+  Min. Carbon Footprint, Min. Charging Cost and Min. Cost with V2G.
 - **Flexibility:** the feasible power and energy envelope with upward and downward headroom.
 - **Five KPI dashboards:** User, Grid, Environment, Mobility and City.
 - **Reports and API:** an Excel workbook with chart images, and a documented REST API for the same
@@ -76,8 +76,9 @@ existing server, `uv run flask --app app db upgrade` applies new migrations.
 - **CPFT session source.** It reads the prebuilt `backend/data/cpft_library.npz`, so the standard
   install already supports it. Rebuilding the library needs TensorFlow: `uv sync --extra cpft`.
 - **Load-forecasting models** in `backend/ml` need PyTorch: `uv sync --extra ml`.
-- **Min. Charging Cost** calls the DRIVE2X ReFlex service, which is reachable only from the project
-  network. The other four strategies run entirely locally.
+- **Min. Charging Cost** and **Min. Cost with V2G** call the DRIVE2X ReFlex service, which is
+  reachable only from the project network, and keep every plan in `instance/reflex_plans.sqlite`.
+  The other four strategies run entirely locally.
 - **Charger data refresh** from the original suppliers is optional:
   `uv run python scripts/update_charger_data.py` and
   `uv run python scripts/export_country_data.py`.

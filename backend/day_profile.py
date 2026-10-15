@@ -7,18 +7,14 @@ thing for every source.
 """
 
 import datetime
-from zoneinfo import ZoneInfo
-
 import numpy as np
 
-from backend.aggregators import simulate_cost_optimal_operation
 from backend.carbon_charging import daily_profiles
+from backend.cost_charging import COST_NOTE, MODES as COST_STRATEGIES, PRICE_REFERENCE_NOTE, V2G_NOTE
 from backend.cpft import day_window
 from backend.flex_polytope import build_polytope, contains, envelopes
 from backend.scenario_profiles import grid
-from backend.scenario_sampling import point_power
 
-TWO_DAY_STEPS = 288
 ENERGY_BUDGET_NOTE = (
     "Each connection charges from its real arrival to its real departure; the window only crops the profile. "
     "Connections crossing the window edge can therefore put different energy inside the window under different strategies.")
@@ -31,10 +27,6 @@ ENSEMBLE_NOTE = (
     "The band spans the 10th to 90th percentile of the aggregate load over seeded draws of the same scenario "
     "(sessions, day effects and weather vary with the seed). The line is the draw for the requested seed. "
     "It shows how sensitive the result is to the synthetic sampling, not a calibrated forecast interval.")
-
-
-class UnsupportedWindow(ValueError):
-    """The strategy cannot run on this window (cost optimisation across a clock change)."""
 
 
 def local_window(target, timezone_name):
@@ -53,39 +45,43 @@ def empty_profile(target, timezone_name, source_metadata):
                 past_steps=past_steps, y=zeros, up_flex=zeros, down_flex=zeros, source=source_metadata)
 
 
-def ensemble_summary(chargers, draws, seeds, target, method, timezone_name, grid_hours):
+def ensemble_summary(chargers, draws, seeds, target, method, timezone_name, grid_hours, optimiser=None):
     """Percentile band of the load over several session draws under one strategy.
 
     `draws` yields each draw's sessions (the requested seed's first). Only the
     aggregate load is combined; flexibility envelopes stay those of the first draw.
+    The cost strategies optimise the plans all draws are missing in one go.
     """
     start, end, _, _ = local_window(target, timezone_name)
-    hours = grid_hours(start, end) if method == "mincarbon" else []
-    loads = [daily_profiles(chargers, sessions, start, end, method, timezone_name, hours)[0] for sessions in draws]
+    if method in COST_STRATEGIES:
+        loads = [profile[0] for profile in optimiser.profiles(chargers, list(draws), start, end, method,
+                                                              background=True)[0]]
+    else:
+        hours = grid_hours(start, end) if method == "mincarbon" else []
+        loads = [daily_profiles(chargers, sessions, start, end, method, timezone_name, hours)[0] for sessions in draws]
     low, middle, high = np.percentile(np.asarray(loads, float), ENSEMBLE_QUANTILES, axis=0)
     return dict(members=len(loads), seeds=list(seeds), quantiles=list(ENSEMBLE_QUANTILES),
                 p10=low.tolist(), p50=middle.tolist(), p90=high.tolist(), note=ENSEMBLE_NOTE)
 
 
-def day_profile(chargers, sessions, metadata, target, method, timezone_name, grid_hours):
+def day_profile(chargers, sessions, metadata, target, method, timezone_name, grid_hours, optimiser=None):
     """Load, flexibility and polytope envelopes of `sessions` under one strategy.
 
     `chargers` are point dictionaries (id, power, ...), `sessions` a SessionFrame
     or ScenarioSession records, and `grid_hours(start, end)` supplies carbon
-    data when the strategy is minimum carbon. `metadata` is extended in place.
+    data when the strategy is minimum carbon. The cost strategies (ocost, v2g)
+    need `optimiser`, a CostOptimiser. `metadata` is extended in place.
     """
     start, end, timestamps, past_steps = local_window(target, timezone_name)
-    if method == "ocost":
-        if len(timestamps) != TWO_DAY_STEPS:
-            raise UnsupportedWindow(
-                "Cost optimisation currently supports two 24-hour days. Choose another strategy for a daylight-saving transition.")
-        zone = ZoneInfo(timezone_name)
-        rows = [(session.cp_id, session.start.astimezone(zone).replace(tzinfo=None),
-                 session.end.astimezone(zone).replace(tzinfo=None), session.energy_kwh)
-                for session in (sessions.records() if hasattr(sessions, "records") else sessions)]
-        load_profile, up_flex, down_flex = simulate_cost_optimal_operation(
-            {int(charger["id"]): point_power(charger) for charger in chargers}, rows,
-            start_date=str(target-datetime.timedelta(days=1)))
+    if method in COST_STRATEGIES:
+        # Never waits for ReFlex: missing plans are the exact local optimum until ReFlex's replace them
+        [(load_profile, up_flex, down_flex)], optimisation = optimiser.profiles(
+            chargers, [sessions], start, end, method, background=True)
+        metadata["energy_budget_note"] = ENERGY_BUDGET_NOTE
+        metadata["optimisation"] = optimisation
+        metadata["scheduling_note"] = V2G_NOTE.format(depth=optimisation["v2g_depth_kwh"]) if method == "v2g" else COST_NOTE
+        if optimisation["prices_use_reference"]:
+            metadata["price_reference_note"] = PRICE_REFERENCE_NOTE
     else:
         hours = grid_hours(start, end) if method == "mincarbon" else []
         load_profile, up_flex, down_flex = daily_profiles(chargers, sessions, start, end, method, timezone_name, hours)
@@ -96,7 +92,8 @@ def day_profile(chargers, sessions, metadata, target, method, timezone_name, gri
     metadata["flexibility_note"] = FLEXIBILITY_NOTE
     polytope = build_polytope(chargers, sessions, start, end)
     flex_polytope = envelopes(polytope)
-    flex_polytope["schedule_feasible"] = contains(polytope, load_profile)
+    # The polytope describes one-way charging, so a schedule that returns energy is outside it by design
+    flex_polytope["schedule_feasible"] = None if method == "v2g" else contains(polytope, load_profile)
     return dict(x=list(range(len(timestamps))), timestamps=[timestamp.isoformat() for timestamp in timestamps],
                 past_steps=past_steps, y=list(load_profile), up_flex=list(up_flex), down_flex=list(down_flex),
                 flex_polytope=flex_polytope, source=metadata)

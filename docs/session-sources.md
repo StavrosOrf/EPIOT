@@ -171,4 +171,5 @@ This takes about 100 minutes on 16 cores and writes a 15 MB file. TensorFlow is 
 - Scenarios are not calibrated to local charging observations; demand levels are assumptions.
 - The spatial atlas covers Amsterdam only; other locations fall back to the generic profile.
 - No private home charger is modelled.
-- *Min. Charging Cost* requires the DRIVE2X ReFlex service ({doc}`load-profiles`).
+- *Min. Charging Cost* and *Min. Cost with V2G* require the DRIVE2X ReFlex service for connections
+  not yet in the plan store ({doc}`charging-strategies`).

@@ -27,7 +27,8 @@ real format that needs no TensorFlow.
 | --- | --- |
 | `test_scenario_profiles.py` | Hand-built sessions through the vectorised engine every source uses: as fast as possible, as late as possible and average power, energy conservation, windows, the 11 kW fallback and overnight connections |
 | `test_api_hardening.py` | Stored sessions through the same engine and strategies, JSON errors, date and ID validation, the `(cp_id, start)` indexes and their migration, shared request parsing, `/healthz`, static MIME types and the debug flag |
-| `test_aggregators.py` | The cost-optimal path through ReFlex (the only strategy not computed locally) with stubbed services |
+| `test_cost_charging.py` | Min. cost and V2G: ReFlex requests and their corrections, the plan and price stores, against fakes of ReFlex and Energy-Charts (`reflex_fakes.py`) |
+| `test_reflex.py` | The ReFlex transport: parallel runs, deadlines and clean-up |
 | `*.mjs` | Browser modules under Node, imported directly (the root `package.json` marks them ES modules): `node --test tests/*.mjs` or `npm test`. `test_group_actions.mjs` and `test_analysis_cache.mjs` use the real `areas.js` and `analysis.js` with stand-in collaborators |
 | `test_ensemble.mjs` | Seeded draws: the band in the chart data, the note, the request and the report |
 

@@ -24,6 +24,17 @@ export function sourceNote(sources, extra = "") {
   return `${metadata.label}. ${metadata.note} ${calendarSummary(sources)}${extra}${draws}`;
 }
 
+// What the cost strategies relied on: reference prices, and ReFlex plans that broke a limit
+export function optimisationNote(sources) {
+  const runs = sources.map(source => source?.optimisation).filter(Boolean);
+  if (!runs.length) return "";
+  const replaced = runs.reduce((total, run) => total + (run.reflex_plans_replaced || 0), 0);
+  return (runs.some(run => run.prices_use_reference)
+    ? " Some day-ahead prices are not published yet; the same time on the nearest priced day is used." : "") +
+    (replaced ? ` ${replaced} ReFlex plan${replaced === 1 ? " was" : "s were"} outside the plug or energy limits and ` +
+      "were replaced by EPIOT's exact local solution." : "");
+}
+
 // One area's chart data from its response and the settings it was requested with
 export function profileFromGroup(group, settings) {
   const response = group.response, split = response.past_steps ?? 144;
@@ -74,8 +85,8 @@ export function createAnalysis({ state, settingsOf, api, view }) {
       state.transformer_ids_list = groups.map(group => group.transformerIds);
       state.load_profile_data = groups.map((group, index) => profileFromGroup(group, settings[index]));
       const sources = groups.map(group => group.response.source);
-      view.setNote(sourceNote(sources,
-        sources[0]?.grid_uses_historical_reference ? " Minimum-carbon estimates use a historical grid reference." : ""));
+      view.setNote(sourceNote(sources, (sources[0]?.grid_uses_historical_reference
+        ? " Minimum-carbon estimates use a historical grid reference." : "") + optimisationNote(sources)));
       if (state.active_tab === "Load Profiles") view.createGraph(state.load_profile_data);
       else if (state.active_tab === "Flexibility") view.createPolytopeGraph(state.load_profile_data);
     } catch (error) {

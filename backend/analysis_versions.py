@@ -32,9 +32,13 @@ def analysis_versions(app):
     paths += list((ROOT/"seed_data").glob("distribution-of-*.csv"))
     paths += [ROOT/"backend/data/cpft_preprocessing.json", ROOT/"backend/data/cpft_library.npz", ROOT/"backend/data/calendar_effects.json",
               app.config.get("SESSION_SCENARIO_ATLAS", DEFAULT_ATLAS), grid_path, str(grid_path)+"-wal"]
+    # Newly published day-ahead prices change cost-optimised results; stored plans do not (they are keyed by input)
+    prices = app.config.get("DAY_AHEAD_PRICE_STORE", Path(app.instance_path)/"day_ahead_prices.sqlite")
+    paths += [prices, str(prices)+"-wal"]
     model_dir = ROOT/"others/CPFT-main/CPFT-tool/CPFT_VS_Code_Python/outputs"
     paths += [model_dir/name for name in ("best_availability.keras", "best_kwh.keras")]
     configuration = {key: app.config.get(key) for key in (
-        "SESSION_SCENARIO_TIMEZONE", "SESSION_DAILY_ARRIVALS", "SESSION_CALENDAR_EFFECTS", "GRID_ALLOW_STALE")}
+        "SESSION_SCENARIO_TIMEZONE", "SESSION_DAILY_ARRIVALS", "SESSION_CALENDAR_EFFECTS", "GRID_ALLOW_STALE",
+        "REFLEX_V2G_DEPTH_KWH")}
     return dict(infrastructure=digest(infrastructure),
                 analysis=digest([infrastructure, configuration, [file_stamp(path) for path in paths]]))

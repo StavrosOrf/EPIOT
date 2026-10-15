@@ -47,16 +47,48 @@ def profile_from_attributes(attributes=None):
                              businesses_per_km2=business_density, retail_per_km2=retail_density)}
 
 
+ATLAS_COLUMNS = ["buurtcode", "buurtnaam", "water", "oppervlakte_land_in_ha", "woningvoorraad",
+                 "aantal_bedrijfsvestigingen", "aantal_bedrijven_handel_en_horeca",
+                 "bevolkingsdichtheid_inwoners_per_km2"]
+# Bytes of the optional envelope in a GeoPackage geometry header, by envelope code
+ENVELOPE_BYTES = {0: 0, 1: 32, 2: 48, 3: 48, 4: 64}
+
+
+def gpkg_wkb(blob):
+    """The WKB inside a GeoPackage geometry blob, or None for an empty or missing geometry."""
+    if blob is None or blob[:2] != b"GP":
+        return None
+    flags = blob[3]
+    if flags & 0b10000:  # empty geometry
+        return None
+    return bytes(blob[8+ENVELOPE_BYTES[(flags >> 1) & 0b111]:])
+
+
+def read_geopackage(path, columns):
+    """The first feature table of a GeoPackage as a GeoDataFrame, read with sqlite3 and shapely.
+
+    Not through GDAL (pyogrio): the application loads the system mod_spatialite
+    into the process, and GDAL's bundled copies of the same libraries then
+    corrupt memory (`munmap_chunk(): invalid pointer`) on the first read.
+    """
+    import sqlite3
+    import geopandas as gpd
+    import shapely
+    with sqlite3.connect(Path(path).resolve().as_uri()+"?mode=ro", uri=True) as connection:
+        table, column, srs = connection.execute(
+            "SELECT table_name, column_name, srs_id FROM gpkg_geometry_columns ORDER BY table_name LIMIT 1").fetchone()
+        quoted = ", ".join(f'"{name}"' for name in columns)
+        rows = connection.execute(f'SELECT "{column}", {quoted} FROM "{table}"').fetchall()
+    geometry = shapely.from_wkb([gpkg_wkb(row[0]) for row in rows])
+    return gpd.GeoDataFrame([row[1:] for row in rows], columns=columns, geometry=geometry, crs=srs)
+
+
 class SpatialAtlas:
     def __init__(self, path=DEFAULT_ATLAS):
         self.path = Path(path)
         self.frame = None
         if self.path.exists():
-            import geopandas as gpd
-            columns = ["buurtcode", "buurtnaam", "water", "oppervlakte_land_in_ha", "woningvoorraad",
-                       "aantal_bedrijfsvestigingen", "aantal_bedrijven_handel_en_horeca",
-                       "bevolkingsdichtheid_inwoners_per_km2"]
-            self.frame = gpd.read_file(self.path, columns=columns).to_crs(4326)
+            self.frame = read_geopackage(self.path, ATLAS_COLUMNS).to_crs(4326)
             self.frame = self.frame[self.frame.geometry.notna() & ~self.frame.geometry.is_empty].reset_index(drop=True)
 
     def resolve(self, charger):

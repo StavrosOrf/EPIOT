@@ -35,13 +35,18 @@ def git(*args):
 
 
 # Profile simulators the baseline views import and this benchmark never calls;
-# they were replaced by the vectorised engine in backend/scenario_profiles.py.
+# they were replaced by the vectorised engine in backend/scenario_profiles.py and,
+# for cost optimisation, by backend/cost_charging.py.
 REMOVED_SIMULATORS = ("simulate_uncontrolled_profiles_from_sessions", "simulate_delayed_profiles_from_sessions",
-                      "simulate_avg_charging_profiles_from_sessions")
+                      "simulate_avg_charging_profiles_from_sessions", "simulate_cost_optimal_operation")
 
 
 def old_module(revision, path):
-    import backend.aggregators as aggregators
+    # The module itself is gone too (cost optimisation moved to backend/cost_charging.py)
+    try:
+        import backend.aggregators as aggregators
+    except ImportError:
+        aggregators = sys.modules.setdefault("backend.aggregators", ModuleType("backend.aggregators"))
 
     def removed(*args, **kwargs):
         raise RuntimeError("Removed from the application; not used by the map benchmark")

@@ -652,7 +652,10 @@ export function createGraph(groupData) {
   // One scale for every area, so loads can be compared across cards
   const peak = Math.max(0, ...groupData.map((item) =>
     Math.max(...item.pastData, ...item.futureData, ...(item.band ? item.band.p90 : []))));
-  const range = [0, peak > 0 ? peak * 1.1 : 1];
+  // Vehicle-to-grid returns energy: the axis then reaches below zero
+  const trough = Math.min(0, ...groupData.map((item) =>
+    Math.min(...item.pastData, ...item.futureData, ...(item.band ? item.band.p10 : []))));
+  const range = [trough * 1.1, peak > 0 ? peak * 1.1 : 1];
   renderGroupPanels(groupData, (item) => loadChart(item, { range }));
 }
 
@@ -668,7 +671,7 @@ export function createPolytopeGraph(groupData) {
   // One power scale for every area, with headroom above the highest curve for the day labels
   const power = groupData.flatMap((item) =>
     item.polytope ? [...item.polytope.power_max_kw, ...item.pastData, ...item.futureData] : []);
-  const range = [0, Math.max(0, ...power) * 1.2 || 1];
+  const range = [Math.min(0, ...power) * 1.2, Math.max(0, ...power) * 1.2 || 1];
   renderGroupPanels(groupData, (item) => polytopeChart(item, { range }));
 }
 

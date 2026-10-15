@@ -17,8 +17,8 @@ scripted. Examples assume the development server at `http://127.0.0.1:5000`.
 | Status | Meaning |
 |---|---|
 | `400` | Invalid input: unknown strategy, source or demand level, malformed date, seed or IDs. Body: `{"error": "..."}` |
-| `422` | Valid input that cannot be computed: no carbon data for minimum carbon, cost optimisation across a daylight-saving change, or a request over the size limit |
-| `503` | A session source or health check is unavailable, for example a stale CPFT library |
+| `422` | Valid input that cannot be computed: no carbon data for minimum carbon, or a request over the size limit |
+| `503` | A session source, the day-ahead prices or the health check is unavailable, for example a stale CPFT library |
 
 The size limit counts charging points × days (two days per load-profile draw, the range for KPIs)
 and defaults to 1,000,000; see {doc}`operations`.
