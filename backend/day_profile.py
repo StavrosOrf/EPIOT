@@ -13,6 +13,7 @@ from backend.carbon_charging import daily_profiles
 from backend.cost_charging import COST_NOTE, MODES as COST_STRATEGIES, PRICE_REFERENCE_NOTE, V2G_NOTE
 from backend.cpft import day_window
 from backend.flex_polytope import build_polytope, contains, envelopes
+from backend.flex_v2g import V2GFlexibility
 from backend.scenario_profiles import grid
 
 ENERGY_BUDGET_NOTE = (
@@ -90,10 +91,21 @@ def day_profile(chargers, sessions, metadata, target, method, timezone_name, gri
             metadata["grid_uses_historical_reference"] = any(hour.carbon_is_stale for hour in hours)
             metadata["scheduling_note"] = CARBON_NOTE
     metadata["flexibility_note"] = FLEXIBILITY_NOTE
-    polytope = build_polytope(chargers, sessions, start, end)
-    flex_polytope = envelopes(polytope)
-    # The polytope describes one-way charging, so a schedule that returns energy is outside it by design
-    flex_polytope["schedule_feasible"] = None if method == "v2g" else contains(polytope, load_profile)
+    if method == "v2g":
+        # Vehicles may also discharge: battery limits at every step, not only the energy at departure
+        flexibility = V2GFlexibility(chargers, sessions, start, end, optimiser.settings.v2g_depth_kwh)
+        flex_polytope = flexibility.envelopes()
+        flex_polytope["schedule_feasible"] = flexibility.contains(load_profile)
+        flex_polytope["model"] = "bidirectional"
+        # Headroom to the feasible band, which respects the battery limits (plug power alone does not)
+        load = np.asarray(load_profile)
+        up_flex = np.maximum(np.asarray(flex_polytope["power_max_kw"])-load, 0).tolist()
+        down_flex = np.minimum(np.asarray(flex_polytope["power_min_kw"])-load, 0).tolist()
+    else:
+        polytope = build_polytope(chargers, sessions, start, end)
+        flex_polytope = envelopes(polytope)
+        flex_polytope["schedule_feasible"] = contains(polytope, load_profile)
+        flex_polytope["model"] = "one-way"
     return dict(x=list(range(len(timestamps))), timestamps=[timestamp.isoformat() for timestamp in timestamps],
                 past_steps=past_steps, y=list(load_profile), up_flex=list(up_flex), down_flex=list(down_flex),
                 flex_polytope=flex_polytope, source=metadata)

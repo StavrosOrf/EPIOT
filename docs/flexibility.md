@@ -59,8 +59,77 @@ absorb the distance up to the upper edge and shed the distance down to the lower
 ```
 
 The per-step bounds are individually attainable. Using flexibility in one step changes what is left
-to charge later, which the cumulative band captures. Vehicle-to-grid, state of charge limits and
-network constraints are not modelled.
+to charge later, which the cumulative band captures. Under *Min. Cost with V2G* the envelope is the
+bidirectional one below. Network constraints are not modelled.
+
+### Vehicle-to-grid
+
+The envelope above assumes one-way charging, $x_{i,t} \ge 0$, and limits only the total energy. Under
+*Min. Cost with V2G* a vehicle can also discharge, so it needs a battery limit at every step, not
+only at departure. Its envelope is therefore computed with the model below (`backend/flex_v2g.py`;
+`flex_polytope.model` is `bidirectional`).
+
+**Model.** Let $S_{i,t} = \sum_{s \le t} x_{i,s}$ be the energy a connection has taken since arrival.
+With $c_{i,t}$ and $d_{i,t}$ the energy the plug can charge and discharge in step $t$ while
+connected, $D$ the discharge depth (10 kWh) and $E_i$ the energy it leaves with:
+
+$$
+-d_{i,t} \le x_{i,t} \le c_{i,t}, \qquad -D \le S_{i,t} \le E_i, \qquad S_{i,\text{departure}} = E_i .
+$$
+
+These are the limits the V2G strategy gives ReFlex.
+
+**Aggregation stays exact.** Mukhi, Loho & Abate (2025, Lemma 1 and §II-D) show that a lossless device
+with per-step power bounds of either sign and state-of-charge bounds at every step is still a
+generalised polymatroid. The fleet's set is therefore again the sum of the connections' sets: every
+bound of the area is the sum of the connections' bounds. This symmetry fails once charging losses
+are modelled (their Remark 3), so it would then need inner approximations such as homothets or
+virtual batteries (Nazir et al., 2018). The EPIOT and ReFlex models are lossless.
+
+**Computation.** The general bound functions follow a recursion (their Corollary 1). EPIOT only needs
+them on time intervals, where they have a closed form. The constraints are differences between
+neighbouring $S_t$, so one forward and one backward pass give the exact range
+$[L_{i,t}, H_{i,t}]$ of every $S_{i,t}$:
+
+$$
+H_t = \min\big(E_i,\; H_{t-1} + c_t,\; H_{t+1} + d_{t+1}\big), \qquad
+L_t = \max\big(-D,\; L_{t-1} - d_t,\; L_{t+1} - c_{t+1}\big),
+$$
+
+where the forward terms are applied first and the backward terms second. The most and least energy
+over steps $j{+}1 \dots k$ is then
+
+$$
+\max x_i(j,k] = \min\Big(\textstyle\sum_{t=j+1}^{k} c_{i,t},\; H_{i,k} - L_{i,j}\Big), \qquad
+\min x_i(j,k] = \max\Big(-\textstyle\sum_{t=j+1}^{k} d_{i,t},\; L_{i,k} - H_{i,j}\Big),
+$$
+
+the shortest paths of the difference-constraint graph. Summed over connections, single steps give the
+power band, whose lower edge is negative where vehicles can return energy. Intervals from the window
+start give the cumulative band, and the last step gives the totals. A connection crossing the window
+edge is modelled over its whole stay, and the window takes $S_k - S_{\text{window start}}$, so no edge
+correction is needed. The cost is $O(N \cdot T)$ in the number of connections and steps per stay.
+
+The step, prefix and interior-interval bounds are checked against linear programming at an absolute
+tolerance of $10^{-7}$ kWh, including connections crossing the window edges. Without discharge
+($d = 0$, $D = 0$) they reduce to the one-way envelope. These checks are in
+`tests/test_flex_v2g.py`.
+
+**In the response.** `schedule_feasible` is checked on every step, prefix and suffix, as for one-way
+charging. This is a necessary envelope check; passing it does not prove that the complete aggregate
+profile can be assigned to individual vehicles. The V2G headroom signals are the distance from the schedule to this band,
+$f^{\uparrow}_t = \overline{p}_t - p^{\text{sel}}_t$ and $f^{\downarrow}_t = \underline{p}_t - p^{\text{sel}}_t$,
+so they respect the battery limits as well as the plug.
+
+**Limits.** The model is lossless. The state of charge is relative to arrival, because battery size and
+arrival charge are unknown. Every vehicle is assumed bidirectional, and no network is modelled.
+
+References: K. Mukhi, G. Loho, A. Abate, *Exact Characterization of Aggregate Flexibility via
+Generalized Polymatroids*, IEEE Trans. Smart Grid (2026), [arXiv:2503.23458](https://arxiv.org/abs/2503.23458);
+K. Mukhi, A. Abate, *Polymatroidal Representations of Aggregate EV Flexibility Considering Network
+Constraints*, [arXiv:2509.16134](https://arxiv.org/abs/2509.16134) (limits itself to one-way charging
+because the bidirectional bound functions are more complex); M. S. Nazir, I. Hiskens, A. Bernstein,
+E. Dall'Anese, *Inner Approximation of Minkowski Sums*, [arXiv:1810.01587](https://arxiv.org/abs/1810.01587).
 
 ## Headroom signals
 
@@ -89,8 +158,8 @@ The headroom signals of the same session under three strategies.
 ```
 
 For *Min. Charging Cost*, upward flexibility is rated power while plugged in minus the scheduled
-load, and downward flexibility is the negative of the scheduled load. For *Min. Cost with V2G*,
-downward flexibility also includes the discharge power while plugged in.
+load, and downward flexibility is the negative of the scheduled load. For *Min. Cost with V2G*, both
+are the distance to the bidirectional envelope (see Vehicle-to-grid above).
 
 These signals are indicative differences between feasible schedules. They ignore the energy
 consequences of using them and are not a firm capacity commitment.
@@ -105,6 +174,7 @@ The fields are part of the `/stations/aggregate_load` response ({doc}`load-profi
 | `flex_polytope.power_min_kw`, `power_max_kw` | kW | Least and most power in each step |
 | `flex_polytope.cumulative_min_kwh`, `cumulative_max_kwh` | kWh | Least and most energy delivered by each step |
 | `flex_polytope.total_min_kwh`, `total_max_kwh` | kWh | Energy range inside the window |
-| `flex_polytope.schedule_feasible` | – | The selected schedule lies inside the envelope |
+| `flex_polytope.schedule_feasible` | – | The selected schedule passes the step, prefix and suffix envelope checks (necessary for feasibility) |
+| `flex_polytope.model` | – | `one-way`, or `bidirectional` under *Min. Cost with V2G* |
 
 The Excel **Load Data** sheet contains the headroom signals; the envelope is not exported.

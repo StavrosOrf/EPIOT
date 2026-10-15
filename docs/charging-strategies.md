@@ -92,7 +92,8 @@ their difference is the basis of the headroom signals in {doc}`flexibility`.
 **Vehicle-to-grid assumptions.** Every connected vehicle is bidirectional at the plug's power. It
 may be discharged by up to $D$ = 10 kWh below its arrival charge (`FLASK_REFLEX_V2G_DEPTH_KWH`) and
 leaves with the same energy $E$ as under the other strategies. Negative load is energy returned to
-the grid; the flexibility polytope describes one-way charging, so `schedule_feasible` is `null`.
+the grid. Its flexibility envelope is bidirectional and respects the same battery limits
+({doc}`flexibility`).
 
 **Plan store.** Without network constraints ReFlex optimises every charger independently, so the
 plan of a connection depends only on its arrival, departure, energy and plug power, the strategy and

@@ -255,7 +255,11 @@ def test_cost_strategies_answer_at_once_and_reflex_replaces_the_plans_later(scen
         assert source["optimisation"]["engine"] == "DRIVE2X ReFlex" and "scheduling_note" in source
         # Nothing waited for ReFlex: the exact local optimum stands in for its plans
         assert source["optimisation"]["reflex_pending"] > 0
-    assert first["v2g"]["flex_polytope"]["schedule_feasible"] is None
+    # V2G has its own bidirectional envelope, which its schedule lies in and which reaches below zero
+    v2g_envelope = first["v2g"]["flex_polytope"]
+    assert v2g_envelope["model"] == "bidirectional" and v2g_envelope["schedule_feasible"] is True
+    assert min(v2g_envelope["power_min_kw"]) < 0 and first["ocost"]["flex_polytope"]["model"] == "one-way"
+    assert all(up >= 0 >= down for up, down in zip(first["v2g"]["up_flex"], first["v2g"]["down_flex"]))
     assert optimiser.wait_idle(timeout=30)
     for strategy, profile in first.items():
         again = client.post("/stations/aggregate_load", json={**query, "strategy": strategy}).get_json()
