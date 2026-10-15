@@ -588,6 +588,27 @@ def architecture():
     save(fig, "architecture.svg")
 
 
+def report_workbook():
+    fig, ax = plt.subplots(figsize=(12.6, 3.7))
+    ax.set_xlim(0, 12.6)
+    ax.set_ylim(1.3, 4.9)
+    ax.axis("off")
+    table_box(ax, 0.1, 4.7, "Load Data   (one row per area and step)",
+              [("Area Name", ""), ("Timestamp (UTC)", ""), ("EV Load (kW)", ""), ("Upward Flexibility (kW)", ""),
+               ("Downward Flexibility (kW)", ""), ("Session source", ""), ("Demand assumption", ""),
+               ("Synthetic", ""), ("Charging strategy", "")], 4.1, BLUE)
+    table_box(ax, 4.5, 4.7, "Charger IDs", [("Area Name", ""), ("Charger IDs", "")], 3.0, GREEN)
+    table_box(ax, 7.9, 4.7, "<Area>_KPIs   (one sheet per area)",
+              [("Session source, demand, range, time zone", ""), ("Environmental method and strategy table", ""),
+               ("arrival_dist_wd, arrival_dist_we, ...", ""), ("... one row per distribution", ""),
+               ("sessions_per_day_0 ... sessions_per_day_6", ""), ("Charger | Occupancy | Utilisation | ...", ""),
+               ("Headline figures", "")], 4.6, ORANGE)
+    ax.text(4.5, 2.9, "Exported from the Load profiles or Flexibility tab:\nLoad Data and Charger IDs.\n\n"
+            "Exported from the KPIs tab:\nCharger IDs and one KPI sheet per area.", fontsize=8.8, color=MUTED, va="top")
+    fig.tight_layout()
+    save(fig, "report-workbook.svg")
+
+
 def main():
     single_session()
     priors()
@@ -595,6 +616,7 @@ def main():
     idle_time()
     er_diagram()
     architecture()
+    report_workbook()
     chargers = district_chargers()
     if not chargers:
         print("instance/default.sqlite not found: district figures skipped")
