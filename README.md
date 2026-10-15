@@ -1,172 +1,182 @@
-## EPIOT - Drive2X WP5
-This is the development repository of the [Drive2X](https://drive2x.eu/) working package 5. The purpose of the tool to be developed is 
-the following:
+<p align="center">
+  <a href="https://drive2x.eu/"><img src="docs/_static/logos/drive2x.png" alt="DRIVE2X" height="64"></a>
+</p>
 
-- provide short-term load forecasting for charge point operators and grid operators
+<h1 align="center">EPIOT</h1>
+<p align="center"><strong>Electromobility Prediction Tool</strong><br>
+Quantify EV charging load and flexibility for any area on the map.</p>
 
-The tool is supposed to be easily accessible and to provide a range of interfaces for researchers and developpers.
+<p align="center">
+  <a href="https://github.com/StavrosOrf/EPIOT/actions/workflows/ci.yml"><img src="https://github.com/StavrosOrf/EPIOT/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://epiot.readthedocs.io/"><img src="https://readthedocs.org/projects/epiot/badge/?version=latest" alt="Documentation"></a>
+  <img src="https://img.shields.io/badge/python-3.11%E2%80%933.13-blue" alt="Python 3.11 to 3.13">
+  <img src="https://img.shields.io/badge/licence-BSD--3--Clause-green" alt="BSD-3-Clause licence">
+</p>
 
-- Source code: https://github.com/StavrosOrf/EPIOT
-- Documentation: https://epiot.readthedocs.io/
-- Project website: https://drive2x.eu/
+EPIOT is a web application and REST API for estimating how electric-vehicle charging loads behave
+in a neighbourhood, a district or a whole city. Draw up to three areas on the map, choose a date, a
+session source and a charging strategy, and compare **load profiles**, **flexibility envelopes** and
+**KPIs** side by side. Results export to Excel.
 
-EPIOT is developed by DLR and TU Delft together with TNO, Labelec and the University of Salford.
-It is funded by the European Union (Horizon Europe, Grant Agreement No. 101056934) and UK Research
-and Innovation (UKRI).
+It was developed in [DRIVE2X](https://drive2x.eu/) Work Package 5 for charge point operators, grid
+operators, city and mobility planners, and researchers.
 
+<p align="center">
+  <img src="docs/_static/screenshots/panel-load-profiles.jpg" alt="The EPIOT analysis panel with the load profiles of three areas over central Amsterdam" width="860">
+</p>
 
-## Environment setup
+> **Scope.** EPIOT receives no live charging data. Every result is a synthetic scenario built from
+> public arrival, duration and energy priors, with assumed demand levels. Results are not verified
+> forecasts of local charging.
 
-The project is managed with [uv](https://docs.astral.sh/uv/); `pyproject.toml`
-and `uv.lock` are the source of truth, and `requirements.txt` is kept only for
-the legacy conda instructions below.
+## Features
 
-```
+- **Map of about 590,000 charging points** in the Netherlands, Germany, France, Switzerland, Finland
+  and seven further cities, with distribution transformers and a spatial atlas for Amsterdam.
+- **Three session sources:** *Simple* (public priors), *Spatial* (neighbourhood-aware) and *CPFT*
+  (an offline library built from trained models), each at low, base or high demand with calendar,
+  holiday and weather day effects.
+- **Five charging strategies:** As Fast As Possible, As Late As Possible, Average Power,
+  Min. Carbon Footprint and Min. Charging Cost.
+- **Flexibility:** the feasible power and energy envelope with upward and downward headroom.
+- **Five KPI dashboards:** User, Grid, Environment, Mobility and City.
+- **Reports and API:** an Excel workbook with chart images, and a documented REST API for the same
+  analyses.
+
+## Quick start
+
+You need Python 3.11 – 3.13, [uv](https://docs.astral.sh/uv/) and the SpatiaLite SQLite extension.
+
+```bash
+git clone https://github.com/StavrosOrf/EPIOT.git
+cd EPIOT
 uv sync
-```
-
-That creates `.venv` from the lockfile. Run everything through `uv run`, which
-uses that environment without needing to activate it:
-
-```
-uv run python app.py
-uv run pytest
-```
-
-The load-forecasting models in `backend/ml` need PyTorch, which the Flask app
-does not. They live behind an optional extra:
-
-```
-uv sync --extra ml
-```
-
-### OneDrive checkouts
-
-This repository is often cloned inside a OneDrive-synced folder. OneDrive locks
-files while it uploads them, which makes `uv sync` fail part-way through with
-`os error 396` or `os error 32`. Two things avoid that:
-
-- `link-mode = "copy"` is set in `pyproject.toml`, because OneDrive rejects the
-  hardlinks uv normally uses.
-- Keep the virtualenv outside the synced tree. Create the real directory
-  elsewhere and point `.venv` at it with a junction, which OneDrive does not
-  follow:
-
-  ```
-  mkdir %USERPROFILE%\.venvs\EPIOT_v2
-  mklink /J .venv %USERPROFILE%\.venvs\EPIOT_v2
-  ```
-
-  Run that before the first `uv sync`. Everything else, `uv run` included,
-  keeps working through the junction.
-
-## Setting up the database
-
-### SpatiaLite
-
-The app stores geometry in SQLite and needs the `mod_spatialite` extension.
-GeoAlchemy2 finds it through `SPATIALITE_LIBRARY_PATH`; `backend/spatialite.py`
-sets that automatically, and an existing value is always respected if you want
-to point at a system copy instead.
-
-On Windows there is no system package, so fetch the official prebuilt bundle
-into `./.spatialite` once:
-
-```
-uv run python scripts/install_spatialite.py
-```
-
-On Ubuntu:
-
-```
-sudo apt-get install libsqlite3-mod-spatialite
-```
-
-On macOS:
-
-```
-brew install libspatialite
-```
-
-### Data and migrations
-
-The GitHub-ready snapshots in **./seed_data** contain the required data in one
-compressed JSON file per country, plus a small shared file and a checksum manifest.
-No raw supplier downloads, large GeoPackages, existing SQLite database or API
-credentials are needed. After installing SpatiaLite, initialize a fresh checkout:
-
-```
-uv run python database_init.py
+uv run python scripts/install_spatialite.py   # Windows only; see below for Linux and macOS
+uv run python database_init.py                # builds instance/default.sqlite offline
 uv run python app.py
 ```
 
-The initializer applies all migrations, restores stable charger IDs, powers,
-Amsterdam sessions, transformers/grid links and historical electricity data,
-and rebuilds SpatiaLite geometry/indexes. The spatial atlas and session priors
-are plain files in `seed_data/` and are read from there directly. Runtime caches are regenerated on demand. It refuses to overwrite an
-existing database. To install only selected countries:
+Open <http://127.0.0.1:5000>.
 
-```
-uv run python database_init.py --countries NL DE FR
-```
+SpatiaLite on Linux or macOS:
 
-Details, coverage and snapshot sizes are in [seed_data/README.md](seed_data/README.md).
-For an existing server, apply new migrations with `uv run flask --app app db upgrade`.
-To apply the verified Anglet location correction without changing any charger IDs:
-
-```
-uv run python scripts/repair_charger_positions.py
+```bash
+sudo apt-get install libsqlite3-mod-spatialite   # Ubuntu
+brew install libspatialite                       # macOS
 ```
 
-To refresh chargers from their original suppliers, download the open data into
-`./instance/chargers` and import it (optional; initialization needs no downloads):
+`database_init.py` needs no downloads or API keys. It restores the snapshots in
+[`seed_data/`](seed_data/README.md) and refuses to overwrite an existing database. Use
+`--countries NL DE FR` to load only some countries. Do not run `flask db upgrade` before it; for an
+existing server, `uv run flask --app app db upgrade` applies new migrations.
 
-```
-uv run python scripts/update_charger_data.py
-uv run python scripts/export_country_data.py
-```
+<details>
+<summary>Optional components</summary>
 
-Sources and licences are listed in
-[docs/getting-started.md](docs/getting-started.md#data-coverage).
+- **CPFT session source.** It reads the prebuilt `backend/data/cpft_library.npz`, so the standard
+  install already supports it. Rebuilding the library needs TensorFlow: `uv sync --extra cpft`.
+- **Load-forecasting models** in `backend/ml` need PyTorch: `uv sync --extra ml`.
+- **Min. Charging Cost** calls the DRIVE2X ReFlex service, which is reachable only from the project
+  network. The other four strategies run entirely locally.
+- **Charger data refresh** from the original suppliers is optional:
+  `uv run python scripts/update_charger_data.py` and
+  `uv run python scripts/export_country_data.py`.
 
-The standard install supports the simple, spatial and CPFT session sources. CPFT reads
-a prebuilt library, `backend/data/cpft_library.npz`; `uv sync --extra cpft` (TensorFlow)
-is needed only to rebuild it. The remote ReFlex service, used by the Min. Charging Cost
-strategy, requires project network access.
+</details>
 
-## Running the app
+<details>
+<summary>Windows and OneDrive checkouts</summary>
 
-```
-uv run python app.py
-```
+OneDrive locks files while it uploads them, which makes `uv sync` fail part-way through with
+`os error 396` or `os error 32`. `link-mode = "copy"` is already set in `pyproject.toml`, and the
+virtual environment should live outside the synced tree, linked in with a junction. Run this
+before the first `uv sync`:
 
-The app serves on http://127.0.0.1:5000.
-
-Note that the `ocost` (cost-optimal) charging strategy calls the ReFlex service
-at `drive2x-reflex.hesi.energy`, which is only reachable from the project
-network. The other strategies (`afap`, `alap`, `avg`) run entirely locally.
-
-## Legacy conda setup
-
-The project previously used conda. These instructions are kept for reference;
-prefer `uv sync` above.
-
-```
-conda create -n epiot python=3.11
-conda activate epiot
-conda install libspatialite -c conda-forge
-pip install -r requirements.txt
+```bat
+mkdir %USERPROFILE%\.venvs\EPIOT
+mklink /J .venv %USERPROFILE%\.venvs\EPIOT
 ```
 
-If you have trouble installing libspatialite, see
-https://docs.djangoproject.com/en/5.1/ref/contrib/gis/install/spatialite/
+</details>
 
-The current development team consists of:
+## Documentation
 
-- [Stavros Orfanoudakis](https://www.stavrosorfanoudakis.com/) (TU Delft, lead developper)
-- Babak Ravanbach (DLR, product owner)
+Full documentation is at **<https://epiot.readthedocs.io/>**.
 
-Past developpers:
-- Arellano Ruiz, Eugenio Salvador (DLR, developper)
-- Elif Turhan (DLR, developper)
-- Niklas Wulff (DLR, developper)
+| Guide | Reference |
+|---|---|
+| [Getting started](docs/getting-started.md) | [REST API](docs/rest-api.md) |
+| [Map and areas](docs/map-and-areas.md) | [Data schema](docs/data-schema.md) |
+| [Session sources](docs/session-sources.md) | [Architecture](docs/architecture.md) |
+| [Charging strategies](docs/charging-strategies.md) | [Operations](docs/operations.md) |
+| [Load profiles](docs/load-profiles.md), [Flexibility](docs/flexibility.md), [KPIs](docs/kpis.md) | [Building the docs](docs/README.md) |
+
+## Development
+
+```bash
+uv run pytest -q            # Python tests
+node --test tests/*.mjs     # browser module tests
+```
+
+The test layout is described in [`tests/README.md`](tests/README.md) and CI runs both suites on every
+push and pull request. The server code lives in [`backend/`](backend/README.md), the browser modules
+in [`static/scripts/`](static/scripts) and the page template in [`templates/`](templates).
+
+Contributions are welcome. Open an issue to discuss larger changes first, and update the matching
+documentation page in the same pull request as a change to a control, parameter or response field.
+
+## Data and licences
+
+Charger locations come from open national and municipal sources, including NDW, the
+Bundesnetzagentur, BFE, data.gouv.fr and Fintraffic. Sources, licences and attribution are listed in
+[`seed_data/manifest.json`](seed_data/manifest.json) and under *Data coverage* in
+[Getting started](docs/getting-started.md#data-coverage). Check them before redistributing data.
+
+## Citing EPIOT
+
+> Ravanbach, B., Turhan, E., Wulff, N., Orfanoudakis, S., Vergara, P. P., Vahidinasab, V., Dias, L.,
+> & Mendes, G. (2024). *A dynamic prediction tool for vehicle-to-grid operation and planning.* In
+> *2024 IEEE 22nd Mediterranean Electrotechnical Conference (MELECON)*.
+
+## Team
+
+- [Stavros Orfanoudakis](https://www.stavrosorfanoudakis.com/), TU Delft, lead developer
+  (<s.orfanoudakis@tudelft.nl>)
+- Babak Ravanbach, DLR, product owner (<babak.ravanbach@dlr.de>)
+
+Past developers: Eugenio Salvador Arellano Ruiz, Elif Turhan and Niklas Wulff (DLR).
+
+EPIOT is developed in DRIVE2X Work Package 5 by DLR and TU Delft together with TNO, Labelec and the
+University of Salford.
+
+## Acknowledgements
+
+<p>
+  <a href="https://drive2x.eu/"><img src="docs/_static/logos/drive2x.png" alt="DRIVE2X" height="48"></a>
+  &nbsp;&nbsp;
+  <a href="https://european-union.europa.eu/"><img src="docs/_static/logos/eu.png" alt="Co-funded by the European Union" height="48"></a>
+  &nbsp;&nbsp;
+  <a href="https://www.ukri.org/"><img src="docs/_static/logos/ukri.png" alt="UK Research and Innovation" height="48"></a>
+</p>
+
+<p>
+  <a href="https://www.dlr.de/en"><img src="docs/_static/logos/dlr.svg" alt="DLR" height="36"></a>
+  &nbsp;&nbsp;
+  <a href="https://www.tudelft.nl/en"><img src="docs/_static/logos/tudelft.svg" alt="TU Delft" height="36"></a>
+  &nbsp;&nbsp;
+  <a href="https://www.tno.nl/en"><img src="docs/_static/logos/tno.svg" alt="TNO" height="26"></a>
+  &nbsp;&nbsp;
+  <a href="https://edp.com/en/innovation/labelec"><img src="docs/_static/logos/edp.svg" alt="EDP, Labelec" height="36"></a>
+  &nbsp;&nbsp;
+  <a href="https://www.salford.ac.uk/"><img src="docs/_static/logos/salford.png" alt="University of Salford" height="36"></a>
+</p>
+
+[DRIVE2X](https://drive2x.eu/) has received funding from the European Union's Horizon Europe
+research and innovation programme under Grant Agreement No. 101056934. The UK participants are
+funded by UK Research and Innovation (UKRI). Views and opinions expressed are those of the author(s)
+only and do not necessarily reflect those of the European Union or the granting authority. Neither
+the European Union nor the granting authority can be held responsible for them.
+
+## Licence
+
+EPIOT is released under the BSD-3-Clause licence.

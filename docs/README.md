@@ -42,8 +42,8 @@ project on Read the Docs.
 
 The partner and funder strip above every page footer comes from `_templates/page.html`, the DRIVE2X
 badge under the sidebar brand from `_templates/sidebar/drive2x.html`, and the logo files from
-`_static/logos`. Labelec appears as a text wordmark; drop a `labelec.svg` or `labelec.png` there and
-swap it into `page.html` to use its official logo.
+`_static/logos`. The app's About window uses copies in `static/images/partners`, so replace a logo
+in both places.
 
 ## Regenerating figures and screenshots
 

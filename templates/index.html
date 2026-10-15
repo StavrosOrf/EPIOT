@@ -42,7 +42,7 @@
   </head>
 
   <body>
-    <!-- Landing / Intro Overlay -->
+    <!-- About / intro overlay -->
     <div id="landing-overlay" class="landing-overlay" aria-hidden="false">
       <div class="landing-backdrop"></div>
 
@@ -57,91 +57,91 @@
         </button>
 
         <header class="landing-header">
-          <div class="brand-lockup">
-            <h1 id="landing-title">EPIOT: Electromobility Prediction Tool</h1>
+          <span class="landing-mark" aria-hidden="true"
+            ><i class="fa fa-bolt"></i
+          ></span>
+          <div class="landing-heading">
+            <h1 id="landing-title">EPIOT</h1>
             <p class="subtitle">
-              Quantifying EV demand and flexibility for grid-aware decisions
+              Electromobility Prediction Tool &middot; quantifying EV demand and
+              flexibility for grid-aware decisions
             </p>
           </div>
-
-          <div class="landing-icons">
-            <a
-              href="https://drive2x.eu/"
-              target="_blank"
-              rel="noopener"
-              class="icon-link"
-              title="DRIVE2X project"
-              aria-label="DRIVE2X project"
-            >
-              <i class="fa fa-external-link" aria-hidden="true"></i>
-            </a>
+          <nav class="landing-icons" aria-label="Project links">
             <a
               href="https://epiot.readthedocs.io/"
               target="_blank"
               rel="noopener"
               class="icon-link"
-              title="Documentation"
-              aria-label="Documentation"
               ><i class="fa fa-book" aria-hidden="true"></i
-            ></a>
+              ><span>Docs</span></a
+            >
             <a
               href="https://github.com/StavrosOrf/EPIOT"
               target="_blank"
               rel="noopener"
               class="icon-link"
-              title="Source code"
-              aria-label="Source code"
               ><i class="fa fa-github" aria-hidden="true"></i
-            ></a>
-          </div>
+              ><span>GitHub</span></a
+            >
+            <a
+              href="https://drive2x.eu/"
+              target="_blank"
+              rel="noopener"
+              class="icon-link"
+              ><i class="fa fa-external-link" aria-hidden="true"></i
+              ><span>DRIVE2X</span></a
+            >
+          </nav>
         </header>
 
         <div class="landing-content">
           <div class="landing-left">
-            <h2>What is this?</h2>
-            <p>
-              EPIOT helps you explore <strong>EV charging load</strong> and
-              <strong>flexibility</strong> across custom areas. Draw regions on
-              the map, pick a date, choose a strategy, and analyse profiles,
-              KPIs and reports.
+            <p class="lead">
+              Draw up to three areas on the map, pick a date, a session source
+              and a charging strategy, and compare
+              <strong>EV charging load</strong>, <strong>flexibility</strong>
+              and <strong>KPIs</strong> side by side.
             </p>
 
-            <h2>Main functions</h2>
-            <ul class="bullets">
+            <ul class="feature-grid">
               <li>
-                <i class="fa fa-pencil-square-o" aria-hidden="true"></i> Select
-                up to <strong>3 custom areas</strong> (draw on the map)
+                <i class="fa fa-pencil-square-o" aria-hidden="true"></i>
+                <div><strong>Custom areas</strong><span>Up to 3, drawn on the map</span></div>
               </li>
               <li>
-                <i class="fa fa-line-chart" aria-hidden="true"></i> Predict
-                <strong>EV load</strong>
+                <i class="fa fa-line-chart" aria-hidden="true"></i>
+                <div><strong>Load profiles</strong><span>Charging power over two days</span></div>
               </li>
               <li>
-                <i class="fa fa-sliders" aria-hidden="true"></i> Quantify
-                <strong>up/down flexibility</strong> and compare scenarios
+                <i class="fa fa-sliders" aria-hidden="true"></i>
+                <div><strong>Flexibility</strong><span>Up and down headroom</span></div>
               </li>
               <li>
-                <i class="fa fa-bar-chart" aria-hidden="true"></i> Explore
-                <strong>KPI dashboards</strong> (user, grid, mobility, city,
-                environment)
+                <i class="fa fa-bar-chart" aria-hidden="true"></i>
+                <div><strong>KPI dashboards</strong><span>User, grid, mobility, city, environment</span></div>
+              </li>
+              <li>
+                <i class="fa fa-bolt" aria-hidden="true"></i>
+                <div><strong>Strategies</strong><span>Five rules, three session sources</span></div>
               </li>
               <li>
                 <i class="fa fa-download" aria-hidden="true"></i>
-                <strong>Export reports (.xlsx)</strong> for analysis &amp; sharing
-              </li>
-              <li>
-                <i class="fa fa-map-marker" aria-hidden="true"></i> Inspect
-                <strong>chargers</strong> &amp; <strong>transformers</strong> on
-                the map
+                <div><strong>Reports</strong><span>Excel export and REST API</span></div>
               </li>
             </ul>
 
-            <h2>Who is it for?</h2>
-            <div class="chips">
-              <span class="chip">Charging Operators (CPOs)</span>
-              <span class="chip">DSOs / City Energy Teams</span>
-              <span class="chip">Urban Mobility Planners</span>
-              <span class="chip">Researchers &amp; Students</span>
+            <p class="scope-note">
+              <i class="fa fa-info-circle" aria-hidden="true"></i>
+              Results are synthetic scenarios with assumed demand, not verified
+              forecasts of local charging.
+            </p>
+
+            <div class="chips" aria-label="Who is it for">
+              <span class="chip">Charging operators</span>
+              <span class="chip">DSOs &amp; city energy teams</span>
+              <span class="chip">Mobility planners</span>
+              <span class="chip">Researchers</span>
               <span class="chip">Policymakers</span>
             </div>
           </div>
@@ -149,62 +149,42 @@
           <div class="landing-right">
             <h2>How to use</h2>
             <ol class="steps">
-              <li>
-                <strong>Pan/zoom</strong> the map and <strong>draw</strong> up
-                to three areas.
-              </li>
-              <li>Click <strong>Analyse</strong>.</li>
-              <li>
-                Pick a <strong>date</strong> and
-                <strong>charging strategy</strong>.
-              </li>
-              <li>
-                Switch between <em>Load Profiles</em>, <em>Flexibility</em>, and
-                <em>KPIs</em>, then <strong>download</strong> the report.
-              </li>
+              <li><span><strong>Pan/zoom</strong> the map and <strong>draw</strong> up to three areas.</span></li>
+              <li><span>Click <strong>Analyse</strong>.</span></li>
+              <li><span>Pick a <strong>date</strong>, <strong>session source</strong> and <strong>charging strategy</strong>.</span></li>
+              <li><span>Switch between <em>Load profiles</em>, <em>Flexibility</em> and <em>KPIs</em>, then <strong>download</strong> the report.</span></li>
             </ol>
 
             <h2>Get in touch</h2>
-            <p>
-              For more information about the
-              <strong>ongoing research</strong> and the
-              <strong>prototype tool</strong>, please contact
-              <a
-                href="https://www.stavrosorfanoudakis.com/"
-                target="_blank"
-                rel="noopener"
-                >Stavros Orfanoudakis</a
-              >
-              (<a href="mailto:s.orfanoudakis@tudelft.nl">s.orfanoudakis@tudelft.nl</a>)
-              and
-              <a
-                href="https://www.linkedin.com/in/babakpr/?originalSubdomain=de"
-                target="_blank"
-                rel="noopener"
-                >Babak Ravanbach</a
-              >
-              (<a href="mailto:babak.ravanbach@dlr.de">babak.ravanbach@dlr.de</a>).
-            </p>
-
-            <div class="related-works">
-              <h2>Related works</h2>
-              <ul class="related-list">
-                <li class="apa">
-                  Ravanbach, B., Turhan, E., Wulff, N., Orfanoudakis, S.,
-                  Vergara, P. P., Vahidinasab, V., Dias, L., &amp; Mendes, G.
-                  (2024).
-                  <em
-                    >A dynamic prediction tool for vehicle-to-grid operation and
-                    planning.</em
-                  >
-                  In
-                  <em
-                    >2024 IEEE 22nd Mediterranean Electrotechnical Conference
-                    (MELECON)</em
-                  >.
-                </li>
-              </ul>
+            <div class="contacts">
+              <div class="contact">
+                <a
+                  href="https://www.stavrosorfanoudakis.com/"
+                  target="_blank"
+                  rel="noopener"
+                  >Stavros Orfanoudakis</a
+                >
+                <span>TU Delft &middot; lead developer</span>
+                <a class="mail" href="mailto:s.orfanoudakis@tudelft.nl">s.orfanoudakis@tudelft.nl</a>
+              </div>
+              <div class="contact">
+                <a
+                  href="https://www.linkedin.com/in/babakpr/?originalSubdomain=de"
+                  target="_blank"
+                  rel="noopener"
+                  >Babak Ravanbach</a
+                >
+                <span>DLR &middot; product owner</span>
+                <a class="mail" href="mailto:babak.ravanbach@dlr.de">babak.ravanbach@dlr.de</a>
+              </div>
             </div>
+
+            <p class="cite">
+              <strong>Cite:</strong> Ravanbach, B., Turhan, E., Wulff, N.,
+              Orfanoudakis, S., et al. (2024).
+              <em>A dynamic prediction tool for vehicle-to-grid operation and
+              planning.</em> IEEE MELECON.
+            </p>
 
             <div class="cta-row">
               <label class="remember">
@@ -217,11 +197,75 @@
             </div>
           </div>
         </div>
-      </section>
 
-      <div class="float float-1"></div>
-      <div class="float float-2"></div>
-      <div class="float float-3"></div>
+        <footer class="landing-footer" aria-label="Project partners and funding">
+          <div class="landing-footer__panel">
+            <div class="landing-footer__group">
+              <a
+                class="landing-footer__lead"
+                href="https://drive2x.eu/"
+                target="_blank"
+                rel="noopener"
+                title="DRIVE2X project"
+                ><img
+                  src="{{ url_for('static', filename='images/drive2X_LOGO.png') }}"
+                  alt="DRIVE2X"
+              /></a>
+              <span class="landing-footer__label">WP5 by</span>
+              <ul class="landing-footer__logos">
+                <li>
+                  <a href="https://www.dlr.de/en" target="_blank" rel="noopener" title="DLR, German Aerospace Center"
+                    ><img src="{{ url_for('static', filename='images/partners/dlr.svg') }}" alt="DLR, German Aerospace Center"
+                  /></a>
+                </li>
+                <li>
+                  <a href="https://www.tudelft.nl/en" target="_blank" rel="noopener" title="TU Delft"
+                    ><img src="{{ url_for('static', filename='images/partners/tudelft.svg') }}" alt="TU Delft"
+                  /></a>
+                </li>
+                <li>
+                  <a href="https://www.tno.nl/en" target="_blank" rel="noopener" title="TNO"
+                    ><img class="landing-footer__tno" src="{{ url_for('static', filename='images/partners/tno.svg') }}" alt="TNO"
+                  /></a>
+                </li>
+                <li>
+                  <a href="https://edp.com/en/innovation/labelec" target="_blank" rel="noopener" title="EDP Labelec"
+                    ><img class="landing-footer__edp" src="{{ url_for('static', filename='images/partners/edp.svg') }}" alt="EDP, Labelec"
+                  /></a>
+                </li>
+                <li>
+                  <a href="https://www.salford.ac.uk/" target="_blank" rel="noopener" title="University of Salford"
+                    ><img src="{{ url_for('static', filename='images/partners/salford.png') }}" alt="University of Salford"
+                  /></a>
+                </li>
+              </ul>
+            </div>
+            <div class="landing-footer__group landing-footer__funders">
+              <span class="landing-footer__label">Funded by</span>
+              <ul class="landing-footer__logos">
+                <li>
+                  <a href="https://european-union.europa.eu/" target="_blank" rel="noopener" title="European Union"
+                    ><img src="{{ url_for('static', filename='images/eu_logo.png') }}" alt="Co-funded by the European Union"
+                  /></a>
+                </li>
+                <li>
+                  <a href="https://www.ukri.org/" target="_blank" rel="noopener" title="UK Research and Innovation"
+                    ><img src="{{ url_for('static', filename='images/ukri_logo.png') }}" alt="UK Research and Innovation"
+                  /></a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p class="landing-footer__grant">
+            <a href="https://drive2x.eu/" target="_blank" rel="noopener">DRIVE2X</a>
+            has received funding from the European Union’s Horizon Europe
+            programme under Grant Agreement No.&nbsp;101056934; UK participants
+            are funded by UKRI. Views and opinions expressed are those of the
+            author(s) only and do not necessarily reflect those of the European
+            Union or the granting authority.
+          </p>
+        </footer>
+      </section>
     </div>
 
     <!-- Map -->

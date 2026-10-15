@@ -149,6 +149,7 @@ kbd {
 .epiot-footer__logos a { display: block; line-height: 0; }
 .epiot-footer__logos img { height: 38px; width: auto; display: block; }
 .epiot-footer__logos img.epiot-footer__tno { height: 26px; }
+.epiot-footer__logos img.epiot-footer__edp { height: 34px; }
 .epiot-footer__logos a.epiot-footer__wordmark {
   line-height: 1; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; color: #0b3d6b;
   text-decoration: none;
